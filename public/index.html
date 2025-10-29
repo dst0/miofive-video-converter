@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>MP4 Video Combiner</title>
+    <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="container">
+    <h1>MP4 Video Combiner</h1>
+    <p class="subtitle">Scan folders for timestamped videos and combine them into a single file</p>
+
+    <div id="ffmpegWarning"></div>
+
+    <div class="section">
+        <div class="section-title">1. Scan Folder</div>
+
+        <div class="input-group">
+            <label>Channels:</label>
+            <label><input type="checkbox" id="channelA" checked /> A</label>
+            <label><input type="checkbox" id="channelB" checked /> B</label>
+        </div>
+
+        <div class="input-group">
+            <label>Folder:</label>
+            <input type="text" id="folderPath" placeholder="No folder selected" />
+        </div>
+
+        <div class="pre-scan-filters">
+            <div class="filter-header">
+                <label class="filter-toggle-label">
+                    <input type="checkbox" id="enablePreScanFilters" />
+                    Enable Pre-Scan Date Range Filters
+                </label>
+                <span class="filter-help">💡 Filter files by date before scanning to improve performance</span>
+            </div>
+            <div class="filter-controls" id="preScanFilterControls" style="display: none;">
+                <div class="filter-group">
+                    <label for="preScanStartTime">Start Date/Time:</label>
+                    <input type="datetime-local" id="preScanStartTime" step="1">
+                    <button type="button" class="clear-btn" id="clearStartTime">Clear</button>
+                </div>
+                <div class="filter-group">
+                    <label for="preScanEndTime">End Date/Time:</label>
+                    <input type="datetime-local" id="preScanEndTime" step="1">
+                    <button type="button" class="clear-btn" id="clearEndTime">Clear</button>
+                </div>
+                <div class="filter-presets">
+                    <span class="preset-label">Quick Presets:</span>
+                    <button type="button" class="preset-btn" data-preset="today">Today</button>
+                    <button type="button" class="preset-btn" data-preset="yesterday">Yesterday</button>
+                    <button type="button" class="preset-btn" data-preset="last7days">Last 7 Days</button>
+                    <button type="button" class="preset-btn" data-preset="thisweek">This Week</button>
+                    <button type="button" class="preset-btn" data-preset="lastweek">Last Week</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <button id="scanBtn">Scan</button>
+        </div>
+    </div>
+
+    <div id="results"></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
