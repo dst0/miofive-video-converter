@@ -682,6 +682,9 @@ function filterFilesByTimeRange(startTime, endTime) {
     }
 
     updateSelectAllState();
+    
+    // Auto-fill filename when range changes
+    autoFillFilename();
 }
 
 function updateTimelineSelection() {
@@ -785,10 +788,7 @@ async function scanFolder() {
           </div>
           <div class="input-group">
             <label>Output File Name:</label>
-            <div class="filename-container">
-              <input type="text" id="outputFilename" placeholder="combined_output.mp4" />
-              <button type="button" id="autoFillFilenameBtn" class="secondary">Auto-Fill</button>
-            </div>
+            <input type="text" id="outputFilename" placeholder="combined_output.mp4" />
           </div>
           <div class="input-group">
             <button class="secondary" id="combineBtn" ${!ffmpegAvailable ? 'disabled' : ''}>Combine</button>
@@ -819,11 +819,15 @@ async function scanFolder() {
 
         // Add event listeners for output folder and filename
         document.getElementById('browseOutputFolderBtn').addEventListener('click', openOutputFolderBrowser);
-        document.getElementById('autoFillFilenameBtn').addEventListener('click', autoFillFilename);
         document.getElementById('outputFolder').addEventListener('input', saveOutputSettings);
         document.getElementById('outputFilename').addEventListener('input', saveOutputSettings);
 
         document.getElementById('combineBtn').addEventListener('click', combineVideos);
+        
+        // Auto-fill filename initially if folder is set
+        if (savedOutputFolder) {
+            autoFillFilename();
+        }
     } catch (err) {
         resultsDiv.innerHTML = '<div class="error">Failed to scan folder.</div>';
     }
@@ -910,14 +914,10 @@ function openOutputFolderBrowser() {
 
 // Auto-fill the filename based on selected files
 async function autoFillFilename() {
-    const outputFolder = document.getElementById('outputFolder').value.trim();
-    const statusDiv = document.getElementById('combineStatus');
+    const outputFolder = document.getElementById('outputFolder')?.value?.trim();
     
+    // Silently return if no output folder is set (auto-fill will happen when folder is selected)
     if (!outputFolder) {
-        if (statusDiv) {
-            statusDiv.innerHTML = '<div class="error">Please select an output folder first</div>';
-            setTimeout(() => { statusDiv.innerHTML = ''; }, 3000);
-        }
         return;
     }
 
@@ -929,18 +929,17 @@ async function autoFillFilename() {
     const selectedFiles = checkedFileIndexes.map(index => scannedFiles[index]);
 
     if (selectedFiles.length === 0) {
-        if (statusDiv) {
-            statusDiv.innerHTML = '<div class="error">No files selected</div>';
-            setTimeout(() => { statusDiv.innerHTML = ''; }, 3000);
-        }
         return;
     }
 
     // Generate filename based on date range and channels
     const filename = generateFilename(selectedFiles, outputFolder);
     
-    document.getElementById('outputFilename').value = filename;
-    saveOutputSettings();
+    const outputFilenameInput = document.getElementById('outputFilename');
+    if (outputFilenameInput) {
+        outputFilenameInput.value = filename;
+        saveOutputSettings();
+    }
 }
 
 // Generate filename with date range and counter

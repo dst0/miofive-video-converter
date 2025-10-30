@@ -69,6 +69,11 @@ function selectCurrentFolder() {
                 if (typeof saveOutputSettings === 'function') {
                     saveOutputSettings();
                 }
+                
+                // Auto-fill filename when output folder is selected
+                if (typeof autoFillFilename === 'function') {
+                    autoFillFilename();
+                }
             }
             window.browsingForOutput = false;
         } else {
