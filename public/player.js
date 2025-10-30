@@ -163,6 +163,11 @@ function preloadNextVideo() {
     const videoURL = `/video?path=${encodeURIComponent(nextVideoFile.path)}`;
     inactiveSource.src = videoURL;
     inactivePlayer.load();
+    
+    // Sync volume and playback rate with active player
+    const activePlayerElement = getActivePlayer();
+    inactivePlayer.volume = activePlayerElement.volume;
+    inactivePlayer.playbackRate = activePlayerElement.playbackRate;
 }
 
 // Load a video by index
@@ -264,8 +269,11 @@ function togglePlayPause() {
 
 // Change playback speed
 function changePlaybackSpeed(speed) {
-    const videoPlayer = getActivePlayer();
-    videoPlayer.playbackRate = speed;
+    const videoPlayer1 = document.getElementById('videoPlayer1');
+    const videoPlayer2 = document.getElementById('videoPlayer2');
+    // Set speed for both players to keep them synchronized
+    videoPlayer1.playbackRate = speed;
+    videoPlayer2.playbackRate = speed;
 }
 
 // Update video info display

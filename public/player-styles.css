@@ -39,6 +39,7 @@
     background: #000;
     border-radius: 8px;
     overflow: hidden;
+    min-height: 400px; /* Prevent layout shifts */
 }
 
 .video-player {
@@ -51,14 +52,16 @@
     max-height: 70vh;
     opacity: 0;
     visibility: hidden;
+    pointer-events: none;
     transition: opacity 0.3s ease, visibility 0s 0.3s;
 }
 
 .video-player.active {
-    position: relative;
     opacity: 1;
     visibility: visible;
+    pointer-events: auto;
     transition: opacity 0.3s ease, visibility 0s;
+    z-index: 1;
 }
 
 #videoPlayer1,
