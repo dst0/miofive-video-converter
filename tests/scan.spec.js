@@ -7,7 +7,7 @@ const os = require('os');
 test.describe('Scan Functionality Tests', () => {
   let testDir;
 
-  test.beforeEach(async () => {
+  test.beforeEach(async ({ page }) => {
     // Create a temporary test directory with mock video files
     testDir = path.join(os.tmpdir(), `test-videos-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
@@ -25,6 +25,9 @@ test.describe('Scan Functionality Tests', () => {
     for (const filename of mockFiles) {
       await fs.writeFile(path.join(testDir, filename), 'mock video content');
     }
+    
+    // Navigate to page - needed because tests modify channel states
+    await page.goto('/');
   });
 
   test.afterEach(async () => {
@@ -39,7 +42,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should scan folder and find video files', async ({ page }) => {
-    await page.goto('/');
     
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);
@@ -59,7 +61,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should filter by channel A only', async ({ page }) => {
-    await page.goto('/');
     
     // Uncheck channel B
     await page.locator('#channelB').uncheck();
@@ -79,7 +80,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should filter by channel B only', async ({ page }) => {
-    await page.goto('/');
     
     // Uncheck channel A
     await page.locator('#channelA').uncheck();
@@ -99,7 +99,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should display file list after scanning', async ({ page }) => {
-    await page.goto('/');
     
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);
@@ -122,7 +121,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should have all files checked by default after scan', async ({ page }) => {
-    await page.goto('/');
     
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);
@@ -143,7 +141,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should show timeline after scanning', async ({ page }) => {
-    await page.goto('/');
     
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);
@@ -162,7 +159,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should show combine section after scanning', async ({ page }) => {
-    await page.goto('/');
     
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);
@@ -173,14 +169,14 @@ test.describe('Scan Functionality Tests', () => {
     // Wait for combine section
     await page.waitForSelector('.combine-section', { timeout: 10000 });
     
-    // Check combine elements
-    await expect(page.locator('#outputPath')).toBeVisible();
+    // Check combine elements (outputFolder and outputFilename, not outputPath)
+    await expect(page.locator('#outputFolder')).toBeVisible();
+    await expect(page.locator('#outputFilename')).toBeVisible();
     await expect(page.locator('#combineBtn')).toBeVisible();
     await expect(page.locator('#combineBtn')).toHaveText('Combine');
   });
 
   test('should toggle select all checkbox', async ({ page }) => {
-    await page.goto('/');
     
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);
@@ -216,7 +212,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should handle invalid folder path', async ({ page }) => {
-    await page.goto('/');
     
     // Set an invalid folder path
     await page.locator('#folderPath').fill('/nonexistent/path/that/does/not/exist');
@@ -230,7 +225,6 @@ test.describe('Scan Functionality Tests', () => {
   });
 
   test('should persist folder path in localStorage', async ({ page }) => {
-    await page.goto('/');
     
     // Set folder path
     await page.locator('#folderPath').fill(testDir);

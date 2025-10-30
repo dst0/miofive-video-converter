@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     
     container:
-      image: jrottenberg/ffmpeg:4.4-ubuntu
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
       options: --user root
 
     strategy:
@@ -26,12 +26,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
     
-    - name: Install Node.js dependencies in container
+    - name: Install FFmpeg
       run: |
-        apt-get update
-        apt-get install -y curl
-        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-        apt-get install -y nodejs
+        apt-get update && apt-get install -y ffmpeg && apt-get clean && rm -rf /var/lib/apt/lists/*
     
     - name: Verify installations
       run: |
@@ -48,7 +45,5 @@ jobs:
           ${{ runner.os }}-node-
     
     - run: npm ci
-    - name: Install Playwright Browsers
-      run: npx playwright install --with-deps chromium
     - run: npm run build --if-present
     - run: npm test --if-present
