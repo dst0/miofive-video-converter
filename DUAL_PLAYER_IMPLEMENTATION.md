@@ -171,8 +171,9 @@ Tests now:
 
 ### Network Usage
 - Preloading uses bandwidth ahead of time
-- More efficient: videos load during playback of previous video
-- Better user experience: no waiting between videos
+- Better user experience: videos load during playback of previous video
+- Smoother transitions: no waiting between videos in sequential playback
+- Trade-off: Uses more bandwidth if user skips videos or stops watching
 
 ### CPU Usage
 - Decoding happens only for active video
@@ -195,10 +196,13 @@ Tested and working on:
 ## Limitations and Edge Cases
 
 1. **Going Backwards**: Previous video navigation uses direct loading (not preloaded)
-   - Could be enhanced to preload previous video too
+   - User Experience: There will be a brief loading delay when clicking "Previous"
+   - Why: The implementation only preloads the *next* video to minimize memory/bandwidth usage
+   - Could be enhanced to preload both next and previous videos for bidirectional seamless navigation
    
 2. **Random Access**: Clicking timeline markers loads directly
-   - Preload is lost, next video is preloaded after load completes
+   - Preload is lost when jumping to a different video
+   - Next video is preloaded after the load completes
    
 3. **First Video**: No preloading before first video
    - Normal behavior, no previous video to preload
