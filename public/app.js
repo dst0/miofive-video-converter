@@ -1,3 +1,5 @@
+import { initializeFolderBrowser } from './folder-browser.js';
+
 let scannedFiles = [];
 let ffmpegAvailable = true;
 let timelineData = null;
@@ -6,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // Load saved values
     loadSavedPaths();
     initializePreScanFilters();
+    initializeFolderBrowser(); // Initialize folder browser from folder-browser.js
 
     // FFmpeg check
     fetch('/check-ffmpeg')

@@ -11,6 +11,26 @@ const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// Simple in-memory rate limiting
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS = 100; // Max requests per window
+
+function checkRateLimit(clientId) {
+    const now = Date.now();
+    const clientData = rateLimitMap.get(clientId) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+    
+    if (now > clientData.resetTime) {
+        clientData.count = 0;
+        clientData.resetTime = now + RATE_LIMIT_WINDOW;
+    }
+    
+    clientData.count++;
+    rateLimitMap.set(clientId, clientData);
+    
+    return clientData.count <= MAX_REQUESTS;
+}
+
 function runStream(command, { cwd, env } = {}) {
     // Stream output live; support shell pipes/&& via shell:true
     return new Promise((resolve, reject) => {
@@ -120,6 +140,74 @@ app.get('/', (req, res) => {
 app.get('/check-ffmpeg', async (req, res) => {
     const available = await checkFFmpeg();
     res.json({available});
+});
+
+// List directories endpoint
+app.post('/list-directories', async (req, res) => {
+    // Rate limiting check
+    const clientId = req.ip || req.connection.remoteAddress;
+    if (!checkRateLimit(clientId)) {
+        return res.status(429).json({error: 'Too many requests. Please try again later.'});
+    }
+    
+    const {path: dirPath} = req.body;
+    
+    try {
+        // If no path provided, list root/common directories based on platform
+        if (!dirPath) {
+            const os = require('os');
+            const platform = os.platform();
+            let roots = [];
+            
+            if (platform === 'win32') {
+                // Windows: List available drives
+                try {
+                    const {stdout} = await execPromise('wmic logicaldisk get name');
+                    const drives = stdout.split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line && line !== 'Name' && line.match(/^[A-Z]:/))
+                        .map(drive => ({name: drive + '\\', path: drive + '\\'}));
+                    res.json({directories: drives.length > 0 ? drives : [{name: 'C:\\', path: 'C:\\'}]});
+                } catch (error) {
+                    res.json({directories: [{name: 'C:\\', path: 'C:\\'}]});
+                }
+                return;
+            } else {
+                // Unix-like: Start from home directory
+                const homeDir = os.homedir();
+                roots = [{name: '~', path: homeDir}];
+                res.json({directories: roots});
+                return;
+            }
+        }
+        
+        // Normalize and resolve the path to prevent directory traversal attacks
+        const normalizedPath = path.resolve(dirPath);
+        
+        // Verify the path exists and is accessible
+        await fs.access(normalizedPath);
+        const stat = await fs.stat(normalizedPath);
+        
+        if (!stat.isDirectory()) {
+            return res.status(400).json({error: 'Path is not a directory'});
+        }
+        
+        // Read directory contents
+        const entries = await fs.readdir(normalizedPath, {withFileTypes: true});
+        
+        // Filter for directories only, exclude hidden directories
+        const directories = entries
+            .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+            .map(entry => ({
+                name: entry.name,
+                path: path.join(normalizedPath, entry.name)
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        
+        res.json({directories});
+    } catch (err) {
+        res.status(400).json({error: 'Unable to access directory', message: err.message});
+    }
 });
 
 // Scan endpoint
