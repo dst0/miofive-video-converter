@@ -3,6 +3,8 @@
 let videoFiles = [];
 let currentVideoIndex = 0;
 let timelineData = null;
+let activePlayer = 1; // 1 or 2, indicates which player is currently active
+let isTransitioning = false;
 
 // HTML escape function to prevent XSS
 function escapeHtml(text) {
@@ -67,23 +69,37 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Video player events
-    const videoPlayer = document.getElementById('videoPlayer');
+    const videoPlayer1 = document.getElementById('videoPlayer1');
+    const videoPlayer2 = document.getElementById('videoPlayer2');
     
-    videoPlayer.addEventListener('ended', () => {
-        playNextVideo();
-    });
-    
-    videoPlayer.addEventListener('timeupdate', () => {
-        updatePlaybackPosition();
-        updateVideoInfo();
-    });
-    
-    videoPlayer.addEventListener('play', () => {
-        document.getElementById('playPauseBtn').textContent = '⏸ Pause';
-    });
-    
-    videoPlayer.addEventListener('pause', () => {
-        document.getElementById('playPauseBtn').textContent = '▶ Play';
+    // Set up event listeners for both players
+    [videoPlayer1, videoPlayer2].forEach((player, index) => {
+        const playerNumber = index + 1;
+        
+        player.addEventListener('ended', () => {
+            if (activePlayer === playerNumber) {
+                playNextVideo();
+            }
+        });
+        
+        player.addEventListener('timeupdate', () => {
+            if (activePlayer === playerNumber) {
+                updatePlaybackPosition();
+                updateVideoInfo();
+            }
+        });
+        
+        player.addEventListener('play', () => {
+            if (activePlayer === playerNumber) {
+                document.getElementById('playPauseBtn').textContent = '⏸ Pause';
+            }
+        });
+        
+        player.addEventListener('pause', () => {
+            if (activePlayer === playerNumber) {
+                document.getElementById('playPauseBtn').textContent = '▶ Play';
+            }
+        });
     });
     
     // Load first video
@@ -92,25 +108,88 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize player controls
 function initializePlayer() {
-    const videoPlayer = document.getElementById('videoPlayer');
-    videoPlayer.volume = 1.0;
+    const videoPlayer1 = document.getElementById('videoPlayer1');
+    const videoPlayer2 = document.getElementById('videoPlayer2');
+    videoPlayer1.volume = 1.0;
+    videoPlayer2.volume = 1.0;
+}
+
+// Get the currently active video player
+function getActivePlayer() {
+    return document.getElementById(`videoPlayer${activePlayer}`);
+}
+
+// Get the inactive (background) video player
+function getInactivePlayer() {
+    const inactivePlayerNumber = activePlayer === 1 ? 2 : 1;
+    return document.getElementById(`videoPlayer${inactivePlayerNumber}`);
+}
+
+// Swap active and inactive players
+function swapPlayers() {
+    const currentActive = getActivePlayer();
+    const currentInactive = getInactivePlayer();
+    
+    // Remove active class from current active player
+    currentActive.classList.remove('active');
+    
+    // Add active class to new active player
+    currentInactive.classList.add('active');
+    
+    // Pause the old active player
+    currentActive.pause();
+    
+    // Play the new active player
+    currentInactive.play().catch(err => {
+        console.error('Error playing video:', err);
+    });
+    
+    // Update active player number
+    activePlayer = activePlayer === 1 ? 2 : 1;
+}
+
+// Preload next video in the inactive player
+function preloadNextVideo() {
+    const nextIndex = currentVideoIndex + 1;
+    if (nextIndex >= videoFiles.length) {
+        return; // No next video to preload
+    }
+    
+    const inactivePlayer = getInactivePlayer();
+    const inactivePlayerNumber = activePlayer === 1 ? 2 : 1;
+    const inactiveSource = document.getElementById(`videoSource${inactivePlayerNumber}`);
+    const nextVideoFile = videoFiles[nextIndex];
+    
+    const videoURL = `/video?path=${encodeURIComponent(nextVideoFile.path)}`;
+    inactiveSource.src = videoURL;
+    inactivePlayer.load();
 }
 
 // Load a video by index
 function loadVideo(index) {
-    if (index < 0 || index >= videoFiles.length) {
+    if (index < 0 || index >= videoFiles.length || isTransitioning) {
         return;
     }
     
+    isTransitioning = true;
     currentVideoIndex = index;
     const videoFile = videoFiles[index];
-    const videoPlayer = document.getElementById('videoPlayer');
-    const videoSource = document.getElementById('videoSource');
+    const currentPlayer = getActivePlayer();
+    const currentPlayerNumber = activePlayer;
+    const currentSource = document.getElementById(`videoSource${currentPlayerNumber}`);
     
     // Set video source
     const videoURL = `/video?path=${encodeURIComponent(videoFile.path)}`;
-    videoSource.src = videoURL;
-    videoPlayer.load();
+    currentSource.src = videoURL;
+    currentPlayer.load();
+    
+    // Wait for the video to be ready to play
+    currentPlayer.addEventListener('loadeddata', () => {
+        isTransitioning = false;
+        
+        // Preload the next video
+        preloadNextVideo();
+    }, { once: true });
     
     // Update video info - textContent is safe from XSS (unlike innerHTML)
     // It treats the value as plain text, not HTML
@@ -126,21 +205,56 @@ function loadVideo(index) {
 
 // Play next video
 function playNextVideo() {
-    if (currentVideoIndex < videoFiles.length - 1) {
-        loadVideo(currentVideoIndex + 1);
+    if (currentVideoIndex < videoFiles.length - 1 && !isTransitioning) {
+        const nextIndex = currentVideoIndex + 1;
+        const nextVideoFile = videoFiles[nextIndex];
+        
+        // Check if next video is already preloaded in inactive player
+        const inactivePlayer = getInactivePlayer();
+        const inactivePlayerNumber = activePlayer === 1 ? 2 : 1;
+        const inactiveSource = document.getElementById(`videoSource${inactivePlayerNumber}`);
+        const expectedURL = `/video?path=${encodeURIComponent(nextVideoFile.path)}`;
+        
+        if (inactiveSource.src.endsWith(expectedURL)) {
+            // Next video is preloaded, swap players
+            currentVideoIndex = nextIndex;
+            isTransitioning = true;
+            
+            // Update video info
+            document.getElementById('currentVideoName').textContent = nextVideoFile.filename;
+            
+            // Update button states
+            document.getElementById('prevBtn').disabled = nextIndex === 0;
+            document.getElementById('nextBtn').disabled = nextIndex === videoFiles.length - 1;
+            
+            // Highlight current file marker
+            highlightCurrentMarker();
+            
+            // Swap the players
+            swapPlayers();
+            
+            // Preload the next video after a short delay
+            setTimeout(() => {
+                isTransitioning = false;
+                preloadNextVideo();
+            }, 100);
+        } else {
+            // Fallback: load video directly if not preloaded
+            loadVideo(nextIndex);
+        }
     }
 }
 
 // Play previous video
 function playPreviousVideo() {
-    if (currentVideoIndex > 0) {
+    if (currentVideoIndex > 0 && !isTransitioning) {
         loadVideo(currentVideoIndex - 1);
     }
 }
 
 // Toggle play/pause
 function togglePlayPause() {
-    const videoPlayer = document.getElementById('videoPlayer');
+    const videoPlayer = getActivePlayer();
     if (videoPlayer.paused) {
         videoPlayer.play();
     } else {
@@ -150,13 +264,13 @@ function togglePlayPause() {
 
 // Change playback speed
 function changePlaybackSpeed(speed) {
-    const videoPlayer = document.getElementById('videoPlayer');
+    const videoPlayer = getActivePlayer();
     videoPlayer.playbackRate = speed;
 }
 
 // Update video info display
 function updateVideoInfo() {
-    const videoPlayer = document.getElementById('videoPlayer');
+    const videoPlayer = getActivePlayer();
     const currentTime = formatTime(videoPlayer.currentTime);
     const duration = formatTime(videoPlayer.duration);
     
@@ -298,7 +412,7 @@ function generateTimeMarkers(minTime, maxTime) {
 function updatePlaybackPosition() {
     if (!timelineData) return;
     
-    const videoPlayer = document.getElementById('videoPlayer');
+    const videoPlayer = getActivePlayer();
     const currentFile = videoFiles[currentVideoIndex];
     
     if (!currentFile) return;

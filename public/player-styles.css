@@ -41,7 +41,28 @@
     overflow: hidden;
 }
 
-#videoPlayer {
+.video-player {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    display: block;
+    max-height: 70vh;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0s 0.3s;
+}
+
+.video-player.active {
+    position: relative;
+    opacity: 1;
+    visibility: visible;
+    transition: opacity 0.3s ease, visibility 0s;
+}
+
+#videoPlayer1,
+#videoPlayer2 {
     width: 100%;
     height: auto;
     display: block;
