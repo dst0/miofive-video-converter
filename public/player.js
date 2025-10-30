@@ -112,7 +112,8 @@ function loadVideo(index) {
     videoSource.src = videoURL;
     videoPlayer.load();
     
-    // Update video info
+    // Update video info - textContent is safe from XSS (unlike innerHTML)
+    // It treats the value as plain text, not HTML
     document.getElementById('currentVideoName').textContent = videoFile.filename;
     
     // Update button states
@@ -192,7 +193,9 @@ function initializeTimeline() {
     
     // Generate file markers
     const fileMarkersHTML = videoFiles.map((file, index) => {
-        const position = ((new Date(file.utcTime).getTime() - minTime) / timelineData.range) * 100;
+        const rawPosition = ((new Date(file.utcTime).getTime() - minTime) / timelineData.range) * 100;
+        // Validate and clamp position to prevent CSS injection
+        const position = Math.max(0, Math.min(100, Number(rawPosition) || 0));
         const fileType = (file.fileType || 'Other').toLowerCase();
         return `<div class="file-marker file-marker-${escapeHtml(fileType)}" 
                      data-index="${index}" 

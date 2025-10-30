@@ -211,10 +211,7 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for video info to be populated
-    await page.waitForTimeout(1000);
-    
-    // Check video name is displayed
+    // Wait for video name to be displayed (replaces arbitrary timeout)
     await expect(page.locator('#currentVideoName')).toContainText('010125_100000_010125_050000_000001A.MP4');
     
     // Check video progress shows "Video 1 of 1"
@@ -245,8 +242,11 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for video to load
-    await page.waitForTimeout(1000);
+    // Wait for video player to be ready
+    await page.waitForFunction(() => {
+      const video = document.querySelector('#videoPlayer');
+      return video && video.readyState >= 3;
+    });
     
     // Previous button should be disabled (first video)
     await expect(page.locator('#prevBtn')).toBeDisabled();
@@ -301,10 +301,7 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for video to load
-    await page.waitForTimeout(1000);
-    
-    // Should start with first video
+    // Wait for video to load by checking the video name appears
     await expect(page.locator('#currentVideoName')).toContainText('000001A.MP4');
     await expect(page.locator('#videoProgress')).toContainText('Video 1 of 3');
     
@@ -316,7 +313,8 @@ test.describe('Video Player - UI Tests', () => {
     
     // Click next
     await page.locator('#nextBtn').click();
-    await page.waitForTimeout(500);
+    // Wait for video 2 to load
+    await expect(page.locator('#currentVideoName')).toContainText('000002A.MP4');
     
     // Should now show second video
     await expect(page.locator('#currentVideoName')).toContainText('000002A.MP4');
@@ -328,9 +326,7 @@ test.describe('Video Player - UI Tests', () => {
     
     // Click previous
     await page.locator('#prevBtn').click();
-    await page.waitForTimeout(500);
-    
-    // Should be back to first video
+    // Wait for video 1 to load
     await expect(page.locator('#currentVideoName')).toContainText('000001A.MP4');
     await expect(page.locator('#videoProgress')).toContainText('Video 1 of 3');
   });
@@ -359,8 +355,11 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for video to load
-    await page.waitForTimeout(1000);
+    // Wait for video player to be ready
+    await page.waitForFunction(() => {
+      const video = document.querySelector('#videoPlayer');
+      return video && video.readyState >= 3;
+    });
     
     // Change speed to 2x
     await page.locator('#speedControl').selectOption('2');
@@ -415,10 +414,7 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for timeline to render
-    await page.waitForTimeout(500);
-    
-    // Check timeline labels
+    // Wait for timeline to render by checking timeline labels are visible
     await expect(page.locator('#timelineStart')).toBeVisible();
     await expect(page.locator('#timelineEnd')).toBeVisible();
     
@@ -470,26 +466,19 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for timeline to render
-    await page.waitForTimeout(500);
-    
-    // Should start at video 1
+    // Wait for video to be loaded
     await expect(page.locator('#videoProgress')).toContainText('Video 1 of 3');
     
     // Click on the third file marker
     const markers = page.locator('.file-marker');
     await markers.nth(2).click();
-    await page.waitForTimeout(500);
-    
-    // Should jump to video 3
+    // Wait for video 3 to load
     await expect(page.locator('#currentVideoName')).toContainText('000003A.MP4');
     await expect(page.locator('#videoProgress')).toContainText('Video 3 of 3');
     
     // Click on the second file marker
     await markers.nth(1).click();
-    await page.waitForTimeout(500);
-    
-    // Should jump to video 2
+    // Wait for video 2 to load
     await expect(page.locator('#currentVideoName')).toContainText('000002A.MP4');
     await expect(page.locator('#videoProgress')).toContainText('Video 2 of 3');
   });
@@ -560,8 +549,8 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for page to load
-    await page.waitForTimeout(500);
+    // Wait for video name to be visible
+    await expect(page.locator('#currentVideoName')).toBeVisible();
     
     // Check that the malicious script is not executed
     // The filename should be displayed as text, not executed
