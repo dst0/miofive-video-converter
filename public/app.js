@@ -811,7 +811,8 @@ async function scanFolder() {
             <label>Output File Name:</label>
             <input type="text" id="outputFilename" placeholder="combined_output.mp4" />
           </div>
-          <div class="input-group">
+          <div class="input-group button-group">
+            <button class="play-button" id="playVideosBtn">▶ Play Videos</button>
             <button class="secondary" id="combineBtn" ${!ffmpegAvailable ? 'disabled' : ''}>Combine</button>
           </div>
           <div id="combineStatus"></div>
@@ -844,6 +845,7 @@ async function scanFolder() {
         document.getElementById('outputFilename').addEventListener('input', saveOutputSettings);
 
         document.getElementById('combineBtn').addEventListener('click', combineVideos);
+        document.getElementById('playVideosBtn').addEventListener('click', playVideos);
         
         // Auto-fill filename initially if folder is set
         if (savedOutputFolder) {
@@ -1013,4 +1015,25 @@ function formatShortDate(date) {
     const minutes = String(date.getMinutes()).padStart(2, '0');
     
     return `${year}-${month}-${day}_${hours}-${minutes}`;
+}
+
+// Play videos in custom video player
+function playVideos() {
+    // Get only checked and visible files
+    const checkedFileIndexes = Array.from(document.querySelectorAll('.file-checkbox:checked'))
+        .filter(cb => cb.closest('.file-item').style.display !== 'none')
+        .map(cb => parseInt(cb.dataset.index));
+
+    const selectedFiles = checkedFileIndexes.map(index => scannedFiles[index]);
+
+    if (selectedFiles.length === 0) {
+        alert('Please select at least one video to play');
+        return;
+    }
+
+    // Encode the file list as URL parameter
+    const filesParam = encodeURIComponent(JSON.stringify(selectedFiles));
+    
+    // Open video player in new window/tab
+    window.open(`/player?files=${filesParam}`, '_blank');
 }

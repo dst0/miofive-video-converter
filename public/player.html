@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Video Player</title>
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="player-styles.css" />
+</head>
+<body>
+<div class="player-container">
+    <div class="player-header">
+        <h1>Video Player</h1>
+        <button id="backBtn" class="back-btn">← Back to Main</button>
+    </div>
+
+    <div class="video-wrapper">
+        <video id="videoPlayer" controls autoplay>
+            <source id="videoSource" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        <div id="videoInfo" class="video-info">
+            <span id="currentVideoName"></span>
+            <span id="videoProgress"></span>
+        </div>
+    </div>
+
+    <div class="timeline-section">
+        <div class="section-title">Video Navigation Timeline</div>
+        <div class="timeline-legend">
+            <span class="legend-label">File Markers:</span>
+            <span class="legend-item"><span class="legend-marker legend-marker-normal"></span> Normal</span>
+            <span class="legend-item"><span class="legend-marker legend-marker-emr"></span> Emergency</span>
+            <span class="legend-item"><span class="legend-marker legend-marker-park"></span> Parking</span>
+            <span class="legend-item"><span class="legend-marker legend-marker-other"></span> Other</span>
+        </div>
+        <div class="timeline-container">
+            <div class="timeline-labels">
+                <span class="timeline-label-start" id="timelineStart"></span>
+                <span class="timeline-label-end" id="timelineEnd"></span>
+            </div>
+            <div class="timeline-track" id="timelineTrack">
+                <div class="timeline-background"></div>
+                <div class="time-markers" id="timeMarkers"></div>
+                <div id="fileMarkers"></div>
+                <div class="playback-position" id="playbackPosition"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="controls-section">
+        <div class="playback-controls">
+            <button id="prevBtn" class="control-btn">⏮ Previous</button>
+            <button id="playPauseBtn" class="control-btn">⏸ Pause</button>
+            <button id="nextBtn" class="control-btn">⏭ Next</button>
+        </div>
+        <div class="speed-control">
+            <label>Playback Speed:</label>
+            <select id="speedControl">
+                <option value="0.25">0.25x</option>
+                <option value="0.5">0.5x</option>
+                <option value="0.75">0.75x</option>
+                <option value="1" selected>1x</option>
+                <option value="1.25">1.25x</option>
+                <option value="1.5">1.5x</option>
+                <option value="2">2x</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<script type="module" src="player.js"></script>
+</body>
+</html>

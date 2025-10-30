@@ -111,6 +111,20 @@ button.secondary:hover {
     background: #218838;
 }
 
+button.play-button {
+    background: #17a2b8;
+}
+
+button.play-button:hover {
+    background: #138496;
+}
+
+.button-group {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
 .reset-btn {
     background: #6c757d;
     font-size: 12px;
