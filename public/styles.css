@@ -529,17 +529,7 @@ button.secondary:hover {
     gap: 5px;
 }
 
-.range-display span:first-child::before {
-    content: '⏮';
-    color: #28a745;
-    font-size: 14px;
-}
 
-.range-display span:nth-child(2)::after {
-    content: '⏭';
-    color: #28a745;
-    font-size: 14px;
-}
 
 .timeline-separator {
     height: 1px;
