@@ -40,7 +40,7 @@ When you insert a Miofive S1 Ultra dashcam microSD card into your computer, you'
 |── LOG/                         # System log files
 |    |── DEVLOG/                 # Dev logs
 |    |── GPSLOG/                 # GPS logs
-└── [other root files]       # Firmware and system data
+└── [other root files]       # Other: `.fseventsd`, `.Trashes`, `.Spotlight-V100`
 ```
 
 **Note**: The exact folder structure may vary depending on firmware version and dashcam settings. Videos may be stored directly in the root, in dated subdirectories, or in other organizational schemes.
