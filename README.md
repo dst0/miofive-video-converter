@@ -190,7 +190,7 @@ MIT License - See LICENSE file for details
 
 ## Author
 
-dst
+Dmytro Stepanov (dst0)
 
 ## Contributing
 
