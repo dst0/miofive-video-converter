@@ -11,6 +11,26 @@ const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// Simple in-memory rate limiting
+const rateLimitMap = new Map();
+const RATE_LIMIT_WINDOW = 60000; // 1 minute
+const MAX_REQUESTS = 100; // Max requests per window
+
+function checkRateLimit(clientId) {
+    const now = Date.now();
+    const clientData = rateLimitMap.get(clientId) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
+    
+    if (now > clientData.resetTime) {
+        clientData.count = 0;
+        clientData.resetTime = now + RATE_LIMIT_WINDOW;
+    }
+    
+    clientData.count++;
+    rateLimitMap.set(clientId, clientData);
+    
+    return clientData.count <= MAX_REQUESTS;
+}
+
 function runStream(command, { cwd, env } = {}) {
     // Stream output live; support shell pipes/&& via shell:true
     return new Promise((resolve, reject) => {
@@ -124,6 +144,12 @@ app.get('/check-ffmpeg', async (req, res) => {
 
 // List directories endpoint
 app.post('/list-directories', async (req, res) => {
+    // Rate limiting check
+    const clientId = req.ip || req.connection.remoteAddress;
+    if (!checkRateLimit(clientId)) {
+        return res.status(429).json({error: 'Too many requests. Please try again later.'});
+    }
+    
     const {path: dirPath} = req.body;
     
     try {
@@ -155,23 +181,26 @@ app.post('/list-directories', async (req, res) => {
             }
         }
         
+        // Normalize and resolve the path to prevent directory traversal attacks
+        const normalizedPath = path.resolve(dirPath);
+        
         // Verify the path exists and is accessible
-        await fs.access(dirPath);
-        const stat = await fs.stat(dirPath);
+        await fs.access(normalizedPath);
+        const stat = await fs.stat(normalizedPath);
         
         if (!stat.isDirectory()) {
             return res.status(400).json({error: 'Path is not a directory'});
         }
         
         // Read directory contents
-        const entries = await fs.readdir(dirPath, {withFileTypes: true});
+        const entries = await fs.readdir(normalizedPath, {withFileTypes: true});
         
         // Filter for directories only, exclude hidden directories
         const directories = entries
             .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
             .map(entry => ({
                 name: entry.name,
-                path: path.join(dirPath, entry.name)
+                path: path.join(normalizedPath, entry.name)
             }))
             .sort((a, b) => a.name.localeCompare(b.name));
         
