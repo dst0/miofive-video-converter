@@ -122,6 +122,66 @@ app.get('/check-ffmpeg', async (req, res) => {
     res.json({available});
 });
 
+// List directories endpoint
+app.post('/list-directories', async (req, res) => {
+    const {path: dirPath} = req.body;
+    
+    try {
+        // If no path provided, list root/common directories based on platform
+        if (!dirPath) {
+            const os = require('os');
+            const platform = os.platform();
+            let roots = [];
+            
+            if (platform === 'win32') {
+                // Windows: List available drives
+                const {exec} = require('child_process');
+                exec('wmic logicaldisk get name', (error, stdout) => {
+                    if (error) {
+                        return res.json({directories: [{name: 'C:\\', path: 'C:\\'}]});
+                    }
+                    const drives = stdout.split('\n')
+                        .map(line => line.trim())
+                        .filter(line => line && line !== 'Name' && line.match(/^[A-Z]:/))
+                        .map(drive => ({name: drive + '\\', path: drive + '\\'}));
+                    res.json({directories: drives.length > 0 ? drives : [{name: 'C:\\', path: 'C:\\'}]});
+                });
+                return;
+            } else {
+                // Unix-like: Start from home directory
+                const homeDir = os.homedir();
+                roots = [{name: '~', path: homeDir}];
+                res.json({directories: roots});
+                return;
+            }
+        }
+        
+        // Verify the path exists and is accessible
+        await fs.access(dirPath);
+        const stat = await fs.stat(dirPath);
+        
+        if (!stat.isDirectory()) {
+            return res.status(400).json({error: 'Path is not a directory'});
+        }
+        
+        // Read directory contents
+        const entries = await fs.readdir(dirPath, {withFileTypes: true});
+        
+        // Filter for directories only, exclude hidden directories
+        const directories = entries
+            .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+            .map(entry => ({
+                name: entry.name,
+                path: path.join(dirPath, entry.name)
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name));
+        
+        res.json({directories});
+    } catch (err) {
+        res.status(400).json({error: 'Unable to access directory', message: err.message});
+    }
+});
+
 // Scan endpoint
 app.post('/scan', async (req, res) => {
     const {folderPath, startTime, endTime, channels} = req.body;
