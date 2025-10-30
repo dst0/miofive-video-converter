@@ -49,7 +49,8 @@ When you insert a Miofive S1 Ultra dashcam microSD card into your computer, you'
 
 Each video file follows a specific naming pattern that encodes timing information:
 
-**Format**: `{MMDDYY}_{HHMMSS}_{MMDDYY}_{HHMMSS}_{dddddd}{C}.MP4`
+**Format** (depends on configuration):
+  `{MMDDYY}_{HHMMSS}_{MMDDYY}_{HHMMSS}_{dddddd}{C}.MP4`
 
 **Components** (depends on configuration):
 - **First timestamp** (`MMDDYY_HHMMSS`): UTC date and time when recording started
