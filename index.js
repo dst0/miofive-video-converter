@@ -400,6 +400,65 @@ app.post('/combine', async (req, res) => {
     }
 });
 
+// Video player page endpoint
+app.get('/player', (req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'player.html'));
+});
+
+// Serve video files with range support for streaming
+app.get('/video', async (req, res) => {
+    const videoPath = req.query.path;
+    
+    if (!videoPath) {
+        return res.status(400).json({error: 'Video path is required'});
+    }
+    
+    try {
+        // Verify the file exists and is accessible
+        await fs.access(videoPath);
+        const stat = await fs.stat(videoPath);
+        
+        if (!stat.isFile()) {
+            return res.status(400).json({error: 'Path is not a file'});
+        }
+        
+        const fileSize = stat.size;
+        const range = req.headers.range;
+        
+        if (range) {
+            // Parse range header
+            const parts = range.replace(/bytes=/, '').split('-');
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunkSize = (end - start) + 1;
+            
+            // Read the file stream
+            const fileStream = require('fs').createReadStream(videoPath, {start, end});
+            
+            // Set headers for partial content
+            res.writeHead(206, {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunkSize,
+                'Content-Type': 'video/mp4',
+            });
+            
+            fileStream.pipe(res);
+        } else {
+            // No range header, send the entire file
+            res.writeHead(200, {
+                'Content-Length': fileSize,
+                'Content-Type': 'video/mp4',
+            });
+            
+            const fileStream = require('fs').createReadStream(videoPath);
+            fileStream.pipe(res);
+        }
+    } catch (err) {
+        res.status(400).json({error: 'Unable to access video file', message: err.message});
+    }
+});
+
 // Start server
 async function startServer() {
     const hasFFmpeg = await checkFFmpeg();
