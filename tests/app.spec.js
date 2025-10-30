@@ -52,6 +52,9 @@ test.describe('Application Basic Tests', () => {
   });
 
   test('should show error when no channels are selected', async ({ page }) => {
+    // Set a folder path first (to test channel validation, not folder validation)
+    await page.locator('#folderPath').fill(path.join(os.tmpdir(), 'test'));
+    
     // Uncheck both channels
     await page.locator('#channelA').uncheck();
     await page.locator('#channelB').uncheck();

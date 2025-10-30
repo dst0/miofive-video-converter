@@ -169,8 +169,9 @@ test.describe('Scan Functionality Tests', () => {
     // Wait for combine section
     await page.waitForSelector('.combine-section', { timeout: 10000 });
     
-    // Check combine elements
-    await expect(page.locator('#outputPath')).toBeVisible();
+    // Check combine elements (outputFolder and outputFilename, not outputPath)
+    await expect(page.locator('#outputFolder')).toBeVisible();
+    await expect(page.locator('#outputFilename')).toBeVisible();
     await expect(page.locator('#combineBtn')).toBeVisible();
     await expect(page.locator('#combineBtn')).toHaveText('Combine');
   });
