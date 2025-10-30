@@ -157,7 +157,7 @@ app.post('/list-directories', async (req, res) => {
         if (!dirPath) {
             const os = require('os');
             const platform = os.platform();
-            let roots = [];
+            let locations = [];
             
             if (platform === 'win32') {
                 // Windows: List available drives
@@ -166,17 +166,94 @@ app.post('/list-directories', async (req, res) => {
                     const drives = stdout.split('\n')
                         .map(line => line.trim())
                         .filter(line => line && line !== 'Name' && line.match(/^[A-Z]:/))
-                        .map(drive => ({name: drive + '\\', path: drive + '\\'}));
-                    res.json({directories: drives.length > 0 ? drives : [{name: 'C:\\', path: 'C:\\'}]});
+                        .map(drive => ({name: drive + '\\', path: drive + '\\', type: 'drive'}));
+                    
+                    if (drives.length > 0) {
+                        locations.push(...drives);
+                    } else {
+                        locations.push({name: 'C:\\', path: 'C:\\', type: 'drive'});
+                    }
                 } catch (error) {
-                    res.json({directories: [{name: 'C:\\', path: 'C:\\'}]});
+                    locations.push({name: 'C:\\', path: 'C:\\', type: 'drive'});
                 }
+                
+                // Add common Windows folders
+                const homeDir = os.homedir();
+                const commonFolders = [
+                    {name: 'Desktop', path: path.join(homeDir, 'Desktop'), type: 'common'},
+                    {name: 'Documents', path: path.join(homeDir, 'Documents'), type: 'common'},
+                    {name: 'Downloads', path: path.join(homeDir, 'Downloads'), type: 'common'},
+                    {name: 'Pictures', path: path.join(homeDir, 'Pictures'), type: 'common'},
+                    {name: 'Videos', path: path.join(homeDir, 'Videos'), type: 'common'},
+                ];
+                
+                // Only add folders that exist
+                for (const folder of commonFolders) {
+                    try {
+                        await fs.access(folder.path);
+                        locations.push(folder);
+                    } catch (err) {
+                        // Folder doesn't exist, skip it
+                    }
+                }
+                
+                res.json({directories: locations});
                 return;
             } else {
-                // Unix-like: Start from home directory
+                // Unix-like: Start from home directory and common places
                 const homeDir = os.homedir();
-                roots = [{name: '~', path: homeDir}];
-                res.json({directories: roots});
+                locations.push({name: '~ (Home)', path: homeDir, type: 'common'});
+                
+                // Add common Unix folders
+                const commonFolders = [
+                    {name: 'Desktop', path: path.join(homeDir, 'Desktop'), type: 'common'},
+                    {name: 'Documents', path: path.join(homeDir, 'Documents'), type: 'common'},
+                    {name: 'Downloads', path: path.join(homeDir, 'Downloads'), type: 'common'},
+                    {name: 'Pictures', path: path.join(homeDir, 'Pictures'), type: 'common'},
+                    {name: 'Videos', path: path.join(homeDir, 'Videos'), type: 'common'},
+                ];
+                
+                // Only add folders that exist
+                for (const folder of commonFolders) {
+                    try {
+                        await fs.access(folder.path);
+                        locations.push(folder);
+                    } catch (err) {
+                        // Folder doesn't exist, skip it
+                    }
+                }
+                
+                // Add system locations for Unix/macOS
+                if (platform === 'darwin') {
+                    // macOS: Add /Volumes for external drives
+                    try {
+                        await fs.access('/Volumes');
+                        locations.push({name: '/Volumes (External Drives)', path: '/Volumes', type: 'system'});
+                    } catch (err) {
+                        // /Volumes doesn't exist or not accessible
+                    }
+                } else {
+                    // Linux: Add /media for external drives
+                    try {
+                        await fs.access('/media');
+                        locations.push({name: '/media (External Drives)', path: '/media', type: 'system'});
+                    } catch (err) {
+                        // /media doesn't exist or not accessible
+                    }
+                    
+                    // Linux: Add /mnt for mounted drives
+                    try {
+                        await fs.access('/mnt');
+                        locations.push({name: '/mnt (Mounted Drives)', path: '/mnt', type: 'system'});
+                    } catch (err) {
+                        // /mnt doesn't exist or not accessible
+                    }
+                }
+                
+                // Add root directory
+                locations.push({name: '/ (Root)', path: '/', type: 'system'});
+                
+                res.json({directories: locations});
                 return;
             }
         }
