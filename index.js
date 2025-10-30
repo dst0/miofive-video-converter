@@ -277,7 +277,8 @@ app.post('/list-directories', async (req, res) => {
             .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
             .map(entry => ({
                 name: entry.name,
-                path: path.join(normalizedPath, entry.name)
+                path: path.join(normalizedPath, entry.name),
+                type: 'folder'
             }))
             .sort((a, b) => a.name.localeCompare(b.name));
         
