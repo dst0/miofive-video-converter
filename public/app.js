@@ -911,9 +911,13 @@ function openOutputFolderBrowser() {
 // Auto-fill the filename based on selected files
 async function autoFillFilename() {
     const outputFolder = document.getElementById('outputFolder').value.trim();
+    const statusDiv = document.getElementById('combineStatus');
     
     if (!outputFolder) {
-        alert('Please select an output folder first');
+        if (statusDiv) {
+            statusDiv.innerHTML = '<div class="error">Please select an output folder first</div>';
+            setTimeout(() => { statusDiv.innerHTML = ''; }, 3000);
+        }
         return;
     }
 
@@ -925,7 +929,10 @@ async function autoFillFilename() {
     const selectedFiles = checkedFileIndexes.map(index => scannedFiles[index]);
 
     if (selectedFiles.length === 0) {
-        alert('No files selected');
+        if (statusDiv) {
+            statusDiv.innerHTML = '<div class="error">No files selected</div>';
+            setTimeout(() => { statusDiv.innerHTML = ''; }, 3000);
+        }
         return;
     }
 

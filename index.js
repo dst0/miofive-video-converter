@@ -253,12 +253,13 @@ app.post('/combine', async (req, res) => {
         let finalOutputPath = outputPath;
         const parsedPath = path.parse(outputPath);
         let counter = 1;
+        const MAX_COUNTER = 9999; // Prevent infinite loops
         
         // Check if the file already exists
         try {
             await fs.access(finalOutputPath);
             // File exists, add counter
-            while (true) {
+            while (counter <= MAX_COUNTER) {
                 finalOutputPath = path.join(parsedPath.dir, `${parsedPath.name}_${counter}${parsedPath.ext}`);
                 try {
                     await fs.access(finalOutputPath);
@@ -268,7 +269,14 @@ app.post('/combine', async (req, res) => {
                     break;
                 }
             }
-        } catch {
+            
+            if (counter > MAX_COUNTER) {
+                throw new Error('Too many files with the same name. Please choose a different filename.');
+            }
+        } catch (err) {
+            if (err.message && err.message.includes('Too many files')) {
+                throw err;
+            }
             // File doesn't exist, use original path
         }
 
