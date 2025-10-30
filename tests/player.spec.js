@@ -167,8 +167,10 @@ test.describe('Video Player - UI Tests', () => {
     await expect(page.locator('#backBtn')).toContainText('Back to Main');
     
     // Check video player
-    await expect(page.locator('#videoPlayer')).toBeVisible();
-    await expect(page.locator('#videoSource')).toBeVisible();
+    await expect(page.locator('#videoPlayer1')).toBeVisible();
+    await expect(page.locator('#videoPlayer2')).toBeVisible();
+    await expect(page.locator('#videoSource1')).toBeVisible();
+    await expect(page.locator('#videoSource2')).toBeVisible();
     
     // Check video info
     await expect(page.locator('#currentVideoName')).toBeVisible();
@@ -242,9 +244,9 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for video player to be ready
+    // Wait for video player to be ready (check active player)
     await page.waitForFunction(() => {
-      const video = document.querySelector('#videoPlayer');
+      const video = document.querySelector('#videoPlayer1.active') || document.querySelector('#videoPlayer2.active');
       return video && video.readyState >= 3;
     });
     
@@ -355,24 +357,30 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for video player to be ready
+    // Wait for video player to be ready (check active player)
     await page.waitForFunction(() => {
-      const video = document.querySelector('#videoPlayer');
+      const video = document.querySelector('#videoPlayer1.active') || document.querySelector('#videoPlayer2.active');
       return video && video.readyState >= 3;
     });
     
     // Change speed to 2x
     await page.locator('#speedControl').selectOption('2');
     
-    // Verify the playback rate is set
-    const playbackRate = await page.locator('#videoPlayer').evaluate(el => el.playbackRate);
+    // Verify the playback rate is set on active player
+    const playbackRate = await page.evaluate(() => {
+      const activePlayer = document.querySelector('#videoPlayer1.active') || document.querySelector('#videoPlayer2.active');
+      return activePlayer.playbackRate;
+    });
     expect(playbackRate).toBe(2);
     
     // Change speed to 0.5x
     await page.locator('#speedControl').selectOption('0.5');
     
-    // Verify the playback rate is set
-    const playbackRate2 = await page.locator('#videoPlayer').evaluate(el => el.playbackRate);
+    // Verify the playback rate is set on active player
+    const playbackRate2 = await page.evaluate(() => {
+      const activePlayer = document.querySelector('#videoPlayer1.active') || document.querySelector('#videoPlayer2.active');
+      return activePlayer.playbackRate;
+    });
     expect(playbackRate2).toBe(0.5);
   });
 
