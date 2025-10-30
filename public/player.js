@@ -4,6 +4,13 @@ let videoFiles = [];
 let currentVideoIndex = 0;
 let timelineData = null;
 
+// HTML escape function to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Parse URL parameters to get video file list
 function getVideoFilesFromURL() {
     const urlParams = new URLSearchParams(window.location.search);
@@ -187,10 +194,10 @@ function initializeTimeline() {
     const fileMarkersHTML = videoFiles.map((file, index) => {
         const position = ((new Date(file.utcTime).getTime() - minTime) / timelineData.range) * 100;
         const fileType = (file.fileType || 'Other').toLowerCase();
-        return `<div class="file-marker file-marker-${fileType}" 
+        return `<div class="file-marker file-marker-${escapeHtml(fileType)}" 
                      data-index="${index}" 
                      style="left: ${position}%" 
-                     title="${file.filename}"></div>`;
+                     title="${escapeHtml(file.filename)}"></div>`;
     }).join('');
     
     document.getElementById('fileMarkers').innerHTML = fileMarkersHTML;

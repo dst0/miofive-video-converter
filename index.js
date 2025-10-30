@@ -407,6 +407,12 @@ app.get('/player', (req, res) => {
 
 // Serve video files with range support for streaming
 app.get('/video', async (req, res) => {
+    // Rate limiting check
+    const clientId = req.ip || req.connection.remoteAddress;
+    if (!checkRateLimit(clientId)) {
+        return res.status(429).json({error: 'Too many requests. Please try again later.'});
+    }
+    
     const videoPath = req.query.path;
     
     if (!videoPath) {
@@ -414,9 +420,17 @@ app.get('/video', async (req, res) => {
     }
     
     try {
+        // Normalize and resolve the path to prevent directory traversal attacks
+        const normalizedPath = path.resolve(videoPath);
+        
+        // Additional validation: check if the file ends with .MP4 or .mp4
+        if (!normalizedPath.toUpperCase().endsWith('.MP4')) {
+            return res.status(400).json({error: 'Only MP4 files are allowed'});
+        }
+        
         // Verify the file exists and is accessible
-        await fs.access(videoPath);
-        const stat = await fs.stat(videoPath);
+        await fs.access(normalizedPath);
+        const stat = await fs.stat(normalizedPath);
         
         if (!stat.isFile()) {
             return res.status(400).json({error: 'Path is not a file'});
@@ -433,7 +447,7 @@ app.get('/video', async (req, res) => {
             const chunkSize = (end - start) + 1;
             
             // Read the file stream
-            const fileStream = require('fs').createReadStream(videoPath, {start, end});
+            const fileStream = require('fs').createReadStream(normalizedPath, {start, end});
             
             // Set headers for partial content
             res.writeHead(206, {
@@ -451,7 +465,7 @@ app.get('/video', async (req, res) => {
                 'Content-Type': 'video/mp4',
             });
             
-            const fileStream = require('fs').createReadStream(videoPath);
+            const fileStream = require('fs').createReadStream(normalizedPath);
             fileStream.pipe(res);
         }
     } catch (err) {

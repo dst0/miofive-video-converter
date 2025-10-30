@@ -17,7 +17,7 @@ The test videos are located in the `Normal/` subdirectory and follow the Miofive
 - **Frame Rate**: 15 fps
 - **File Size**: ~32KB each
 - **Format**: H.264 video with AAC audio
-- **Timestamps**: 
+- **Timestamps** (using future dates to match the Miofive filename format pattern): 
   - Video 1: 2025-01-01 10:00:00 UTC
   - Video 2: 2025-01-01 10:01:00 UTC
   - Video 3: 2025-01-01 10:02:00 UTC
