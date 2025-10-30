@@ -249,6 +249,29 @@ app.post('/combine', async (req, res) => {
     }
 
     try {
+        // Check if file exists and add counter if needed
+        let finalOutputPath = outputPath;
+        const parsedPath = path.parse(outputPath);
+        let counter = 1;
+        
+        // Check if the file already exists
+        try {
+            await fs.access(finalOutputPath);
+            // File exists, add counter
+            while (true) {
+                finalOutputPath = path.join(parsedPath.dir, `${parsedPath.name}_${counter}${parsedPath.ext}`);
+                try {
+                    await fs.access(finalOutputPath);
+                    counter++;
+                } catch {
+                    // File doesn't exist, we can use this name
+                    break;
+                }
+            }
+        } catch {
+            // File doesn't exist, use original path
+        }
+
         const listPath = path.join(__dirname, 'filelist.txt');
         console.log('Creating file with input file list: ' + listPath);
         const fileListContent = files.map(f => `file '${String(f).replace(/'/g, "'\\''")}'`).join('\n');
@@ -264,13 +287,13 @@ app.post('/combine', async (req, res) => {
             '-c', 'copy',
             '-bsf:a', 'aac_adtstoasc',
             '-movflags', '+faststart',
-            `"${outputPath}"`
+            `"${finalOutputPath}"`
         ].join(' ');
         await runStream(command);
         await fs.unlink(listPath);
 
-        console.log('Videos combined successfully to:', outputPath);
-        res.json({success: true, message: 'Videos combined successfully', output: outputPath});
+        console.log('Videos combined successfully to:', finalOutputPath);
+        res.json({success: true, message: 'Videos combined successfully', output: finalOutputPath});
     } catch (err) {
         console.error('Failed to combine videos:', err.message);
         res.status(500).json({error: `Failed to combine videos: ${err.message}`});

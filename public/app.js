@@ -776,9 +776,21 @@ async function scanFolder() {
         </div>
         <div class="combine-section">
           <div class="section-title">3. Combine Selected Videos</div>
+          <div class="input-group folder-browser-group">
+            <label>Output Folder:</label>
+            <div class="folder-browser-container">
+              <input type="text" id="outputFolder" placeholder="No folder selected" readonly />
+              <button type="button" id="browseOutputFolderBtn" class="browse-btn">Browse</button>
+            </div>
+          </div>
           <div class="input-group">
-            <label>Output File:</label>
-            <input type="text" id="outputPath" value="${savedOutputPath}" placeholder="e.g., C:\\\\combined_output.mp4" />
+            <label>Output File Name:</label>
+            <div class="filename-container">
+              <input type="text" id="outputFilename" placeholder="combined_output.mp4" />
+              <button type="button" id="autoFillFilenameBtn" class="secondary">Auto-Fill</button>
+            </div>
+          </div>
+          <div class="input-group">
             <button class="secondary" id="combineBtn" ${!ffmpegAvailable ? 'disabled' : ''}>Combine</button>
           </div>
           <div id="combineStatus"></div>
@@ -798,8 +810,18 @@ async function scanFolder() {
             checkbox.addEventListener('change', updateSelectAllState);
         });
 
-        // Add event listener to save output path
-        document.getElementById('outputPath').addEventListener('input', savePaths);
+        // Initialize output folder/filename with saved values
+        const savedOutputFolder = localStorage.getItem('mp4-combiner-output-folder') || '';
+        const savedOutputFilename = localStorage.getItem('mp4-combiner-output-filename') || '';
+        
+        document.getElementById('outputFolder').value = savedOutputFolder;
+        document.getElementById('outputFilename').value = savedOutputFilename;
+
+        // Add event listeners for output folder and filename
+        document.getElementById('browseOutputFolderBtn').addEventListener('click', openOutputFolderBrowser);
+        document.getElementById('autoFillFilenameBtn').addEventListener('click', autoFillFilename);
+        document.getElementById('outputFolder').addEventListener('input', saveOutputSettings);
+        document.getElementById('outputFilename').addEventListener('input', saveOutputSettings);
 
         document.getElementById('combineBtn').addEventListener('click', combineVideos);
     } catch (err) {
@@ -808,13 +830,25 @@ async function scanFolder() {
 }
 
 async function combineVideos() {
-    const outputPath = document.getElementById('outputPath').value.trim();
+    const outputFolder = document.getElementById('outputFolder').value.trim();
+    const outputFilename = document.getElementById('outputFilename').value.trim();
     const statusDiv = document.getElementById('combineStatus');
 
-    if (!outputPath) {
-        statusDiv.innerHTML = '<div class="error">Please enter an output path</div>';
+    if (!outputFolder) {
+        statusDiv.innerHTML = '<div class="error">Please select an output folder</div>';
         return;
     }
+
+    if (!outputFilename) {
+        statusDiv.innerHTML = '<div class="error">Please enter an output filename</div>';
+        return;
+    }
+
+    // Construct the full output path (browser-compatible)
+    const separator = outputFolder.includes('\\') ? '\\' : '/';
+    const outputPath = outputFolder.endsWith(separator) 
+        ? `${outputFolder}${outputFilename}` 
+        : `${outputFolder}${separator}${outputFilename}`;
 
     // Get only checked and visible files
     const checkedFileIndexes = Array.from(document.querySelectorAll('.file-checkbox:checked'))
@@ -848,4 +882,107 @@ async function combineVideos() {
     } catch {
         statusDiv.innerHTML = '<div class="error">Failed to combine videos.</div>';
     }
+}
+
+// Save output folder and filename to localStorage
+function saveOutputSettings() {
+    const outputFolder = document.getElementById('outputFolder')?.value;
+    const outputFilename = document.getElementById('outputFilename')?.value;
+    
+    if (outputFolder && outputFolder.trim()) {
+        localStorage.setItem('mp4-combiner-output-folder', outputFolder);
+    }
+    
+    if (outputFilename && outputFilename.trim()) {
+        localStorage.setItem('mp4-combiner-output-filename', outputFilename);
+    }
+}
+
+// Open output folder browser
+function openOutputFolderBrowser() {
+    // Set a flag to indicate we're browsing for output folder
+    window.browsingForOutput = true;
+    
+    // Reuse the existing folder browser
+    const browseFolderBtn = document.getElementById('browseFolderBtn');
+    browseFolderBtn.click();
+}
+
+// Auto-fill the filename based on selected files
+async function autoFillFilename() {
+    const outputFolder = document.getElementById('outputFolder').value.trim();
+    
+    if (!outputFolder) {
+        alert('Please select an output folder first');
+        return;
+    }
+
+    // Get only checked and visible files
+    const checkedFileIndexes = Array.from(document.querySelectorAll('.file-checkbox:checked'))
+        .filter(cb => cb.closest('.file-item').style.display !== 'none')
+        .map(cb => parseInt(cb.dataset.index));
+
+    const selectedFiles = checkedFileIndexes.map(index => scannedFiles[index]);
+
+    if (selectedFiles.length === 0) {
+        alert('No files selected');
+        return;
+    }
+
+    // Generate filename based on date range and channels
+    const filename = generateFilename(selectedFiles, outputFolder);
+    
+    document.getElementById('outputFilename').value = filename;
+    saveOutputSettings();
+}
+
+// Generate filename with date range and counter
+function generateFilename(selectedFiles, outputFolder) {
+    // Sort files by timestamp
+    const sortedFiles = [...selectedFiles].sort((a, b) => 
+        new Date(a.utcTime).getTime() - new Date(b.utcTime).getTime()
+    );
+    
+    // Get start and end dates
+    const startDate = new Date(sortedFiles[0].utcTime);
+    const endDate = new Date(sortedFiles[sortedFiles.length - 1].utcTime);
+    
+    // Format dates in human-readable short format
+    const startStr = formatShortDate(startDate);
+    const endStr = formatShortDate(endDate);
+    
+    // Determine channels
+    const hasA = selectedFiles.some(f => f.filename.toUpperCase().endsWith('A.MP4'));
+    const hasB = selectedFiles.some(f => f.filename.toUpperCase().endsWith('B.MP4'));
+    let channelStr = '';
+    if (hasA && hasB) {
+        channelStr = '_AB';
+    } else if (hasA) {
+        channelStr = '_A';
+    } else if (hasB) {
+        channelStr = '_B';
+    }
+    
+    // Build base filename
+    let baseFilename;
+    if (startStr === endStr) {
+        baseFilename = `combined_${startStr}${channelStr}`;
+    } else {
+        baseFilename = `combined_${startStr}_to_${endStr}${channelStr}`;
+    }
+    
+    // We'll check for existing files on the server side
+    // For now, return the base filename
+    return baseFilename + '.mp4';
+}
+
+// Format date in short human-readable format: YYYYMMDD_HHMM
+function formatShortDate(date) {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    
+    return `${year}${month}${day}_${hours}${minutes}`;
 }

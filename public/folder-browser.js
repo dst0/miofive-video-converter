@@ -35,10 +35,15 @@ export function initializeFolderBrowser() {
 // Open the folder browser modal
 async function openFolderBrowser() {
     const modal = document.getElementById('folderBrowserModal');
-    const folderPathInput = document.getElementById('folderPath');
     
-    // Start from saved path or home directory
-    currentBrowsePath = folderPathInput.value || null;
+    // Determine starting path based on whether we're browsing for output or input
+    if (window.browsingForOutput) {
+        const outputFolderInput = document.getElementById('outputFolder');
+        currentBrowsePath = outputFolderInput?.value || null;
+    } else {
+        const folderPathInput = document.getElementById('folderPath');
+        currentBrowsePath = folderPathInput?.value || null;
+    }
     
     modal.style.display = 'flex';
     await loadFolderContents(currentBrowsePath);
@@ -53,14 +58,29 @@ function closeFolderBrowser() {
 // Select the current folder and close the browser
 function selectCurrentFolder() {
     if (currentBrowsePath) {
-        const folderPathInput = document.getElementById('folderPath');
-        folderPathInput.value = currentBrowsePath;
-        
-        // Save the selected path to localStorage
-        if (typeof savePaths === 'function') {
-            savePaths();
+        // Check if we're browsing for output folder or input folder
+        if (window.browsingForOutput) {
+            const outputFolderInput = document.getElementById('outputFolder');
+            if (outputFolderInput) {
+                outputFolderInput.value = currentBrowsePath;
+                localStorage.setItem('mp4-combiner-output-folder', currentBrowsePath);
+                
+                // Trigger save function if it exists
+                if (typeof saveOutputSettings === 'function') {
+                    saveOutputSettings();
+                }
+            }
+            window.browsingForOutput = false;
         } else {
-            localStorage.setItem('mp4-combiner-folder-path', currentBrowsePath);
+            const folderPathInput = document.getElementById('folderPath');
+            folderPathInput.value = currentBrowsePath;
+            
+            // Save the selected path to localStorage
+            if (typeof savePaths === 'function') {
+                savePaths();
+            } else {
+                localStorage.setItem('mp4-combiner-folder-path', currentBrowsePath);
+            }
         }
     }
     closeFolderBrowser();
