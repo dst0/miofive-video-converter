@@ -26,7 +26,8 @@ test.describe('Scan Functionality Tests', () => {
       await fs.writeFile(path.join(testDir, filename), 'mock video content');
     }
     
-    // Navigate to the page once for all tests
+    // Navigate to page - needed because tests modify channel states
+    await page.goto('/');
   });
 
   test.afterEach(async () => {
@@ -43,7 +44,7 @@ test.describe('Scan Functionality Tests', () => {
   test('should scan folder and find video files', async ({ page }) => {
     
     // Set the test folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -65,7 +66,7 @@ test.describe('Scan Functionality Tests', () => {
     await page.locator('#channelB').uncheck();
     
     // Set the test folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -84,7 +85,7 @@ test.describe('Scan Functionality Tests', () => {
     await page.locator('#channelA').uncheck();
     
     // Set the test folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -100,7 +101,7 @@ test.describe('Scan Functionality Tests', () => {
   test('should display file list after scanning', async ({ page }) => {
     
     // Set the test folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -122,7 +123,7 @@ test.describe('Scan Functionality Tests', () => {
   test('should have all files checked by default after scan', async ({ page }) => {
     
     // Set the test folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -142,7 +143,7 @@ test.describe('Scan Functionality Tests', () => {
   test('should show timeline after scanning', async ({ page }) => {
     
     // Set the test folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -160,7 +161,7 @@ test.describe('Scan Functionality Tests', () => {
   test('should show combine section after scanning', async ({ page }) => {
     
     // Set the test folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -177,7 +178,7 @@ test.describe('Scan Functionality Tests', () => {
   test('should toggle select all checkbox', async ({ page }) => {
     
     // Set the test folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -212,7 +213,7 @@ test.describe('Scan Functionality Tests', () => {
   test('should handle invalid folder path', async ({ page }) => {
     
     // Set an invalid folder path
-    await page.locator('#folderPath').fill('/nonexistent/path/that/does/not/exist');
+    await page.evaluate(() => { document.getElementById('folderPath').value = '/nonexistent/path/that/does/not/exist'; });
     
     // Click scan button
     await page.locator('#scanBtn').click();
@@ -225,7 +226,7 @@ test.describe('Scan Functionality Tests', () => {
   test('should persist folder path in localStorage', async ({ page }) => {
     
     // Set folder path
-    await page.locator('#folderPath').fill(testDir);
+    await page.evaluate((path) => { document.getElementById('folderPath').value = path; }, testDir);
     
     // Reload page
     await page.reload();
