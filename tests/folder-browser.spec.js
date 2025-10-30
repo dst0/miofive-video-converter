@@ -61,11 +61,11 @@ test.describe('Folder Browser Tests', () => {
     // Open modal
     await page.locator('#browseFolderBtn').click();
     
-    // Wait for folders to load
-    await page.waitForTimeout(1000);
+    // Wait for folders to load by checking for content
+    const folderTree = page.locator('#folderTree');
+    await expect(folderTree).not.toContainText('Loading folders...');
     
     // Check that folder tree has content (not just "Loading folders...")
-    const folderTree = page.locator('#folderTree');
     const content = await folderTree.textContent();
     
     // Should not show loading message after loading
@@ -78,12 +78,10 @@ test.describe('Folder Browser Tests', () => {
     // Open modal
     await page.locator('#browseFolderBtn').click();
     
-    // Wait for current path to load
-    await page.waitForTimeout(1000);
-    
-    // Check current path display exists and has content
+    // Wait for current path to load by checking it's not showing "Loading..."
     const currentPath = page.locator('#currentPathDisplay');
     await expect(currentPath).toBeVisible();
+    await expect(currentPath).not.toHaveText('Loading...');
     
     const pathText = await currentPath.textContent();
     expect(pathText).not.toBe('Loading...');
