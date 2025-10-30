@@ -13,6 +13,10 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+    
+    container:
+      image: jrottenberg/ffmpeg:4.4-ubuntu
+      options: --user root
 
     strategy:
       matrix:
@@ -21,10 +25,28 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
+    
+    - name: Install Node.js dependencies in container
+      run: |
+        apt-get update
+        apt-get install -y curl
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        apt-get install -y nodejs
+    
+    - name: Verify installations
+      run: |
+        node --version
+        npm --version
+        ffmpeg -version
+    
+    - name: Cache npm dependencies
+      uses: actions/cache@v4
       with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+    
     - run: npm ci
     - run: npm run build --if-present
+    - run: npm test --if-present

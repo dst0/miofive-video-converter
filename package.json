@@ -5,12 +5,23 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "postinstall": "node install-ffmpeg.js"
+    "postinstall": "node install-ffmpeg.js",
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui"
   },
-  "keywords": ["video", "mp4", "combiner", "ffmpeg"],
+  "keywords": [
+    "video",
+    "mp4",
+    "combiner",
+    "ffmpeg"
+  ],
   "author": "dst",
   "license": "MIT",
   "dependencies": {
     "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.1"
   }
 }
