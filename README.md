@@ -51,7 +51,7 @@ Each video file follows a specific naming pattern that encodes timing informatio
 
 **Format**: `{MMDDYY}_{HHMMSS}_{MMDDYY}_{HHMMSS}_{dddddd}{C}.MP4`
 
-**Components**:
+**Components** (depends on configuration):
 - **First timestamp** (`MMDDYY_HHMMSS`): UTC date and time when recording started
 - **Second timestamp** (`MMDDYY_HHMMSS`): Local date and time when recording started
 - **Sequence number** (`dddddd`): 6-digit sequential counter
