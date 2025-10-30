@@ -1,5 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const os = require('os');
+const path = require('path');
 
 test.describe('Application Basic Tests', () => {
   test('should load the homepage with correct title', async ({ page }) => {
@@ -70,7 +72,7 @@ test.describe('Application Basic Tests', () => {
     await page.goto('/');
     
     // Set a dummy folder path
-    await page.locator('#folderPath').fill('/tmp/test');
+    await page.locator('#folderPath').fill(path.join(os.tmpdir(), 'test'));
     
     // Uncheck both channels
     await page.locator('#channelA').uncheck();

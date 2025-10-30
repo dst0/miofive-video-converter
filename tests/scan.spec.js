@@ -2,13 +2,14 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
 
 test.describe('Scan Functionality Tests', () => {
   let testDir;
 
   test.beforeEach(async () => {
     // Create a temporary test directory with mock video files
-    testDir = path.join('/tmp', `test-videos-${Date.now()}`);
+    testDir = path.join(os.tmpdir(), `test-videos-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
     
     // Create mock video files with proper naming convention

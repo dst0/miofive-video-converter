@@ -1,5 +1,7 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
+const os = require('os');
+const path = require('path');
 
 test.describe('Folder Browser Tests', () => {
   test('should open folder browser modal when clicking browse button', async ({ page }) => {
@@ -91,7 +93,8 @@ test.describe('Folder Browser Tests', () => {
     await page.goto('/');
     
     // Manually set a folder path
-    await page.locator('#folderPath').fill('/tmp/test');
+    const testPath = path.join(os.tmpdir(), 'test');
+    await page.locator('#folderPath').fill(testPath);
     
     // Open modal
     await page.locator('#browseFolderBtn').click();
@@ -101,6 +104,6 @@ test.describe('Folder Browser Tests', () => {
     await page.locator('#cancelBrowserBtn').click();
     
     // Verify path is still there
-    await expect(page.locator('#folderPath')).toHaveValue('/tmp/test');
+    await expect(page.locator('#folderPath')).toHaveValue(testPath);
   });
 });

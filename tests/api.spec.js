@@ -2,6 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const fs = require('fs').promises;
 const path = require('path');
+const os = require('os');
 
 test.describe('API Endpoint Tests', () => {
   test('GET /check-ffmpeg should return availability status', async ({ request }) => {
@@ -76,7 +77,7 @@ test.describe('API Endpoint Tests', () => {
 
   test('POST /scan with valid folder should return files', async ({ request }) => {
     // Create a temporary test directory with mock video files
-    const testDir = path.join('/tmp', `test-api-${Date.now()}`);
+    const testDir = path.join(os.tmpdir(), `test-api-${Date.now()}`);
     await fs.mkdir(testDir, { recursive: true });
     
     try {
