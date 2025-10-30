@@ -1,11 +1,16 @@
 let scannedFiles = [];
 let ffmpegAvailable = true;
 let timelineData = null;
+let folderBrowserState = {
+    expandedPaths: new Set(),
+    selectedPath: null
+};
 
 document.addEventListener('DOMContentLoaded', () => {
     // Load saved values
     loadSavedPaths();
     initializePreScanFilters();
+    initializeFolderBrowser();
 
     // FFmpeg check
     fetch('/check-ffmpeg')
@@ -22,8 +27,183 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
     document.getElementById('scanBtn').addEventListener('click', scanFolder);
-    document.getElementById('folderPath').addEventListener('input', savePaths);
 });
+
+// Folder Browser functionality
+function initializeFolderBrowser() {
+    const browseFolderBtn = document.getElementById('browseFolderBtn');
+    const closeFolderBrowserBtn = document.getElementById('closeFolderBrowser');
+    const folderBrowserTree = document.getElementById('folderBrowserTree');
+
+    browseFolderBtn.addEventListener('click', () => {
+        folderBrowserTree.style.display = 'flex';
+        loadRootFolders();
+    });
+
+    closeFolderBrowserBtn.addEventListener('click', () => {
+        folderBrowserTree.style.display = 'none';
+    });
+
+    // Close folder browser when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.folder-browser-container') && 
+            folderBrowserTree.style.display === 'flex') {
+            folderBrowserTree.style.display = 'none';
+        }
+    });
+}
+
+async function loadRootFolders() {
+    const treeContent = document.querySelector('.folder-tree-content');
+    treeContent.innerHTML = '<div class="loading"><div class="spinner"></div>Loading folders...</div>';
+
+    try {
+        const response = await fetch('/browse-directories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: null })
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+            treeContent.innerHTML = `<div class="folder-error">${data.error || 'Failed to load folders'}</div>`;
+            return;
+        }
+
+        if (data.folders.length === 0) {
+            treeContent.innerHTML = '<div class="folder-error">No folders found</div>';
+            return;
+        }
+
+        treeContent.innerHTML = '';
+        data.folders.forEach(folder => {
+            treeContent.appendChild(createFolderItem(folder, 0));
+        });
+    } catch (err) {
+        treeContent.innerHTML = '<div class="folder-error">Failed to load folders</div>';
+    }
+}
+
+function createFolderItem(folder, level) {
+    const item = document.createElement('div');
+    item.className = 'folder-item';
+    item.dataset.path = folder.path;
+    item.style.paddingLeft = `${10 + level * 20}px`;
+
+    const content = document.createElement('div');
+    content.className = 'folder-item-content';
+
+    const toggle = document.createElement('span');
+    toggle.className = 'folder-toggle collapsed';
+    
+    const icon = document.createElement('span');
+    icon.className = 'folder-icon';
+    icon.textContent = '📁';
+
+    const name = document.createElement('span');
+    name.className = 'folder-name';
+    name.textContent = folder.name;
+    name.title = folder.path;
+
+    content.appendChild(toggle);
+    content.appendChild(icon);
+    content.appendChild(name);
+    item.appendChild(content);
+
+    // Toggle expansion
+    toggle.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        
+        if (toggle.classList.contains('collapsed')) {
+            await expandFolder(item, folder.path, level);
+            toggle.classList.remove('collapsed');
+            toggle.classList.add('expanded');
+            folderBrowserState.expandedPaths.add(folder.path);
+        } else {
+            collapseFolder(item);
+            toggle.classList.remove('expanded');
+            toggle.classList.add('collapsed');
+            folderBrowserState.expandedPaths.delete(folder.path);
+        }
+    });
+
+    // Select folder
+    item.addEventListener('click', (e) => {
+        if (e.target === toggle) return;
+        
+        // Remove previous selection
+        document.querySelectorAll('.folder-item.selected').forEach(el => {
+            el.classList.remove('selected');
+        });
+        
+        // Add selection to current item
+        item.classList.add('selected');
+        folderBrowserState.selectedPath = folder.path;
+        
+        // Update the input field
+        document.getElementById('folderPath').value = folder.path;
+        savePaths();
+        
+        // Close the browser after selection
+        setTimeout(() => {
+            document.getElementById('folderBrowserTree').style.display = 'none';
+        }, 200);
+    });
+
+    return item;
+}
+
+async function expandFolder(itemElement, folderPath, level) {
+    // Check if already expanded
+    let childrenContainer = itemElement.nextElementSibling;
+    if (childrenContainer && childrenContainer.classList.contains('folder-children')) {
+        return;
+    }
+
+    // Create container for children
+    childrenContainer = document.createElement('div');
+    childrenContainer.className = 'folder-children';
+    childrenContainer.innerHTML = '<div class="folder-loading">Loading...</div>';
+    itemElement.parentNode.insertBefore(childrenContainer, itemElement.nextSibling);
+
+    try {
+        const response = await fetch('/browse-directories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: folderPath })
+        });
+
+        const data = await response.json();
+        childrenContainer.innerHTML = '';
+
+        if (!response.ok) {
+            childrenContainer.innerHTML = `<div class="folder-error">${data.error || 'Failed to load'}</div>`;
+            return;
+        }
+
+        if (data.folders.length === 0) {
+            // No subfolders - mark toggle as empty
+            const toggle = itemElement.querySelector('.folder-toggle');
+            toggle.classList.remove('collapsed', 'expanded');
+            toggle.classList.add('empty');
+            childrenContainer.remove();
+            return;
+        }
+
+        data.folders.forEach(folder => {
+            childrenContainer.appendChild(createFolderItem(folder, level + 1));
+        });
+    } catch (err) {
+        childrenContainer.innerHTML = '<div class="folder-error">Failed to load subfolders</div>';
+    }
+}
+
+function collapseFolder(itemElement) {
+    const childrenContainer = itemElement.nextElementSibling;
+    if (childrenContainer && childrenContainer.classList.contains('folder-children')) {
+        childrenContainer.remove();
+    }
+}
 
 // Function to load saved path values from localStorage
 function loadSavedPaths() {
