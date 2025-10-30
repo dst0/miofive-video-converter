@@ -348,8 +348,8 @@ function createTimeline(files) {
 
     const fileMarkers = files.map((file, index) => {
         const position = ((new Date(file.utcTime).getTime() - actualMin) / (actualMax - actualMin)) * 100;
-        const directoryType = file.directoryType || 'Other';
-        return `<div class="file-marker file-marker-${directoryType.toLowerCase()}" data-index="${index}" data-directory="${directoryType}" style="left: ${position}%" title="${file.filename} (${directoryType})&#10;Click to select ±3 minute range"></div>`;
+        const fileType = file.fileType || 'Other';
+        return `<div class="file-marker file-marker-${fileType.toLowerCase()}" data-index="${index}" data-directory="${fileType}" style="left: ${position}%" title="${file.filename} (${fileType})&#10;Click to select ±3 minute range"></div>`;
     }).join('');
 
     // Generate time markers for midnight and noon

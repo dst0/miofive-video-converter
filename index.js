@@ -91,8 +91,8 @@ function parseFilename(filename) {
     };
 }
 
-// Extract directory type from path (Normal, Emr, Park, or Other)
-function getDirectoryType(filePath) {
+// Extract file type from path (Normal, Emr, Park, or Other)
+function getFileType(filePath) {
     const pathUpper = filePath.toUpperCase();
     if (pathUpper.includes('/EMR') || pathUpper.includes('\\EMR')) {
         return 'Emr';
@@ -133,7 +133,7 @@ async function scanDirectory(dirPath, startTime, endTime) {
                             utcTime: parsed.utcTimestamp.toISOString(),
                             localTime: parsed.localTimestamp.toISOString(),
                             timestamp,
-                            directoryType: getDirectoryType(fullPath)
+                            fileType: getFileType(fullPath)
                         });
                     }
                 }
