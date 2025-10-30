@@ -3,6 +3,13 @@
 
 let currentBrowsePath = null;
 
+// HTML escape function to prevent XSS
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
 // Initialize the folder browser
 export function initializeFolderBrowser() {
     const browseFolderBtn = document.getElementById('browseFolderBtn');
@@ -99,7 +106,7 @@ async function loadFolderContents(path) {
         if (path) {
             const parentPath = getParentPath(path);
             html += `
-                <div class="folder-item parent-folder" data-path="${parentPath || ''}">
+                <div class="folder-item parent-folder" data-path="${escapeHtml(parentPath || '')}">
                     <span class="folder-icon">↩️</span>
                     <span class="folder-name">.. (Parent Directory)</span>
                 </div>
@@ -109,9 +116,9 @@ async function loadFolderContents(path) {
         // Add all subdirectories
         directories.forEach(dir => {
             html += `
-                <div class="folder-item" data-path="${dir.path}">
+                <div class="folder-item" data-path="${escapeHtml(dir.path)}">
                     <span class="folder-icon">📁</span>
-                    <span class="folder-name">${dir.name}</span>
+                    <span class="folder-name">${escapeHtml(dir.name)}</span>
                 </div>
             `;
         });

@@ -135,17 +135,16 @@ app.post('/list-directories', async (req, res) => {
             
             if (platform === 'win32') {
                 // Windows: List available drives
-                const {exec} = require('child_process');
-                exec('wmic logicaldisk get name', (error, stdout) => {
-                    if (error) {
-                        return res.json({directories: [{name: 'C:\\', path: 'C:\\'}]});
-                    }
+                try {
+                    const {stdout} = await execPromise('wmic logicaldisk get name');
                     const drives = stdout.split('\n')
                         .map(line => line.trim())
                         .filter(line => line && line !== 'Name' && line.match(/^[A-Z]:/))
                         .map(drive => ({name: drive + '\\', path: drive + '\\'}));
                     res.json({directories: drives.length > 0 ? drives : [{name: 'C:\\', path: 'C:\\'}]});
-                });
+                } catch (error) {
+                    res.json({directories: [{name: 'C:\\', path: 'C:\\'}]});
+                }
                 return;
             } else {
                 // Unix-like: Start from home directory
