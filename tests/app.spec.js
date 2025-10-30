@@ -43,7 +43,7 @@ test.describe('Application Basic Tests', () => {
   });
 
   test('should show error when scanning without folder path', async ({ page }) => {
-    // folderPath field is readonly and starts empty, so just click scan
+    // folderPath field starts empty, so just click scan without setting it
     await page.locator('#scanBtn').click();
     
     // Wait for error message
