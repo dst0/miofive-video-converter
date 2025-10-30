@@ -91,6 +91,19 @@ function parseFilename(filename) {
     };
 }
 
+// Extract file type from path (Normal, Emr, Park, or Other)
+function getFileType(filePath) {
+    const pathUpper = filePath.toUpperCase();
+    if (pathUpper.includes('/EMR') || pathUpper.includes('\\EMR')) {
+        return 'Emr';
+    } else if (pathUpper.includes('/NORMAL') || pathUpper.includes('\\NORMAL')) {
+        return 'Normal';
+    } else if (pathUpper.includes('/PARK') || pathUpper.includes('\\PARK')) {
+        return 'Park';
+    }
+    return 'Other';
+}
+
 // Recursively scan directory
 async function scanDirectory(dirPath, startTime, endTime) {
     const results = [];
@@ -119,7 +132,8 @@ async function scanDirectory(dirPath, startTime, endTime) {
                             filename: entry.name,
                             utcTime: parsed.utcTimestamp.toISOString(),
                             localTime: parsed.localTimestamp.toISOString(),
-                            timestamp
+                            timestamp,
+                            fileType: getFileType(fullPath)
                         });
                     }
                 }
