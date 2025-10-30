@@ -31,11 +31,13 @@ When you insert a Miofive S1 Ultra dashcam microSD card into your computer, you'
 
 ```
 /
-├── DCIM/                    # Main directory for camera files
-│   ├── MOVIE/               # Regular recording mode videos
-│   ├── PHOTO/               # Photo snapshots (if enabled)
-│   └── EVENT/               # Event/incident recordings (G-sensor triggered)
-├── SYSTEM/                  # System configuration files
+|── CarDV/                      # Main directory for camera files
+|    |── Movie/                 # Recording videos
+|    |    |── Emr/                # Emergency recording mode videos (also car start and stop)
+|    |    |── Normal/          # Regular recording mode videos
+|    |    |── Park/               # Parking recording mode videos (mostly when there is a movement outside)
+|    |── Photo/                 # Photo snapshots (if enabled)
+|── LOG/                         # System log files
 └── [other root files]       # Firmware and system data
 ```
 
