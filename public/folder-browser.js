@@ -114,11 +114,26 @@ async function loadFolderContents(path) {
             `;
         }
         
-        // Add all subdirectories
+        // Add all subdirectories with appropriate icons based on type
         directories.forEach(dir => {
+            let icon = '📁'; // Default folder icon
+            let itemClass = 'folder-item';
+            
+            // Set icon based on type
+            if (dir.type === 'drive') {
+                icon = '💾'; // Floppy disk for drives
+                itemClass += ' drive-item';
+            } else if (dir.type === 'common') {
+                icon = '⭐'; // Star for common places
+                itemClass += ' common-item';
+            } else if (dir.type === 'system') {
+                icon = '🖥️'; // Computer for system locations
+                itemClass += ' system-item';
+            }
+            
             html += `
-                <div class="folder-item" data-path="${escapeHtml(dir.path)}">
-                    <span class="folder-icon">📁</span>
+                <div class="${itemClass}" data-path="${escapeHtml(dir.path)}">
+                    <span class="folder-icon">${icon}</span>
                     <span class="folder-name">${escapeHtml(dir.name)}</span>
                 </div>
             `;

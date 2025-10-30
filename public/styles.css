@@ -777,6 +777,50 @@ button.secondary:hover {
     font-style: italic;
 }
 
+/* Drive items (Windows drives) */
+.folder-item.drive-item {
+    background-color: #f0f8ff;
+    font-weight: 500;
+}
+
+.folder-item.drive-item:hover {
+    background-color: #e1f0ff;
+}
+
+.folder-item.drive-item .folder-icon {
+    font-size: 20px;
+}
+
+/* Common places items (Desktop, Documents, etc.) */
+.folder-item.common-item {
+    background-color: #fffef0;
+    font-weight: 500;
+}
+
+.folder-item.common-item:hover {
+    background-color: #fffde0;
+}
+
+.folder-item.common-item .folder-icon {
+    font-size: 18px;
+    color: #ffa500;
+}
+
+/* System items (/Volumes, /media, etc.) */
+.folder-item.system-item {
+    background-color: #f5f5f5;
+    font-weight: 500;
+}
+
+.folder-item.system-item:hover {
+    background-color: #e8e8e8;
+}
+
+.folder-item.system-item .folder-icon {
+    font-size: 18px;
+    color: #6c757d;
+}
+
 .empty-folder-message {
     text-align: center;
     padding: 40px 20px;
