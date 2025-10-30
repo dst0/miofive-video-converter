@@ -161,6 +161,9 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
+    // Wait for page to be loaded by checking for the header
+    await expect(page.locator('h1')).toBeVisible();
+    
     // Check main UI elements
     await expect(page.locator('h1')).toContainText('Video Player');
     await expect(page.locator('#backBtn')).toBeVisible();
@@ -242,11 +245,11 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for video player to be ready
+    // Wait for video player to be ready (with explicit timeout)
     await page.waitForFunction(() => {
       const video = document.querySelector('#videoPlayer');
       return video && video.readyState >= 3;
-    });
+    }, { timeout: 10000 });
     
     // Previous button should be disabled (first video)
     await expect(page.locator('#prevBtn')).toBeDisabled();
@@ -355,11 +358,11 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for video player to be ready
+    // Wait for video player to be ready (with explicit timeout)
     await page.waitForFunction(() => {
       const video = document.querySelector('#videoPlayer');
       return video && video.readyState >= 3;
-    });
+    }, { timeout: 10000 });
     
     // Change speed to 2x
     await page.locator('#speedControl').selectOption('2');
