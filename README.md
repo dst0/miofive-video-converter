@@ -38,6 +38,8 @@ When you insert a Miofive S1 Ultra dashcam microSD card into your computer, you'
 |    |    |── Park/               # Parking recording mode videos (mostly when there is a movement outside)
 |    |── Photo/                 # Photo snapshots (if enabled)
 |── LOG/                         # System log files
+|    |── DEVLOG/                 # Dev logs
+|    |── GPSLOG/                 # GPS logs
 └── [other root files]       # Firmware and system data
 ```
 
