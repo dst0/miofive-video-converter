@@ -192,6 +192,56 @@ button.secondary:hover {
     border: 1px solid #e0e6ff;
 }
 
+/* Timeline legend */
+.timeline-legend {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 15px;
+    padding: 10px;
+    background: #ffffff;
+    border-radius: 6px;
+    border: 1px solid #d0d8ff;
+    flex-wrap: wrap;
+}
+
+.legend-label {
+    font-weight: 600;
+    color: #333;
+    font-size: 13px;
+}
+
+.legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: #555;
+}
+
+.legend-marker {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    display: inline-block;
+}
+
+.legend-marker-normal {
+    background: #4a90e2;
+}
+
+.legend-marker-emr {
+    background: #e74c3c;
+}
+
+.legend-marker-park {
+    background: #f39c12;
+}
+
+.legend-marker-other {
+    background: #95a5a6;
+}
+
 .timeline-container {
     width: 100%;
 }
@@ -244,13 +294,49 @@ button.secondary:hover {
     background: #667eea;
     border-radius: 4px;
     transform: translate(-50%, -50%);
-    transition: opacity 0.3s;
-    z-index: 2;
+    transition: opacity 0.3s, transform 0.2s;
+    z-index: 4;
+    cursor: pointer;
+    pointer-events: auto;
+}
+
+/* Color-coded file markers based on directory type */
+.file-marker-normal {
+    background: #4a90e2; /* Blue for Normal recordings */
+}
+
+.file-marker-emr {
+    background: #e74c3c; /* Red for Emergency recordings */
+}
+
+.file-marker-park {
+    background: #f39c12; /* Orange for Parking recordings */
+}
+
+.file-marker-other {
+    background: #95a5a6; /* Gray for Other/Unknown */
 }
 
 .file-marker:hover {
-    background: #5568d3;
-    transform: translate(-50%, -50%) scale(1.2);
+    transform: translate(-50%, -50%) scale(1.3);
+    box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+}
+
+/* Hover colors for each type */
+.file-marker-normal:hover {
+    background: #357abd;
+}
+
+.file-marker-emr:hover {
+    background: #c0392b;
+}
+
+.file-marker-park:hover {
+    background: #d68910;
+}
+
+.file-marker-other:hover {
+    background: #7f8c8d;
 }
 
 .timeline-range {
@@ -273,6 +359,7 @@ button.secondary:hover {
     transform: translateY(-50%);
     left: 0%;
     width: 100%;
+    pointer-events: none;
 }
 
 .range-selection::before {

@@ -348,7 +348,8 @@ function createTimeline(files) {
 
     const fileMarkers = files.map((file, index) => {
         const position = ((new Date(file.utcTime).getTime() - actualMin) / (actualMax - actualMin)) * 100;
-        return `<div class="file-marker" data-index="${index}" style="left: ${position}%" title="${file.filename}"></div>`;
+        const directoryType = file.directoryType || 'Other';
+        return `<div class="file-marker file-marker-${directoryType.toLowerCase()}" data-index="${index}" data-directory="${directoryType}" style="left: ${position}%" title="${file.filename} (${directoryType})&#10;Click to select ±3 minute range"></div>`;
     }).join('');
 
     // Generate time markers for midnight and noon
@@ -357,6 +358,13 @@ function createTimeline(files) {
     return `
         <div class="timeline-section">
             <div class="section-title">2. Set Date Range Filter</div>
+            <div class="timeline-legend">
+                <span class="legend-label">File Markers:</span>
+                <span class="legend-item"><span class="legend-marker legend-marker-normal"></span> Normal</span>
+                <span class="legend-item"><span class="legend-marker legend-marker-emr"></span> Emergency</span>
+                <span class="legend-item"><span class="legend-marker legend-marker-park"></span> Parking</span>
+                <span class="legend-item"><span class="legend-marker legend-marker-other"></span> Other</span>
+            </div>
             <div class="timeline-container">
                 <div class="timeline-labels">
                     <span class="timeline-label-start">${new Date(actualMin).toLocaleString()}</span>
@@ -602,8 +610,21 @@ function initializeTimeline() {
     document.addEventListener('click', (e) => {
         const timeMarker = e.target.closest('.time-marker');
         const halfDayZone = e.target.closest('.half-day-zone');
+        const fileMarker = e.target.closest('.file-marker');
 
-        if (timeMarker && timeMarker.dataset.time) {
+        if (fileMarker && fileMarker.dataset.index) {
+            // File marker clicked: select range -3 to +3 minutes (6 minute window)
+            const MINI_RANGE_MINUTES = 3; // Constant for now, will be configurable later
+            const fileIndex = parseInt(fileMarker.dataset.index);
+            const file = scannedFiles[fileIndex];
+            const fileTime = new Date(file.utcTime).getTime();
+            
+            // Calculate -3 and +3 minutes range
+            const rangeStart = fileTime - (MINI_RANGE_MINUTES * 60 * 1000);
+            const rangeEnd = fileTime + (MINI_RANGE_MINUTES * 60 * 1000);
+            
+            setRangeFromTimes(rangeStart, rangeEnd);
+        } else if (timeMarker && timeMarker.dataset.time) {
             const markerTime = parseInt(timeMarker.dataset.time);
             const markerType = timeMarker.dataset.type;
 
