@@ -4,9 +4,11 @@ const os = require('os');
 const path = require('path');
 
 test.describe('Application Basic Tests', () => {
-  test('should load the homepage with correct title', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    
+  });
+
+  test('should load homepage with correct structure', async ({ page }) => {
     // Check page title
     await expect(page).toHaveTitle(/MP4 Video Combiner/);
     
@@ -17,26 +19,14 @@ test.describe('Application Basic Tests', () => {
     // Check subtitle
     const subtitle = page.locator('.subtitle');
     await expect(subtitle).toContainText('Scan folders for timestamped videos');
-  });
-
-  test('should have all main UI elements visible', async ({ page }) => {
-    await page.goto('/');
     
-    // Check channel checkboxes
+    // Check all main UI elements are visible
     await expect(page.locator('#channelA')).toBeVisible();
     await expect(page.locator('#channelB')).toBeVisible();
-    
-    // Check both channels are checked by default
     await expect(page.locator('#channelA')).toBeChecked();
     await expect(page.locator('#channelB')).toBeChecked();
-    
-    // Check folder input
     await expect(page.locator('#folderPath')).toBeVisible();
-    
-    // Check browse button
     await expect(page.locator('#browseFolderBtn')).toBeVisible();
-    
-    // Check scan button
     await expect(page.locator('#scanBtn')).toBeVisible();
     await expect(page.locator('#scanBtn')).toHaveText('Scan');
   });
@@ -44,8 +34,6 @@ test.describe('Application Basic Tests', () => {
   test('should check FFmpeg availability', async ({ page }) => {
     // Listen for the API call
     const responsePromise = page.waitForResponse('/check-ffmpeg');
-    
-    await page.goto('/');
     
     const response = await responsePromise;
     expect(response.ok()).toBeTruthy();
@@ -55,12 +43,7 @@ test.describe('Application Basic Tests', () => {
   });
 
   test('should show error when scanning without folder path', async ({ page }) => {
-    await page.goto('/');
-    
-    // Clear folder path if any
-    await page.locator('#folderPath').clear();
-    
-    // Click scan button
+    // folderPath field starts empty, so just click scan without setting it
     await page.locator('#scanBtn').click();
     
     // Wait for error message
@@ -69,9 +52,7 @@ test.describe('Application Basic Tests', () => {
   });
 
   test('should show error when no channels are selected', async ({ page }) => {
-    await page.goto('/');
-    
-    // Set a dummy folder path
+    // Set a folder path first (to test channel validation, not folder validation)
     await page.locator('#folderPath').fill(path.join(os.tmpdir(), 'test'));
     
     // Uncheck both channels
@@ -88,43 +69,35 @@ test.describe('Application Basic Tests', () => {
 });
 
 test.describe('Pre-Scan Filters', () => {
-  test('should have pre-scan filter controls', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/');
-    
-    // Check filter toggle checkbox
+  });
+
+  test('should have pre-scan filter controls and toggle visibility', async ({ page }) => {
+    // Check filter toggle checkbox is visible and unchecked by default
     await expect(page.locator('#enablePreScanFilters')).toBeVisible();
     await expect(page.locator('#enablePreScanFilters')).not.toBeChecked();
     
     // Filter controls should be hidden by default
     await expect(page.locator('#preScanFilterControls')).not.toBeVisible();
-  });
-
-  test('should show filter controls when enabled', async ({ page }) => {
-    await page.goto('/');
     
     // Enable filters
     await page.locator('#enablePreScanFilters').check();
     
-    // Filter controls should be visible
+    // Filter controls should now be visible
     await expect(page.locator('#preScanFilterControls')).toBeVisible();
     
-    // Check filter inputs
+    // Check all filter UI elements are present
     await expect(page.locator('#preScanStartTime')).toBeVisible();
     await expect(page.locator('#preScanEndTime')).toBeVisible();
-    
-    // Check clear buttons
     await expect(page.locator('#clearStartTime')).toBeVisible();
     await expect(page.locator('#clearEndTime')).toBeVisible();
-    
-    // Check preset buttons
     await expect(page.locator('[data-preset="today"]')).toBeVisible();
     await expect(page.locator('[data-preset="yesterday"]')).toBeVisible();
     await expect(page.locator('[data-preset="last7days"]')).toBeVisible();
   });
 
-  test('should apply date presets correctly', async ({ page }) => {
-    await page.goto('/');
-    
+  test('should apply date presets and clear filters', async ({ page }) => {
     // Enable filters
     await page.locator('#enablePreScanFilters').check();
     
@@ -142,23 +115,11 @@ test.describe('Pre-Scan Filters', () => {
     const today = new Date().toISOString().split('T')[0];
     expect(startTime).toContain(today);
     expect(endTime).toContain(today);
-  });
-
-  test('should clear filter values with clear buttons', async ({ page }) => {
-    await page.goto('/');
     
-    // Enable filters and set a preset
-    await page.locator('#enablePreScanFilters').check();
-    await page.locator('[data-preset="today"]').click();
-    
-    // Verify values are set
-    await expect(page.locator('#preScanStartTime')).not.toHaveValue('');
-    
-    // Clear start time
+    // Test clearing filters
     await page.locator('#clearStartTime').click();
     await expect(page.locator('#preScanStartTime')).toHaveValue('');
     
-    // Clear end time
     await page.locator('#clearEndTime').click();
     await expect(page.locator('#preScanEndTime')).toHaveValue('');
   });
