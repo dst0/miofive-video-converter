@@ -53,6 +53,8 @@ Each video file follows a specific naming pattern that encodes timing informatio
 - **Sequence number** (`dddddd`): 6-digit sequential counter
 - **Camera channel** (`C`): Either `A` (front camera) or `B` (rear camera)
 
+**Note**: Timestamp interpretation may vary depending on firmware version or timezone settings. The tool uses the first timestamp for sorting and filtering.
+
 **Example**: `010125_143052_010125_093052_000001A.MP4`
 - UTC time: January 1, 2025, 14:30:52
 - Local time: January 1, 2025, 09:30:52 (UTC-5)
