@@ -963,19 +963,19 @@ function generateFilename(selectedFiles, outputFolder) {
     const hasB = selectedFiles.some(f => f.filename.toUpperCase().endsWith('B.MP4'));
     let channelStr = '';
     if (hasA && hasB) {
-        channelStr = '_AB';
+        channelStr = '_Front-Back-cam';
     } else if (hasA) {
-        channelStr = '_A';
+        channelStr = '_Front-cam';
     } else if (hasB) {
-        channelStr = '_B';
+        channelStr = '_Back-cam';
     }
     
     // Build base filename
     let baseFilename;
     if (startStr === endStr) {
-        baseFilename = `combined_${startStr}${channelStr}`;
+        baseFilename = `combined_from_${startStr}${channelStr}`;
     } else {
-        baseFilename = `combined_${startStr}_to_${endStr}${channelStr}`;
+        baseFilename = `combined_from_${startStr}_to_${endStr}${channelStr}`;
     }
     
     // We'll check for existing files on the server side
@@ -983,13 +983,14 @@ function generateFilename(selectedFiles, outputFolder) {
     return baseFilename + '.mp4';
 }
 
-// Format date in short human-readable format: YYYYMMDD_HHMM
+// Format date in human-readable format: YYYY-MMM-DD_HH-MM
 function formatShortDate(date) {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const month = monthNames[date.getMonth()];
     const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
     
-    return `${year}${month}${day}_${hours}${minutes}`;
+    return `${year}-${month}-${day}_${hours}-${minutes}`;
 }
