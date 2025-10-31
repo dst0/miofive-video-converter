@@ -1,8 +1,17 @@
-// Video Player JavaScript
+// Video Player JavaScript - Dual Player Architecture
 
 let videoFiles = [];
 let currentVideoIndex = 0;
 let timelineData = null;
+let activePlayerIndex = 0; // 0 or 1, which player is currently active
+let videoPlayers = [null, null]; // References to both video elements
+let videoSources = [null, null]; // References to both source elements
+let totalDuration = 0; // Total duration of all videos combined
+let videoDurations = []; // Array of individual video durations
+let videoStartTimes = []; // Array of start times for each video in combined timeline
+let isSeekingGlobal = false; // Flag for global seeking
+let currentGlobalTime = 0; // Current playback time across all videos
+let isDraggingProgress = false; // Flag for progress bar dragging
 
 // HTML escape function to prevent XSS
 function escapeHtml(text) {
@@ -41,9 +50,16 @@ document.addEventListener('DOMContentLoaded', () => {
     // Sort files by timestamp
     videoFiles.sort((a, b) => new Date(a.utcTime).getTime() - new Date(b.utcTime).getTime());
     
+    // Initialize dual players
+    videoPlayers[0] = document.getElementById('videoPlayer1');
+    videoPlayers[1] = document.getElementById('videoPlayer2');
+    videoSources[0] = document.getElementById('videoSource1');
+    videoSources[1] = document.getElementById('videoSource2');
+    
     // Initialize player
     initializePlayer();
     initializeTimeline();
+    initializeCustomControls();
     
     // Set up event listeners
     document.getElementById('backBtn').addEventListener('click', () => {
@@ -62,55 +78,162 @@ document.addEventListener('DOMContentLoaded', () => {
         togglePlayPause();
     });
     
-    document.getElementById('speedControl').addEventListener('change', (e) => {
-        changePlaybackSpeed(parseFloat(e.target.value));
+    // Speed control event listeners
+    document.getElementById('speedInput').addEventListener('input', (e) => {
+        const speed = parseFloat(e.target.value);
+        if (speed >= 0.1 && speed <= 50) {
+            changePlaybackSpeed(speed);
+        }
     });
     
-    // Video player events
-    const videoPlayer = document.getElementById('videoPlayer');
-    
-    videoPlayer.addEventListener('ended', () => {
-        playNextVideo();
+    document.getElementById('speedSlider').addEventListener('input', (e) => {
+        const speed = parseFloat(e.target.value);
+        changePlaybackSpeed(speed);
     });
     
-    videoPlayer.addEventListener('timeupdate', () => {
-        updatePlaybackPosition();
-        updateVideoInfo();
+    // Speed preset buttons
+    document.querySelectorAll('.preset-speed-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const speed = parseFloat(btn.dataset.speed);
+            changePlaybackSpeed(speed);
+        });
     });
     
-    videoPlayer.addEventListener('play', () => {
-        document.getElementById('playPauseBtn').textContent = '⏸ Pause';
+    // Video player events for both players
+    videoPlayers.forEach((player, index) => {
+        player.addEventListener('ended', () => {
+            if (index === activePlayerIndex) {
+                playNextVideo();
+            }
+        });
+        
+        player.addEventListener('timeupdate', () => {
+            if (index === activePlayerIndex && !isDraggingProgress) {
+                updatePlaybackPosition();
+                updateVideoInfo();
+                updateCustomProgressBar();
+            }
+        });
+        
+        player.addEventListener('play', () => {
+            if (index === activePlayerIndex) {
+                document.getElementById('playPauseBtn').textContent = '⏸ Pause';
+                document.querySelector('#playPauseOverlayBtn .btn-icon').textContent = '⏸';
+            }
+        });
+        
+        player.addEventListener('pause', () => {
+            if (index === activePlayerIndex) {
+                document.getElementById('playPauseBtn').textContent = '▶ Play';
+                document.querySelector('#playPauseOverlayBtn .btn-icon').textContent = '▶';
+            }
+        });
+        
+        player.addEventListener('loadedmetadata', () => {
+            if (player.dataset.videoIndex !== undefined) {
+                const videoIdx = parseInt(player.dataset.videoIndex);
+                videoDurations[videoIdx] = player.duration || 0;
+                updateTotalDuration();
+                updateCustomProgressBar();
+            }
+        });
     });
     
-    videoPlayer.addEventListener('pause', () => {
-        document.getElementById('playPauseBtn').textContent = '▶ Play';
-    });
-    
-    // Load first video
-    loadVideo(0);
+    // Load first video and preload second
+    loadVideoIntoPlayer(0, activePlayerIndex);
+    if (videoFiles.length > 1) {
+        preloadNextVideo();
+    }
 });
 
 // Initialize player controls
 function initializePlayer() {
-    const videoPlayer = document.getElementById('videoPlayer');
-    videoPlayer.volume = 1.0;
+    // Initialize volume
+    videoPlayers.forEach(player => {
+        player.volume = 1.0;
+    });
+    
+    // Initialize video durations array
+    videoDurations = new Array(videoFiles.length).fill(0);
+    videoStartTimes = new Array(videoFiles.length).fill(0);
 }
 
-// Load a video by index
+// Calculate total duration and start times for each video
+function updateTotalDuration() {
+    totalDuration = 0;
+    for (let i = 0; i < videoFiles.length; i++) {
+        videoStartTimes[i] = totalDuration;
+        totalDuration += videoDurations[i] || 0;
+    }
+    updateCustomProgressBar();
+}
+
+// Load a video into a specific player (0 or 1)
+function loadVideoIntoPlayer(videoIndex, playerIndex) {
+    if (videoIndex < 0 || videoIndex >= videoFiles.length) {
+        return;
+    }
+    
+    const videoFile = videoFiles[videoIndex];
+    const player = videoPlayers[playerIndex];
+    const source = videoSources[playerIndex];
+    
+    // Set video source
+    const videoURL = `/video?path=${encodeURIComponent(videoFile.path)}`;
+    source.src = videoURL;
+    player.dataset.videoIndex = videoIndex;
+    player.load();
+}
+
+// Preload the next video into the inactive player
+function preloadNextVideo() {
+    const nextVideoIndex = currentVideoIndex + 1;
+    if (nextVideoIndex < videoFiles.length) {
+        const nextPlayerIndex = 1 - activePlayerIndex;
+        loadVideoIntoPlayer(nextVideoIndex, nextPlayerIndex);
+    }
+}
+
+// Switch to the next video (seamless transition using dual players)
+function switchToNextVideo() {
+    const nextVideoIndex = currentVideoIndex + 1;
+    if (nextVideoIndex >= videoFiles.length) {
+        return false;
+    }
+    
+    // Switch active player
+    const previousPlayerIndex = activePlayerIndex;
+    activePlayerIndex = 1 - activePlayerIndex;
+    currentVideoIndex = nextVideoIndex;
+    
+    // Hide previous player, show new active player
+    videoPlayers[previousPlayerIndex].classList.remove('active-player');
+    videoPlayers[activePlayerIndex].classList.add('active-player');
+    
+    // Start playback on new active player
+    videoPlayers[activePlayerIndex].currentTime = 0;
+    videoPlayers[activePlayerIndex].play().catch(err => {
+        console.error('Error playing video:', err);
+    });
+    
+    // Preload the next video into the now-inactive player
+    preloadNextVideo();
+    
+    return true;
+}
+
+// Load a video by index (used for seeking/jumping)
 function loadVideo(index) {
     if (index < 0 || index >= videoFiles.length) {
         return;
     }
     
+    // If seeking backward or far forward, need to reload
     currentVideoIndex = index;
     const videoFile = videoFiles[index];
-    const videoPlayer = document.getElementById('videoPlayer');
-    const videoSource = document.getElementById('videoSource');
     
-    // Set video source
-    const videoURL = `/video?path=${encodeURIComponent(videoFile.path)}`;
-    videoSource.src = videoURL;
-    videoPlayer.load();
+    // Load into active player
+    loadVideoIntoPlayer(index, activePlayerIndex);
     
     // Update video info - textContent is safe from XSS (unlike innerHTML)
     // It treats the value as plain text, not HTML
@@ -122,12 +245,28 @@ function loadVideo(index) {
     
     // Highlight current file marker
     highlightCurrentMarker();
+    
+    // Preload next video if available
+    if (index + 1 < videoFiles.length) {
+        const nextPlayerIndex = 1 - activePlayerIndex;
+        loadVideoIntoPlayer(index + 1, nextPlayerIndex);
+    }
 }
 
 // Play next video
 function playNextVideo() {
-    if (currentVideoIndex < videoFiles.length - 1) {
-        loadVideo(currentVideoIndex + 1);
+    // Try seamless transition first
+    if (switchToNextVideo()) {
+        updateVideoInfo();
+        highlightCurrentMarker();
+        updateCustomProgressBar();
+        return;
+    }
+    
+    // If no next video, just ensure UI is updated
+    if (currentVideoIndex >= videoFiles.length - 1) {
+        // Already at last video
+        return;
     }
 }
 
@@ -140,25 +279,31 @@ function playPreviousVideo() {
 
 // Toggle play/pause
 function togglePlayPause() {
-    const videoPlayer = document.getElementById('videoPlayer');
-    if (videoPlayer.paused) {
-        videoPlayer.play();
+    const activePlayer = videoPlayers[activePlayerIndex];
+    if (activePlayer.paused) {
+        activePlayer.play();
     } else {
-        videoPlayer.pause();
+        activePlayer.pause();
     }
 }
 
 // Change playback speed
 function changePlaybackSpeed(speed) {
-    const videoPlayer = document.getElementById('videoPlayer');
-    videoPlayer.playbackRate = speed;
+    videoPlayers.forEach(player => {
+        player.playbackRate = speed;
+    });
+    
+    // Update speed display
+    document.getElementById('speedInput').value = speed;
+    document.getElementById('speedSlider').value = speed;
+    document.getElementById('speedValue').textContent = `${speed.toFixed(1)}x`;
 }
 
 // Update video info display
 function updateVideoInfo() {
-    const videoPlayer = document.getElementById('videoPlayer');
-    const currentTime = formatTime(videoPlayer.currentTime);
-    const duration = formatTime(videoPlayer.duration);
+    const activePlayer = videoPlayers[activePlayerIndex];
+    const currentTime = formatTime(activePlayer.currentTime);
+    const duration = formatTime(activePlayer.duration);
     
     document.getElementById('videoProgress').textContent = 
         `${currentTime} / ${duration} | Video ${currentVideoIndex + 1} of ${videoFiles.length}`;
@@ -299,14 +444,14 @@ function generateTimeMarkers(minTime, maxTime) {
 function updatePlaybackPosition() {
     if (!timelineData) return;
     
-    const videoPlayer = document.getElementById('videoPlayer');
+    const activePlayer = videoPlayers[activePlayerIndex];
     const currentFile = videoFiles[currentVideoIndex];
     
     if (!currentFile) return;
     
     // Calculate the time offset of current video in the overall timeline
     const videoStartTime = new Date(currentFile.utcTime).getTime();
-    const currentVideoTime = videoPlayer.currentTime * 1000; // Convert to milliseconds
+    const currentVideoTime = activePlayer.currentTime * 1000; // Convert to milliseconds
     const totalTime = videoStartTime + currentVideoTime;
     
     // Calculate position percentage
@@ -328,5 +473,175 @@ function highlightCurrentMarker() {
     const currentMarker = document.querySelector(`.file-marker[data-index="${currentVideoIndex}"]`);
     if (currentMarker) {
         currentMarker.classList.add('current-marker');
+    }
+}
+
+// Initialize custom controls overlay
+function initializeCustomControls() {
+    const progressContainer = document.getElementById('progressBarContainer');
+    const progressHandle = document.getElementById('progressHandle');
+    const playPauseOverlayBtn = document.getElementById('playPauseOverlayBtn');
+    const muteBtn = document.getElementById('muteBtn');
+    const volumeSlider = document.getElementById('volumeSlider');
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    
+    // Play/Pause button
+    playPauseOverlayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        togglePlayPause();
+    });
+    
+    // Mute button
+    muteBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const activePlayer = videoPlayers[activePlayerIndex];
+        activePlayer.muted = !activePlayer.muted;
+        muteBtn.querySelector('.btn-icon').textContent = activePlayer.muted ? '🔇' : '🔊';
+        
+        // Apply to both players
+        videoPlayers.forEach(player => {
+            player.muted = activePlayer.muted;
+        });
+    });
+    
+    // Volume slider
+    volumeSlider.addEventListener('input', (e) => {
+        const volume = e.target.value / 100;
+        videoPlayers.forEach(player => {
+            player.volume = volume;
+            player.muted = false;
+        });
+        muteBtn.querySelector('.btn-icon').textContent = volume === 0 ? '🔇' : '🔊';
+    });
+    
+    // Fullscreen button
+    fullscreenBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const videoWrapper = document.querySelector('.video-wrapper');
+        if (!document.fullscreenElement) {
+            videoWrapper.requestFullscreen().catch(err => {
+                console.error('Error entering fullscreen:', err);
+            });
+        } else {
+            document.exitFullscreen();
+        }
+    });
+    
+    // Progress bar seeking
+    let isDragging = false;
+    
+    const startDrag = (e) => {
+        isDragging = true;
+        isDraggingProgress = true;
+        handleProgressDrag(e);
+    };
+    
+    const handleProgressDrag = (e) => {
+        if (!isDragging) return;
+        
+        const rect = progressContainer.getBoundingClientRect();
+        const clickX = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+        const percent = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+        
+        // Update progress bar visually
+        updateProgressBarVisual(percent);
+    };
+    
+    const endDrag = (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        
+        const rect = progressContainer.getBoundingClientRect();
+        const clickX = (e.clientX || e.changedTouches?.[0]?.clientX) - rect.left;
+        const percent = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
+        
+        // Seek to the clicked position
+        seekToGlobalPercent(percent);
+        
+        setTimeout(() => {
+            isDraggingProgress = false;
+        }, 100);
+    };
+    
+    progressHandle.addEventListener('mousedown', startDrag);
+    progressContainer.addEventListener('mousedown', startDrag);
+    document.addEventListener('mousemove', handleProgressDrag);
+    document.addEventListener('mouseup', endDrag);
+    
+    // Touch support
+    progressHandle.addEventListener('touchstart', startDrag);
+    progressContainer.addEventListener('touchstart', startDrag);
+    document.addEventListener('touchmove', handleProgressDrag);
+    document.addEventListener('touchend', endDrag);
+}
+
+// Update custom progress bar based on current playback
+function updateCustomProgressBar() {
+    if (totalDuration === 0) return;
+    
+    // Calculate current global time
+    const activePlayer = videoPlayers[activePlayerIndex];
+    const videoIdx = parseInt(activePlayer.dataset.videoIndex);
+    
+    if (videoIdx === undefined || videoDurations[videoIdx] === undefined) return;
+    
+    currentGlobalTime = videoStartTimes[videoIdx] + activePlayer.currentTime;
+    const percent = (currentGlobalTime / totalDuration) * 100;
+    
+    updateProgressBarVisual(percent);
+    
+    // Update time display
+    document.getElementById('currentTime').textContent = formatTime(currentGlobalTime);
+    document.getElementById('totalDuration').textContent = formatTime(totalDuration);
+}
+
+// Update progress bar visual appearance
+function updateProgressBarVisual(percent) {
+    const progressPlayed = document.getElementById('progressPlayed');
+    const progressHandle = document.getElementById('progressHandle');
+    
+    progressPlayed.style.width = `${percent}%`;
+    progressHandle.style.left = `${percent}%`;
+}
+
+// Seek to a specific percentage of the total duration
+function seekToGlobalPercent(percent) {
+    const targetTime = (percent / 100) * totalDuration;
+    seekToGlobalTime(targetTime);
+}
+
+// Seek to a specific time in the global timeline
+function seekToGlobalTime(targetTime) {
+    // Find which video this time corresponds to
+    let targetVideoIndex = 0;
+    let localTime = targetTime;
+    
+    for (let i = 0; i < videoFiles.length; i++) {
+        if (videoStartTimes[i] + videoDurations[i] > targetTime) {
+            targetVideoIndex = i;
+            localTime = targetTime - videoStartTimes[i];
+            break;
+        }
+    }
+    
+    // If we need to change videos
+    if (targetVideoIndex !== currentVideoIndex) {
+        currentVideoIndex = targetVideoIndex;
+        loadVideo(targetVideoIndex);
+        
+        // Wait for video to load, then seek
+        const checkLoaded = setInterval(() => {
+            const activePlayer = videoPlayers[activePlayerIndex];
+            if (activePlayer.readyState >= 2) { // HAVE_CURRENT_DATA or better
+                clearInterval(checkLoaded);
+                activePlayer.currentTime = localTime;
+                updateCustomProgressBar();
+            }
+        }, 50);
+    } else {
+        // Same video, just seek
+        const activePlayer = videoPlayers[activePlayerIndex];
+        activePlayer.currentTime = localTime;
+        updateCustomProgressBar();
     }
 }
