@@ -39,6 +39,7 @@
     background: #000;
     border-radius: 8px;
     overflow: hidden;
+<<<<<<< HEAD
     min-height: 400px; /* Prevent layout shifts */
 }
 
@@ -66,6 +67,11 @@
 
 #videoPlayer1,
 #videoPlayer2 {
+=======
+}
+
+#videoPlayer {
+>>>>>>> origin/main
     width: 100%;
     height: auto;
     display: block;

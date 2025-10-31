@@ -3,8 +3,11 @@
 let videoFiles = [];
 let currentVideoIndex = 0;
 let timelineData = null;
+<<<<<<< HEAD
 let activePlayer = 1; // 1 or 2, indicates which player is currently active
 let isTransitioning = false;
+=======
+>>>>>>> origin/main
 
 // HTML escape function to prevent XSS
 function escapeHtml(text) {
@@ -69,6 +72,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // Video player events
+<<<<<<< HEAD
     const videoPlayer1 = document.getElementById('videoPlayer1');
     const videoPlayer2 = document.getElementById('videoPlayer2');
     
@@ -100,6 +104,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('playPauseBtn').textContent = '▶ Play';
             }
         });
+=======
+    const videoPlayer = document.getElementById('videoPlayer');
+    
+    videoPlayer.addEventListener('ended', () => {
+        playNextVideo();
+    });
+    
+    videoPlayer.addEventListener('timeupdate', () => {
+        updatePlaybackPosition();
+        updateVideoInfo();
+    });
+    
+    videoPlayer.addEventListener('play', () => {
+        document.getElementById('playPauseBtn').textContent = '⏸ Pause';
+    });
+    
+    videoPlayer.addEventListener('pause', () => {
+        document.getElementById('playPauseBtn').textContent = '▶ Play';
+>>>>>>> origin/main
     });
     
     // Load first video
@@ -108,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Initialize player controls
 function initializePlayer() {
+<<<<<<< HEAD
     const videoPlayer1 = document.getElementById('videoPlayer1');
     const videoPlayer2 = document.getElementById('videoPlayer2');
     videoPlayer1.volume = 1.0;
@@ -168,10 +192,15 @@ function preloadNextVideo() {
     const activePlayerElement = getActivePlayer();
     inactivePlayer.volume = activePlayerElement.volume;
     inactivePlayer.playbackRate = activePlayerElement.playbackRate;
+=======
+    const videoPlayer = document.getElementById('videoPlayer');
+    videoPlayer.volume = 1.0;
+>>>>>>> origin/main
 }
 
 // Load a video by index
 function loadVideo(index) {
+<<<<<<< HEAD
     if (index < 0 || index >= videoFiles.length || isTransitioning) {
         return;
     }
@@ -199,6 +228,25 @@ function loadVideo(index) {
     // Update video info - textContent is safe from XSS (unlike innerHTML)
     // It treats the value as plain text, not HTML
     document.getElementById('currentVideoName').textContent = videoFile.filename;
+=======
+    if (index < 0 || index >= videoFiles.length) {
+        return;
+    }
+    
+    currentVideoIndex = index;
+    const videoFile = videoFiles[index];
+    const videoPlayer = document.getElementById('videoPlayer');
+    const videoSource = document.getElementById('videoSource');
+    
+    // Set video source
+    const videoURL = `/video?path=${encodeURIComponent(videoFile.path)}`;
+    videoSource.src = videoURL;
+    videoPlayer.load();
+    
+    // Update video info - textContent is safe from XSS (unlike innerHTML)
+    // It treats the value as plain text, not HTML
+    document.getElementById('currentVideoName').innerHTML = escapeHtml(videoFile.filename);
+>>>>>>> origin/main
     
     // Update button states
     document.getElementById('prevBtn').disabled = index === 0;
@@ -210,6 +258,7 @@ function loadVideo(index) {
 
 // Play next video
 function playNextVideo() {
+<<<<<<< HEAD
     if (currentVideoIndex < videoFiles.length - 1 && !isTransitioning) {
         const nextIndex = currentVideoIndex + 1;
         const nextVideoFile = videoFiles[nextIndex];
@@ -247,19 +296,31 @@ function playNextVideo() {
             // Fallback: load video directly if not preloaded
             loadVideo(nextIndex);
         }
+=======
+    if (currentVideoIndex < videoFiles.length - 1) {
+        loadVideo(currentVideoIndex + 1);
+>>>>>>> origin/main
     }
 }
 
 // Play previous video
 function playPreviousVideo() {
+<<<<<<< HEAD
     if (currentVideoIndex > 0 && !isTransitioning) {
+=======
+    if (currentVideoIndex > 0) {
+>>>>>>> origin/main
         loadVideo(currentVideoIndex - 1);
     }
 }
 
 // Toggle play/pause
 function togglePlayPause() {
+<<<<<<< HEAD
     const videoPlayer = getActivePlayer();
+=======
+    const videoPlayer = document.getElementById('videoPlayer');
+>>>>>>> origin/main
     if (videoPlayer.paused) {
         videoPlayer.play();
     } else {
@@ -269,16 +330,25 @@ function togglePlayPause() {
 
 // Change playback speed
 function changePlaybackSpeed(speed) {
+<<<<<<< HEAD
     const videoPlayer1 = document.getElementById('videoPlayer1');
     const videoPlayer2 = document.getElementById('videoPlayer2');
     // Set speed for both players to keep them synchronized
     videoPlayer1.playbackRate = speed;
     videoPlayer2.playbackRate = speed;
+=======
+    const videoPlayer = document.getElementById('videoPlayer');
+    videoPlayer.playbackRate = speed;
+>>>>>>> origin/main
 }
 
 // Update video info display
 function updateVideoInfo() {
+<<<<<<< HEAD
     const videoPlayer = getActivePlayer();
+=======
+    const videoPlayer = document.getElementById('videoPlayer');
+>>>>>>> origin/main
     const currentTime = formatTime(videoPlayer.currentTime);
     const duration = formatTime(videoPlayer.duration);
     
@@ -318,10 +388,18 @@ function initializeTimeline() {
         const rawPosition = ((new Date(file.utcTime).getTime() - minTime) / timelineData.range) * 100;
         // Validate and clamp position to prevent CSS injection
         const position = Math.max(0, Math.min(100, Number(rawPosition) || 0));
+<<<<<<< HEAD
         const fileType = (file.fileType || 'Other').toLowerCase();
         return `<div class="file-marker file-marker-${escapeHtml(fileType)}" 
                      data-index="${index}" 
                      style="left: ${position}%" 
+=======
+        const clampedPosition = Math.max(0, Math.min(100, Number(position)));
+        const fileType = (file.fileType || 'Other').toLowerCase();
+        return `<div class="file-marker file-marker-${escapeHtml(fileType)}" 
+                     data-index="${index}" 
+                     style="left: ${clampedPosition}%" 
+>>>>>>> origin/main
                      title="${escapeHtml(file.filename)}"></div>`;
     }).join('');
     
@@ -420,7 +498,11 @@ function generateTimeMarkers(minTime, maxTime) {
 function updatePlaybackPosition() {
     if (!timelineData) return;
     
+<<<<<<< HEAD
     const videoPlayer = getActivePlayer();
+=======
+    const videoPlayer = document.getElementById('videoPlayer');
+>>>>>>> origin/main
     const currentFile = videoFiles[currentVideoIndex];
     
     if (!currentFile) return;
