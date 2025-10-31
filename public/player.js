@@ -196,10 +196,11 @@ function initializeTimeline() {
         const rawPosition = ((new Date(file.utcTime).getTime() - minTime) / timelineData.range) * 100;
         // Validate and clamp position to prevent CSS injection
         const position = Math.max(0, Math.min(100, Number(rawPosition) || 0));
+        const clampedPosition = Math.max(0, Math.min(100, Number(position)));
         const fileType = (file.fileType || 'Other').toLowerCase();
         return `<div class="file-marker file-marker-${escapeHtml(fileType)}" 
                      data-index="${index}" 
-                     style="left: ${position}%" 
+                     style="left: ${clampedPosition}%" 
                      title="${escapeHtml(file.filename)}"></div>`;
     }).join('');
     
