@@ -139,11 +139,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Load first video and preload second
-    loadVideoIntoPlayer(0, activePlayerIndex);
-    if (videoFiles.length > 1) {
-        preloadNextVideo();
-    }
+    // Load first video (which also updates UI)
+    loadVideo(0);
 });
 
 // Initialize player controls
@@ -209,6 +206,14 @@ function switchToNextVideo() {
     // Hide previous player, show new active player
     videoPlayers[previousPlayerIndex].classList.remove('active-player');
     videoPlayers[activePlayerIndex].classList.add('active-player');
+    
+    // Update video info
+    const videoFile = videoFiles[currentVideoIndex];
+    document.getElementById('currentVideoName').innerHTML = escapeHtml(videoFile.filename);
+    
+    // Update button states
+    document.getElementById('prevBtn').disabled = currentVideoIndex === 0;
+    document.getElementById('nextBtn').disabled = currentVideoIndex === videoFiles.length - 1;
     
     // Start playback on new active player
     videoPlayers[activePlayerIndex].currentTime = 0;
