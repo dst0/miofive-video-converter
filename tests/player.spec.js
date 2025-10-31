@@ -182,7 +182,8 @@ test.describe('Video Player - UI Tests', () => {
     // Check timeline
     await expect(page.locator('.timeline-section')).toBeVisible();
     await expect(page.locator('#timelineTrack')).toBeVisible();
-    await expect(page.locator('#fileMarkers')).toBeVisible();
+    // Wait for file markers to be populated (empty div may not be visible)
+    await expect(page.locator('.file-marker')).toHaveCount(1);
     await expect(page.locator('#playbackPosition')).toBeVisible();
     
     // Check controls
