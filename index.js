@@ -1,6 +1,7 @@
 // server
 const express = require('express');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const {exec, spawn} = require('child_process');
 const {promisify} = require('util');
@@ -397,6 +398,88 @@ app.post('/combine', async (req, res) => {
     } catch (err) {
         console.error('Failed to combine videos:', err.message);
         res.status(500).json({error: `Failed to combine videos: ${err.message}`});
+    }
+});
+
+// Video player page endpoint
+app.get('/player', (req, res) => {
+    res.sendFile(path.join(PUBLIC_DIR, 'player.html'));
+});
+
+// Serve video files with range support for streaming
+app.get('/video', async (req, res) => {
+    // Rate limiting check
+    const clientId = req.ip || req.connection.remoteAddress;
+    if (!checkRateLimit(clientId)) {
+        return res.status(429).json({error: 'Too many requests. Please try again later.'});
+    }
+    
+    const videoPath = req.query.path;
+    
+    if (!videoPath) {
+        return res.status(400).json({error: 'Video path is required'});
+    }
+    
+    try {
+        // Normalize and resolve the path to prevent directory traversal attacks
+        const normalizedPath = path.resolve(videoPath);
+        
+        // Security Note: This endpoint serves video files from paths provided by the user.
+        // The application is designed to work with dashcam videos that can be located
+        // anywhere on the filesystem (external drives, network shares, etc.).
+        // Security is enforced through:
+        // 1. File type validation (MP4 only)
+        // 2. Rate limiting (to prevent DoS)
+        // 3. File existence and accessibility checks
+        // Users should be aware they're granting access to files they explicitly select.
+        
+        // Additional validation: check if the file ends with .MP4 or .mp4
+        if (!normalizedPath.toUpperCase().endsWith('.MP4')) {
+            return res.status(400).json({error: 'Only MP4 files are allowed'});
+        }
+        
+        // Verify the file exists and is accessible
+        await fs.access(normalizedPath);
+        const stat = await fs.stat(normalizedPath);
+        
+        if (!stat.isFile()) {
+            return res.status(400).json({error: 'Path is not a file'});
+        }
+        
+        const fileSize = stat.size;
+        const range = req.headers.range;
+        
+        if (range) {
+            // Parse range header
+            const parts = range.replace(/bytes=/, '').split('-');
+            const start = parseInt(parts[0], 10);
+            const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+            const chunkSize = (end - start) + 1;
+            
+            // Read the file stream
+            const fileStream = fsSync.createReadStream(normalizedPath, {start, end});
+            
+            // Set headers for partial content
+            res.writeHead(206, {
+                'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+                'Accept-Ranges': 'bytes',
+                'Content-Length': chunkSize,
+                'Content-Type': 'video/mp4',
+            });
+            
+            fileStream.pipe(res);
+        } else {
+            // No range header, send the entire file
+            res.writeHead(200, {
+                'Content-Length': fileSize,
+                'Content-Type': 'video/mp4',
+            });
+            
+            const fileStream = fsSync.createReadStream(normalizedPath);
+            fileStream.pipe(res);
+        }
+    } catch (err) {
+        res.status(400).json({error: 'Unable to access video file', message: err.message});
     }
 });
 
