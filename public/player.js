@@ -588,7 +588,7 @@ function updateCustomProgressBar() {
     const activePlayer = videoPlayers[activePlayerIndex];
     const videoIdx = parseInt(activePlayer.dataset.videoIndex);
     
-    if (videoIdx === undefined || videoDurations[videoIdx] === undefined) return;
+    if (isNaN(videoIdx) || videoDurations[videoIdx] === undefined) return;
     
     currentGlobalTime = videoStartTimes[videoIdx] + activePlayer.currentTime;
     const percent = (currentGlobalTime / totalDuration) * 100;
@@ -634,13 +634,19 @@ function seekToGlobalTime(targetTime) {
         currentVideoIndex = targetVideoIndex;
         loadVideo(targetVideoIndex);
         
-        // Wait for video to load, then seek
+        // Wait for video to load, then seek (with timeout to prevent memory leak)
+        let attempts = 0;
+        const maxAttempts = 100; // 5 seconds max (100 * 50ms)
         const checkLoaded = setInterval(() => {
+            attempts++;
             const activePlayer = videoPlayers[activePlayerIndex];
             if (activePlayer.readyState >= 2) { // HAVE_CURRENT_DATA or better
                 clearInterval(checkLoaded);
                 activePlayer.currentTime = localTime;
                 updateCustomProgressBar();
+            } else if (attempts >= maxAttempts) {
+                clearInterval(checkLoaded);
+                console.error('Timeout waiting for video to load');
             }
         }, 50);
     } else {
