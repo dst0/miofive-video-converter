@@ -169,9 +169,8 @@ test.describe('Video Player - UI Tests', () => {
     await expect(page.locator('#backBtn')).toBeVisible();
     await expect(page.locator('#backBtn')).toContainText('Back to Main');
     
-    // Check video players (dual-player architecture)
+    // Check video player (dual-player architecture - only active player is visible)
     await expect(page.locator('#videoPlayer1')).toBeVisible();
-    await expect(page.locator('#videoPlayer2')).toBeVisible();
     
     // Wait for video to be loaded (currentVideoName gets populated by loadVideo function)
     await expect(page.locator('#currentVideoName')).not.toBeEmpty();
