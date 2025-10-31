@@ -169,8 +169,9 @@ test.describe('Video Player - UI Tests', () => {
     await expect(page.locator('#backBtn')).toBeVisible();
     await expect(page.locator('#backBtn')).toContainText('Back to Main');
     
-    // Check video player
-    await expect(page.locator('#videoPlayer')).toBeVisible();
+    // Check video players (dual-player architecture)
+    await expect(page.locator('#videoPlayer1')).toBeVisible();
+    await expect(page.locator('#videoPlayer2')).toBeVisible();
     
     // Wait for video to be loaded (currentVideoName gets populated by loadVideo function)
     await expect(page.locator('#currentVideoName')).not.toBeEmpty();
@@ -190,7 +191,9 @@ test.describe('Video Player - UI Tests', () => {
     await expect(page.locator('#prevBtn')).toBeVisible();
     await expect(page.locator('#playPauseBtn')).toBeVisible();
     await expect(page.locator('#nextBtn')).toBeVisible();
-    await expect(page.locator('#speedControl')).toBeVisible();
+    // Check speed control elements (new implementation)
+    await expect(page.locator('#speedInput')).toBeVisible();
+    await expect(page.locator('#speedSlider')).toBeVisible();
   });
 
   test('should display correct video information', async ({ page }) => {
@@ -262,9 +265,11 @@ test.describe('Video Player - UI Tests', () => {
     // Play/Pause button should be visible and clickable
     await expect(page.locator('#playPauseBtn')).toBeEnabled();
     
-    // Speed control should be visible and have default value
-    await expect(page.locator('#speedControl')).toBeVisible();
-    await expect(page.locator('#speedControl')).toHaveValue('1');
+    // Speed control should be visible and have default value (new implementation)
+    await expect(page.locator('#speedInput')).toBeVisible();
+    await expect(page.locator('#speedInput')).toHaveValue('1.0');
+    await expect(page.locator('#speedSlider')).toBeVisible();
+    await expect(page.locator('#speedSlider')).toHaveValue('1');
   });
 
   test('should navigate between multiple videos', async ({ page }) => {
@@ -360,21 +365,28 @@ test.describe('Video Player - UI Tests', () => {
     
     await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
     
-    // Wait for speed control to be visible
-    await expect(page.locator('#speedControl')).toBeVisible();
+    // Wait for speed control to be visible (new implementation with input/slider)
+    await expect(page.locator('#speedInput')).toBeVisible();
     
-    // Change speed to 2x
-    await page.locator('#speedControl').selectOption('2');
+    // Change speed to 2x using input
+    await page.locator('#speedInput').fill('2');
+    await page.locator('#speedInput').blur(); // Trigger change event
     
-    // Verify the playback rate is set
-    const playbackRate = await page.locator('#videoPlayer').evaluate(el => el.playbackRate);
+    // Wait a bit for the speed to be applied
+    await page.waitForTimeout(100);
+    
+    // Verify the playback rate is set on the active player
+    const playbackRate = await page.locator('#videoPlayer1').evaluate(el => el.playbackRate);
     expect(playbackRate).toBe(2);
     
-    // Change speed to 0.5x
-    await page.locator('#speedControl').selectOption('0.5');
+    // Change speed to 0.5x using slider
+    await page.locator('#speedSlider').fill('0.5');
+    
+    // Wait a bit for the speed to be applied
+    await page.waitForTimeout(100);
     
     // Verify the playback rate is set
-    const playbackRate2 = await page.locator('#videoPlayer').evaluate(el => el.playbackRate);
+    const playbackRate2 = await page.locator('#videoPlayer1').evaluate(el => el.playbackRate);
     expect(playbackRate2).toBe(0.5);
   });
 
