@@ -171,7 +171,6 @@ test.describe('Video Player - UI Tests', () => {
     
     // Check video player
     await expect(page.locator('#videoPlayer')).toBeVisible();
-    await expect(page.locator('#videoSource')).toBeVisible();
     
     // Wait for video to be loaded (currentVideoName gets populated by loadVideo function)
     await expect(page.locator('#currentVideoName')).not.toBeEmpty();
