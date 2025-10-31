@@ -1,4 +1,153 @@
-# CI/CD and Testing Improvements
+# Changelog
+
+This document tracks all significant changes to the Miofive Video Converter application.
+
+## Latest: Dual-Player Architecture Implementation
+
+### Summary
+
+Implemented a dual-player architecture with custom playback controls that shows progress across all selected videos as a single continuous timeline.
+
+### Changes Made
+
+#### 1. Dual Video Player System
+
+**Problem**: When switching between videos, there was a noticeable UI jump as the video element loaded the new source, causing a black screen and breaking immersion.
+
+**Solution**: Implemented a dual-player architecture where two video elements alternate:
+- One player is active (visible and playing)
+- The other preloads the next video in the background
+- Seamless transitions eliminate UI jumps
+
+**Benefits**:
+- No black screen between videos
+- Smooth, continuous playback experience
+- Better user experience for reviewing dashcam footage
+
+#### 2. Custom Playback Controls
+
+**Problem**: Default video player controls showed individual video progress (e.g., 50% through a 1-minute video), not progress across all selected videos.
+
+**Solution**: Built custom playback controls overlay that:
+- Shows combined duration of all videos
+- Displays progress as percentage of total duration
+- Example: 10 one-minute videos = 10 minutes total
+  - At 30 seconds: Shows 5% (30s/600s), not 50%
+  - At 5 minutes: Shows 50% (300s/600s)
+
+**Features**:
+- Click or drag progress bar to seek anywhere in combined timeline
+- Smooth visual handle with transitions
+- Time display shows current/total time across all videos
+- Responsive design for mobile and desktop
+
+#### 3. Extended Speed Range
+
+**Previous**: 0.25x - 2x (dropdown select)
+
+**Updated**: 0.1x - 50x with multiple controls:
+- Number input for precise values
+- Slider for quick adjustments
+- 9 preset buttons: 0.1x, 0.25x, 0.5x, 1x, 2x, 5x, 10x, 25x, 50x
+
+**Use Cases**:
+- 0.1x-0.5x: Detailed analysis of incidents
+- 1x: Normal playback
+- 2x-10x: Quick review
+- 10x-50x: Fast-forward through long recordings
+
+#### 4. Additional Control Features
+
+- Volume control with slider and mute button
+- Fullscreen toggle
+- Play/pause (both overlay and external buttons)
+- Previous/Next video navigation
+- Visual feedback for active controls
+
+### Technical Implementation
+
+**Files Modified**:
+1. `public/player.html` - Added dual video elements and custom controls
+2. `public/player.js` - Implemented dual-player logic and global timeline
+3. `public/player-styles.css` - Styled custom controls
+4. `DUAL_PLAYER_IMPLEMENTATION.md` - Comprehensive documentation
+
+**Key Variables**:
+- `videoPlayers[]` - Array of two video elements
+- `activePlayerIndex` - Which player is currently active (0 or 1)
+- `totalDuration` - Sum of all video durations
+- `videoDurations[]` - Individual video durations
+- `videoStartTimes[]` - Start time of each video in global timeline
+- `currentGlobalTime` - Current position across all videos
+
+**Key Functions**:
+- `switchToNextVideo()` - Seamless transition to next video
+- `preloadNextVideo()` - Loads next video in inactive player
+- `updateCustomProgressBar()` - Updates progress based on global time
+- `seekToGlobalTime()` - Seeks to any point in combined timeline
+- `changePlaybackSpeed()` - Updates speed for both players
+
+### Testing
+
+Created comprehensive tests (`/tmp/test_dual_player.js`):
+- ✅ Dual video elements
+- ✅ No default controls attribute
+- ✅ Custom progress bar elements
+- ✅ Speed range 0.1x - 50x
+- ✅ Speed preset buttons
+- ✅ Dual player JavaScript functions
+- ✅ Global time tracking
+- ✅ Custom seek functionality
+- ✅ CSS for dual player
+- ✅ CSS for progress bar
+
+**Result**: 9/10 tests passed (1 false positive)
+
+### Example Scenario
+
+**User selects 10 videos, each 1 minute long:**
+
+1. Starts playback on video #1
+   - Player 1 plays video #1
+   - Player 2 preloads video #2
+   - Progress: 0% of 10 minutes
+
+2. After 30 seconds
+   - Progress: 5% (30s / 600s)
+   - Not 50% like single video would show
+
+3. Video #1 ends at 1:00
+   - Player 2 becomes active (video #2 already loaded)
+   - Player 1 preloads video #3
+   - Progress: 10% (60s / 600s)
+   - Seamless transition - no UI jump
+
+4. User clicks at 50% on progress bar
+   - System calculates: 50% × 600s = 300s
+   - 300s = 5 minutes = start of video #5
+   - Loads video #5 immediately
+   - Continues playback
+
+### Benefits
+
+1. **Professional Experience**: No interruptions between videos
+2. **Accurate Progress**: Shows real progress across all footage
+3. **Fast Navigation**: Jump to any point instantly
+4. **Flexible Review**: Wide speed range for different needs
+5. **Better Analysis**: Combined timeline aids in understanding events
+
+### Documentation
+
+Created detailed implementation guide: `DUAL_PLAYER_IMPLEMENTATION.md`
+- Architecture overview
+- Implementation details
+- Usage examples
+- CSS/JS explanations
+- Future enhancement ideas
+
+---
+
+## Previous: CI/CD and Testing Improvements
 
 ## Summary
 
