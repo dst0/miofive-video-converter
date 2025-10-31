@@ -114,7 +114,7 @@ function loadVideo(index) {
     
     // Update video info - textContent is safe from XSS (unlike innerHTML)
     // It treats the value as plain text, not HTML
-    document.getElementById('currentVideoName').textContent = videoFile.filename;
+    document.getElementById('currentVideoName').innerHTML = escapeHtml(videoFile.filename);
     
     // Update button states
     document.getElementById('prevBtn').disabled = index === 0;
