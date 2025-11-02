@@ -12,6 +12,9 @@ const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// MP4 duration extraction configuration
+const MP4_HEADER_BUFFER_SIZE = 1024 * 1024; // 1MB should be enough for headers
+
 // Simple in-memory rate limiting
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
@@ -63,7 +66,7 @@ function getVideoDurationFast(filePath) {
         let fd;
         try {
             fd = fsSync.openSync(filePath, 'r');
-            const buffer = Buffer.alloc(1024 * 1024); // 1MB should be enough for headers
+            const buffer = Buffer.alloc(MP4_HEADER_BUFFER_SIZE);
             
             fsSync.readSync(fd, buffer, 0, buffer.length, 0);
             fsSync.closeSync(fd);
@@ -81,7 +84,8 @@ function getVideoDurationFast(filePath) {
                     break;
                 }
                 
-                if (atomSize === 0 || atomSize > buffer.length) break;
+                // Bounds check: ensure atom doesn't extend beyond remaining buffer
+                if (atomSize === 0 || atomSize > (buffer.length - pos)) break;
                 pos += atomSize;
             }
             
@@ -109,14 +113,17 @@ function getVideoDurationFast(filePath) {
                     } else {
                         // Version 1: 64-bit values
                         timescale = buffer.readUInt32BE(pos + 28);
-                        // Duration is 64-bit, read lower 32 bits (sufficient for dashcam videos)
-                        duration = buffer.readUInt32BE(pos + 36);
+                        // Duration is 64-bit - read as BigInt for full precision
+                        const durationBig = buffer.readBigUInt64BE(pos + 32);
+                        // Convert to number (safe for typical dashcam videos < 584 years at 1000 Hz)
+                        duration = Number(durationBig);
                     }
                     
                     return resolve(duration / timescale);
                 }
                 
-                if (atomSize === 0 || atomSize > buffer.length) break;
+                // Bounds check: ensure atom doesn't extend beyond remaining buffer
+                if (atomSize === 0 || atomSize > (buffer.length - pos)) break;
                 pos += atomSize;
             }
             
