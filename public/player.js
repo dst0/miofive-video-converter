@@ -176,7 +176,7 @@ function initializePlayer() {
             videoDurations[i] = videoFiles[i].duration;
             hasPreloadedDurations = true;
         } else {
-            videoDurations[i] = 0;
+            videoDurations[i] = 1;
         }
     }
     
