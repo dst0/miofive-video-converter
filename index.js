@@ -12,6 +12,9 @@ const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+// MP4 duration extraction configuration
+const MP4_HEADER_BUFFER_SIZE = 1024 * 1024; // 1MB should be enough for headers
+
 // Simple in-memory rate limiting
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
@@ -54,6 +57,89 @@ async function checkFFmpeg() {
     } catch {
         return false;
     }
+}
+
+// Get video duration by parsing MP4 file structure (pure JavaScript - very fast!)
+// This reads the MP4 'mvhd' atom to extract duration without spawning external processes
+function getVideoDurationFast(filePath) {
+    return new Promise((resolve, reject) => {
+        let fd;
+        try {
+            fd = fsSync.openSync(filePath, 'r');
+            const buffer = Buffer.alloc(MP4_HEADER_BUFFER_SIZE);
+            
+            fsSync.readSync(fd, buffer, 0, buffer.length, 0);
+            fsSync.closeSync(fd);
+            
+            // Find 'moov' atom (movie metadata container)
+            let pos = 0;
+            let moovStart = -1;
+            
+            while (pos < buffer.length - 8) {
+                const atomSize = buffer.readUInt32BE(pos);
+                const atomType = buffer.toString('ascii', pos + 4, pos + 8);
+                
+                if (atomType === 'moov') {
+                    moovStart = pos;
+                    break;
+                }
+                
+                // Bounds check: ensure atom doesn't extend beyond remaining buffer
+                if (atomSize === 0 || atomSize > (buffer.length - pos)) break;
+                pos += atomSize;
+            }
+            
+            if (moovStart === -1) {
+                return resolve(null);
+            }
+            
+            // Find 'mvhd' atom (movie header) inside 'moov'
+            pos = moovStart + 8;
+            const moovEnd = moovStart + buffer.readUInt32BE(moovStart);
+            
+            while (pos < moovEnd && pos < buffer.length - 8) {
+                const atomSize = buffer.readUInt32BE(pos);
+                const atomType = buffer.toString('ascii', pos + 4, pos + 8);
+                
+                if (atomType === 'mvhd') {
+                    // Found mvhd atom - extract duration
+                    const version = buffer.readUInt8(pos + 8);
+                    let timescale, duration;
+                    
+                    if (version === 0) {
+                        // Version 0: 32-bit values
+                        timescale = buffer.readUInt32BE(pos + 20);
+                        duration = buffer.readUInt32BE(pos + 24);
+                    } else {
+                        // Version 1: 64-bit values
+                        timescale = buffer.readUInt32BE(pos + 28);
+                        // Duration is 64-bit - read as BigInt for full precision
+                        const durationBig = buffer.readBigUInt64BE(pos + 32);
+                        // Convert to number (safe for typical dashcam videos < 584 years at 1000 Hz)
+                        duration = Number(durationBig);
+                    }
+                    
+                    return resolve(duration / timescale);
+                }
+                
+                // Bounds check: ensure atom doesn't extend beyond remaining buffer
+                if (atomSize === 0 || atomSize > (buffer.length - pos)) break;
+                pos += atomSize;
+            }
+            
+            resolve(null);
+        } catch (err) {
+            if (fd !== undefined) {
+                try { fsSync.closeSync(fd); } catch {}
+            }
+            reject(err);
+        }
+    });
+}
+
+// Get durations for multiple files (pure JS - extremely fast, ~0.1ms per file)
+async function getVideoDurationsBatch(filePaths) {
+    return Promise.all(filePaths.map(filePath => getVideoDurationFast(filePath)));
 }
 
 // Parse filename to extract UTC and local timestamps
@@ -305,7 +391,7 @@ app.post('/list-directories', async (req, res) => {
 
 // Scan endpoint
 app.post('/scan', async (req, res) => {
-    const {folderPath, startTime, endTime, channels} = req.body;
+    const {folderPath, startTime, endTime, channels, includeDurations = true} = req.body;
     if (!folderPath) return res.status(400).json({error: 'Folder path is required'});
     const includeA = channels?.includes('A');
     const includeB = channels?.includes('B');
@@ -319,6 +405,25 @@ app.post('/scan', async (req, res) => {
             const name = f.filename.toUpperCase();
             return (includeA && name.endsWith('A.MP4')) || (includeB && name.endsWith('B.MP4'));
         });
+        
+        // Probe video durations if requested
+        if (includeDurations && files.length > 0) {
+            console.log(`Probing durations for ${files.length} video files...`);
+            const startTime = Date.now();
+            const filePaths = files.map(f => f.path);
+            const durations = await getVideoDurationsBatch(filePaths);
+            
+            // Add durations to file objects
+            files = files.map((file, index) => ({
+                ...file,
+                duration: durations[index]
+            }));
+            
+            const totalDuration = durations.reduce((sum, d) => sum + (d || 0), 0);
+            const elapsed = Date.now() - startTime;
+            console.log(`Duration probing complete in ${elapsed}ms. Total duration: ${totalDuration.toFixed(2)}s`);
+        }
+        
         res.json({files, count: files.length});
     } catch (err) {
         res.status(400).json({error: 'Invalid folder path or access denied', message: err.message});
