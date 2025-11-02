@@ -12,12 +12,12 @@ test.describe('Application Basic Tests', () => {
     // Check page title
     await expect(page).toHaveTitle(/MP4 Video Combiner/);
     
-    // Check main heading is visible
-    const heading = page.locator('h1');
+    // Check main heading is visible (scope to main screen to avoid SPA duplicate)
+    const heading = page.locator('#mainScreen h1');
     await expect(heading).toHaveText('MP4 Video Combiner');
     
     // Check subtitle
-    const subtitle = page.locator('.subtitle');
+    const subtitle = page.locator('#mainScreen .subtitle');
     await expect(subtitle).toContainText('Scan folders for timestamped videos');
     
     // Check all main UI elements are visible

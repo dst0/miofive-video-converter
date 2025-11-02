@@ -151,9 +151,9 @@ test.describe('Scan Functionality Tests', () => {
     // Wait for timeline to appear
     await page.waitForSelector('.timeline-section', { timeout: 10000 });
     
-    // Check timeline elements
-    await expect(page.locator('.timeline-container')).toBeVisible();
-    await expect(page.locator('.timeline-track')).toBeVisible();
+    // Check timeline elements (scope to main screen to avoid duplicate from player screen)
+    await expect(page.locator('#mainScreen .timeline-container')).toBeVisible();
+    await expect(page.locator('#mainScreen .timeline-track')).toBeVisible();
     await expect(page.locator('.range-start')).toBeVisible();
     await expect(page.locator('.range-end')).toBeVisible();
   });

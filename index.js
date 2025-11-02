@@ -401,11 +401,6 @@ app.post('/combine', async (req, res) => {
     }
 });
 
-// Video player page endpoint
-app.get('/player', (req, res) => {
-    res.sendFile(path.join(PUBLIC_DIR, 'player.html'));
-});
-
 // Serve video files with range support for streaming
 app.get('/video', async (req, res) => {
     // Rate limiting check

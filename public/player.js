@@ -1,4 +1,4 @@
-// Video Player JavaScript - Dual Player Architecture
+// Video Player JavaScript - Dual Player Architecture (SPA Module)
 
 let videoFiles = [];
 let currentVideoIndex = 0;
@@ -12,6 +12,7 @@ let videoStartTimes = []; // Array of start times for each video in combined tim
 let isSeekingGlobal = false; // Flag for global seeking
 let currentGlobalTime = 0; // Current playback time across all videos
 let isDraggingProgress = false; // Flag for progress bar dragging
+let isPlayerInitialized = false;
 
 // HTML escape function to prevent XSS
 function escapeHtml(text) {
@@ -20,50 +21,17 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// Parse URL parameters to get video file list
-function getVideoFilesFromURL() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const filesParam = urlParams.get('files');
-    
-    if (!filesParam) {
-        return [];
-    }
-    
-    try {
-        return JSON.parse(decodeURIComponent(filesParam));
-    } catch (e) {
-        console.error('Error parsing video files from URL:', e);
-        return [];
-    }
-}
-
-// Initialize the video player
-document.addEventListener('DOMContentLoaded', () => {
-    videoFiles = getVideoFilesFromURL();
-    
-    if (videoFiles.length === 0) {
-        alert('No video files to play. Please select videos from the main page.');
-        window.location.href = '/';
-        return;
-    }
-    
-    // Sort files by timestamp
-    videoFiles.sort((a, b) => new Date(a.utcTime).getTime() - new Date(b.utcTime).getTime());
-    
-    // Initialize dual players
+// Initialize the player module (called once on page load)
+export function initPlayer() {
+    // Initialize dual players references
     videoPlayers[0] = document.getElementById('videoPlayer1');
     videoPlayers[1] = document.getElementById('videoPlayer2');
     videoSources[0] = document.getElementById('videoSource1');
     videoSources[1] = document.getElementById('videoSource2');
     
-    // Initialize player
-    initializePlayer();
-    initializeTimeline();
-    initializeCustomControls();
-    
-    // Set up event listeners
+    // Set up event listeners for back button
     document.getElementById('backBtn').addEventListener('click', () => {
-        window.location.href = '/';
+        hidePlayerScreen();
     });
     
     document.getElementById('prevBtn').addEventListener('click', () => {
@@ -139,9 +107,53 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // Load first video (which also updates UI)
+    isPlayerInitialized = true;
+}
+
+// Show player screen and start playback
+export function showPlayerScreen(files) {
+    if (!files || files.length === 0) {
+        alert('No video files to play.');
+        return;
+    }
+    
+    // Set video files and sort by timestamp
+    videoFiles = files;
+    videoFiles.sort((a, b) => new Date(a.utcTime).getTime() - new Date(b.utcTime).getTime());
+    
+    // Hide main screen and show player screen
+    document.getElementById('mainScreen').style.display = 'none';
+    document.getElementById('playerScreen').style.display = 'block';
+    
+    // Initialize player UI
+    initializePlayer();
+    initializeTimeline();
+    initializeCustomControls();
+    
+    // Load first video
     loadVideo(0);
-});
+}
+
+// Hide player screen and return to main
+export function hidePlayerScreen() {
+    // Pause playback
+    videoPlayers.forEach(player => {
+        player.pause();
+        player.removeAttribute('src');
+        player.load(); // Reset the video element
+    });
+    
+    // Reset state
+    videoFiles = [];
+    currentVideoIndex = 0;
+    videoDurations = [];
+    videoStartTimes = [];
+    totalDuration = 0;
+    
+    // Hide player screen and show main screen
+    document.getElementById('playerScreen').style.display = 'none';
+    document.getElementById('mainScreen').style.display = 'block';
+}
 
 // Initialize player controls
 function initializePlayer() {

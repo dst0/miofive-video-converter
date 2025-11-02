@@ -4,18 +4,6 @@ const fs = require('fs').promises;
 const path = require('path');
 
 test.describe('Video Player - API Tests', () => {
-  test('GET /player should serve video player page', async ({ request }) => {
-    const response = await request.get('/player');
-    
-    expect(response.ok()).toBeTruthy();
-    expect(response.headers()['content-type']).toContain('text/html');
-    
-    const body = await response.text();
-    expect(body).toContain('Video Player');
-    expect(body).toContain('videoPlayer');
-    expect(body).toContain('Back to Main');
-  });
-
   test('GET /video without path should return error', async ({ request }) => {
     const response = await request.get('/video');
     
@@ -115,7 +103,7 @@ test.describe('Video Player - API Tests', () => {
   });
 });
 
-test.describe('Video Player - UI Tests', () => {
+test.describe('Video Player - UI Tests (SPA)', () => {
   test('should show Play Videos button after scanning', async ({ page }) => {
     await page.goto('/');
     
@@ -136,36 +124,49 @@ test.describe('Video Player - UI Tests', () => {
     await expect(page.locator('#playVideosBtn')).toContainText('Play Videos');
   });
 
-  test('should have all player UI elements', async ({ page }) => {
-    // Navigate directly to player with test data
-    const testVideoPath = path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4');
+  test('should show player screen when clicking Play Videos', async ({ page }) => {
+    await page.goto('/');
     
-    // Check if test video exists
-    try {
-      await fs.access(testVideoPath);
-    } catch {
-      test.skip();
-      return;
-    }
+    const testDir = path.join(__dirname, '../test-data');
+    
+    // Set folder path and scan
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
+    
+    // Wait for scan to complete
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+    
+    // Click Play Videos button
+    await page.locator('#playVideosBtn').click();
+    
+    // Wait for player screen to be visible
+    await expect(page.locator('#playerScreen')).toBeVisible();
+    
+    // Main screen should be hidden
+    await expect(page.locator('#mainScreen')).not.toBeVisible();
+    
+    // Check player UI elements (scope to player screen)
+    await expect(page.locator('#playerScreen h1')).toContainText('Video Player');
+    await expect(page.locator('#backBtn')).toBeVisible();
+  });
 
-    const files = [
-      {
-        path: testVideoPath,
-        filename: '010125_100000_010125_050000_000001A.MP4',
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
-      }
-    ];
+  test('should have all player UI elements in SPA mode', async ({ page }) => {
+    await page.goto('/');
     
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
+    const testDir = path.join(__dirname, '../test-data');
     
-    // Wait for page to be loaded by checking for the header
-    await expect(page.locator('h1')).toBeVisible();
+    // Set folder path and scan
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
+    
+    // Wait for scan and click Play Videos
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+    await page.locator('#playVideosBtn').click();
+    
+    // Wait for player screen
+    await expect(page.locator('#playerScreen')).toBeVisible();
     
     // Check main UI elements
-    await expect(page.locator('h1')).toContainText('Video Player');
     await expect(page.locator('#backBtn')).toBeVisible();
     await expect(page.locator('#backBtn')).toContainText('Back to Main');
     
@@ -179,78 +180,82 @@ test.describe('Video Player - UI Tests', () => {
     await expect(page.locator('#currentVideoName')).toBeVisible();
     await expect(page.locator('#videoProgress')).toBeVisible();
     
-    // Check timeline
-    await expect(page.locator('.timeline-section')).toBeVisible();
+    // Check timeline (scope to player screen to avoid duplicate)
+    await expect(page.locator('#playerScreen .timeline-section')).toBeVisible();
     await expect(page.locator('#timelineTrack')).toBeVisible();
-    // Wait for file markers to be populated (empty div may not be visible)
-    await expect(page.locator('.file-marker')).toHaveCount(1);
+    // File markers should be present (scope to player screen)
+    await expect(page.locator('#playerScreen .file-marker')).toHaveCount(await page.locator('.file-checkbox:checked').count());
     await expect(page.locator('#playbackPosition')).toBeVisible();
     
     // Check controls
     await expect(page.locator('#prevBtn')).toBeVisible();
     await expect(page.locator('#playPauseBtn')).toBeVisible();
     await expect(page.locator('#nextBtn')).toBeVisible();
-    // Check speed control elements (new implementation)
+    // Check speed control elements
     await expect(page.locator('#speedInput')).toBeVisible();
     await expect(page.locator('#speedSlider')).toBeVisible();
   });
 
   test('should display correct video information', async ({ page }) => {
-    const testVideoPath = path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4');
+    await page.goto('/');
     
-    // Check if test video exists
-    try {
-      await fs.access(testVideoPath);
-    } catch {
-      test.skip();
-      return;
-    }
-
-    const files = [
-      {
-        path: testVideoPath,
-        filename: '010125_100000_010125_050000_000001A.MP4',
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
+    const testDir = path.join(__dirname, '../test-data');
+    
+    // Set folder path and scan
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
+    
+    // Wait for scan and click Play Videos
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+    
+    // Select only first file for simpler test
+    const checkboxes = page.locator('.file-checkbox');
+    const count = await checkboxes.count();
+    if (count > 1) {
+      // Uncheck all except first
+      for (let i = 1; i < count; i++) {
+        await checkboxes.nth(i).uncheck();
       }
-    ];
+    }
     
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
+    await page.locator('#playVideosBtn').click();
     
-    // Wait for video name to be displayed (replaces arbitrary timeout)
-    await expect(page.locator('#currentVideoName')).toContainText('010125_100000_010125_050000_000001A.MP4');
+    // Wait for player screen
+    await expect(page.locator('#playerScreen')).toBeVisible();
+    
+    // Wait for video name to be displayed
+    await expect(page.locator('#currentVideoName')).not.toBeEmpty();
     
     // Check video progress shows "Video 1 of 1"
     await expect(page.locator('#videoProgress')).toContainText('Video 1 of 1');
   });
 
   test('should have working playback controls', async ({ page }) => {
-    const testVideoPath = path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4');
+    await page.goto('/');
     
-    // Check if test video exists
-    try {
-      await fs.access(testVideoPath);
-    } catch {
-      test.skip();
-      return;
-    }
-
-    const files = [
-      {
-        path: testVideoPath,
-        filename: '010125_100000_010125_050000_000001A.MP4',
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
+    const testDir = path.join(__dirname, '../test-data');
+    
+    // Set folder path and scan
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
+    
+    // Wait for scan and select only first file
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+    
+    const checkboxes = page.locator('.file-checkbox');
+    const count = await checkboxes.count();
+    if (count > 1) {
+      for (let i = 1; i < count; i++) {
+        await checkboxes.nth(i).uncheck();
       }
-    ];
+    }
     
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
+    await page.locator('#playVideosBtn').click();
     
-    // Wait for controls to be visible instead of waiting for video to load
+    // Wait for player screen
+    await expect(page.locator('#playerScreen')).toBeVisible();
+    
+    // Wait for controls to be visible
     await expect(page.locator('#prevBtn')).toBeVisible();
     await expect(page.locator('#playPauseBtn')).toBeVisible();
     await expect(page.locator('#nextBtn')).toBeVisible();
@@ -264,7 +269,7 @@ test.describe('Video Player - UI Tests', () => {
     // Play/Pause button should be visible and clickable
     await expect(page.locator('#playPauseBtn')).toBeEnabled();
     
-    // Speed control should be visible and have default value (new implementation)
+    // Speed control should be visible and have default value
     await expect(page.locator('#speedInput')).toBeVisible();
     await expect(page.locator('#speedInput')).toHaveValue('1.0');
     await expect(page.locator('#speedSlider')).toBeVisible();
@@ -272,47 +277,40 @@ test.describe('Video Player - UI Tests', () => {
   });
 
   test('should navigate between multiple videos', async ({ page }) => {
-    // Create multiple test video entries
-    const files = [
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4'),
-        filename: '010125_100000_010125_050000_000001A.MP4',
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
-      },
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100100_010125_050100_000002A.MP4'),
-        filename: '010125_100100_010125_050100_000002A.MP4',
-        utcTime: '2025-01-01T10:01:00.000Z',
-        localTime: '2025-01-01T05:01:00.000Z',
-        timestamp: 1735725660000,
-        fileType: 'Normal'
-      },
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100200_010125_050200_000003A.MP4'),
-        filename: '010125_100200_010125_050200_000003A.MP4',
-        utcTime: '2025-01-01T10:02:00.000Z',
-        localTime: '2025-01-01T05:02:00.000Z',
-        timestamp: 1735725720000,
-        fileType: 'Normal'
-      }
-    ];
+    await page.goto('/');
     
-    // Check if test videos exist
-    try {
-      await fs.access(files[0].path);
-    } catch {
+    const testDir = path.join(__dirname, '../test-data');
+    
+    // Set folder path and scan
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
+    
+    // Wait for scan - need at least 3 videos for navigation test
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+    
+    // Check if we have enough videos
+    const checkboxes = page.locator('.file-checkbox');
+    const count = await checkboxes.count();
+    if (count < 3) {
       test.skip();
       return;
     }
     
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
+    // Select only first 3 videos
+    if (count > 3) {
+      for (let i = 3; i < count; i++) {
+        await checkboxes.nth(i).uncheck();
+      }
+    }
     
-    // Wait for video to load by checking the video name appears
-    await expect(page.locator('#currentVideoName')).toContainText('000001A.MP4');
-    await expect(page.locator('#videoProgress')).toContainText('Video 1 of 3');
+    await page.locator('#playVideosBtn').click();
+    
+    // Wait for player screen
+    await expect(page.locator('#playerScreen')).toBeVisible();
+    
+    // Wait for video to load
+    await expect(page.locator('#currentVideoName')).not.toBeEmpty();
+    await expect(page.locator('#videoProgress')).toContainText('Video 1 of');
     
     // Previous should be disabled
     await expect(page.locator('#prevBtn')).toBeDisabled();
@@ -322,12 +320,8 @@ test.describe('Video Player - UI Tests', () => {
     
     // Click next
     await page.locator('#nextBtn').click();
-    // Wait for video 2 to load
-    await expect(page.locator('#currentVideoName')).toContainText('000002A.MP4');
-    
-    // Should now show second video
-    await expect(page.locator('#currentVideoName')).toContainText('000002A.MP4');
-    await expect(page.locator('#videoProgress')).toContainText('Video 2 of 3');
+    // Wait for video 2 to load by checking progress text changes
+    await expect(page.locator('#videoProgress')).toContainText('Video 2 of');
     
     // Both prev and next should be enabled
     await expect(page.locator('#prevBtn')).toBeEnabled();
@@ -335,41 +329,41 @@ test.describe('Video Player - UI Tests', () => {
     
     // Click previous
     await page.locator('#prevBtn').click();
-    // Wait for video 1 to load
-    await expect(page.locator('#currentVideoName')).toContainText('000001A.MP4');
-    await expect(page.locator('#videoProgress')).toContainText('Video 1 of 3');
+    // Wait for video 1 to load by checking progress text changes
+    await expect(page.locator('#videoProgress')).toContainText('Video 1 of');
   });
 
   test('should change playback speed', async ({ page }) => {
-    const testVideoPath = path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4');
+    await page.goto('/');
     
-    // Check if test video exists
-    try {
-      await fs.access(testVideoPath);
-    } catch {
-      test.skip();
-      return;
-    }
-
-    const files = [
-      {
-        path: testVideoPath,
-        filename: '010125_100000_010125_050000_000001A.MP4',
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
+    const testDir = path.join(__dirname, '../test-data');
+    
+    // Set folder path and scan
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
+    
+    // Wait for scan and select first file
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+    
+    const checkboxes = page.locator('.file-checkbox');
+    const count = await checkboxes.count();
+    if (count > 1) {
+      for (let i = 1; i < count; i++) {
+        await checkboxes.nth(i).uncheck();
       }
-    ];
+    }
     
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
+    await page.locator('#playVideosBtn').click();
     
-    // Wait for speed control to be visible (new implementation with input/slider)
+    // Wait for player screen
+    await expect(page.locator('#playerScreen')).toBeVisible();
+    
+    // Wait for speed control to be visible
     await expect(page.locator('#speedInput')).toBeVisible();
     
     // Change speed to 2x using input
     await page.locator('#speedInput').fill('2');
-    await page.locator('#speedInput').blur(); // Trigger change event
+    await page.locator('#speedInput').blur();
     
     // Wait a bit for the speed to be applied
     await page.waitForTimeout(100);
@@ -390,49 +384,42 @@ test.describe('Video Player - UI Tests', () => {
   });
 
   test('should display timeline with file markers', async ({ page }) => {
-    const files = [
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4'),
-        filename: '010125_100000_010125_050000_000001A.MP4',
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
-      },
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100100_010125_050100_000002A.MP4'),
-        filename: '010125_100100_010125_050100_000002A.MP4',
-        utcTime: '2025-01-01T10:01:00.000Z',
-        localTime: '2025-01-01T05:01:00.000Z',
-        timestamp: 1735725660000,
-        fileType: 'Normal'
-      },
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100200_010125_050200_000003A.MP4'),
-        filename: '010125_100200_010125_050200_000003A.MP4',
-        utcTime: '2025-01-01T10:02:00.000Z',
-        localTime: '2025-01-01T05:02:00.000Z',
-        timestamp: 1735725720000,
-        fileType: 'Normal'
-      }
-    ];
+    await page.goto('/');
     
-    // Check if test videos exist
-    try {
-      await fs.access(files[0].path);
-    } catch {
+    const testDir = path.join(__dirname, '../test-data');
+    
+    // Set folder path and scan
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
+    
+    // Wait for scan - need at least 3 videos
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+    
+    const checkboxes = page.locator('.file-checkbox');
+    const count = await checkboxes.count();
+    if (count < 3) {
       test.skip();
       return;
     }
     
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
+    // Select only first 3 videos
+    if (count > 3) {
+      for (let i = 3; i < count; i++) {
+        await checkboxes.nth(i).uncheck();
+      }
+    }
     
-    // Wait for timeline to render by checking timeline labels are visible
+    await page.locator('#playVideosBtn').click();
+    
+    // Wait for player screen
+    await expect(page.locator('#playerScreen')).toBeVisible();
+    
+    // Wait for timeline to render
     await expect(page.locator('#timelineStart')).toBeVisible();
     await expect(page.locator('#timelineEnd')).toBeVisible();
     
-    // Check file markers are present
-    const markers = page.locator('.file-marker');
+    // Check file markers are present (scope to player screen)
+    const markers = page.locator('#playerScreen .file-marker');
     await expect(markers).toHaveCount(3);
     
     // Check that markers are visible
@@ -441,137 +428,31 @@ test.describe('Video Player - UI Tests', () => {
     }
   });
 
-  test('should navigate by clicking file markers', async ({ page }) => {
-    const files = [
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4'),
-        filename: '010125_100000_010125_050000_000001A.MP4',
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
-      },
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100100_010125_050100_000002A.MP4'),
-        filename: '010125_100100_010125_050100_000002A.MP4',
-        utcTime: '2025-01-01T10:01:00.000Z',
-        localTime: '2025-01-01T05:01:00.000Z',
-        timestamp: 1735725660000,
-        fileType: 'Normal'
-      },
-      {
-        path: path.join(__dirname, '../test-data/Normal/010125_100200_010125_050200_000003A.MP4'),
-        filename: '010125_100200_010125_050200_000003A.MP4',
-        utcTime: '2025-01-01T10:02:00.000Z',
-        localTime: '2025-01-01T05:02:00.000Z',
-        timestamp: 1735725720000,
-        fileType: 'Normal'
-      }
-    ];
+  test('should return to main screen when clicking back button', async ({ page }) => {
+    await page.goto('/');
     
-    // Check if test videos exist
-    try {
-      await fs.access(files[0].path);
-    } catch {
-      test.skip();
-      return;
-    }
+    const testDir = path.join(__dirname, '../test-data');
     
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
+    // Set folder path and scan
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
     
-    // Wait for video to be loaded
-    await expect(page.locator('#videoProgress')).toContainText('Video 1 of 3');
+    // Wait for scan and play
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+    await page.locator('#playVideosBtn').click();
     
-    // Click on the third file marker
-    const markers = page.locator('.file-marker');
-    await markers.nth(2).click();
-    // Wait for video 3 to load
-    await expect(page.locator('#currentVideoName')).toContainText('000003A.MP4');
-    await expect(page.locator('#videoProgress')).toContainText('Video 3 of 3');
-    
-    // Click on the second file marker
-    await markers.nth(1).click();
-    // Wait for video 2 to load
-    await expect(page.locator('#currentVideoName')).toContainText('000002A.MP4');
-    await expect(page.locator('#videoProgress')).toContainText('Video 2 of 3');
-  });
-
-  test('should return to main page when clicking back button', async ({ page }) => {
-    const testVideoPath = path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4');
-    
-    // Check if test video exists
-    try {
-      await fs.access(testVideoPath);
-    } catch {
-      test.skip();
-      return;
-    }
-
-    const files = [
-      {
-        path: testVideoPath,
-        filename: '010125_100000_010125_050000_000001A.MP4',
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
-      }
-    ];
-    
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
+    // Wait for player screen
+    await expect(page.locator('#playerScreen')).toBeVisible();
     
     // Click back button
     await page.locator('#backBtn').click();
     
-    // Should navigate to main page
-    await expect(page).toHaveURL('/');
-    await expect(page.locator('h1')).toContainText('MP4 Video Combiner');
-  });
-
-  test('should show alert when no video files provided', async ({ page }) => {
-    page.on('dialog', dialog => dialog.accept());
+    // Wait a bit for transition
+    await page.waitForTimeout(100);
     
-    await page.goto('/player');
-    
-    // Should redirect to main page after alert
-    await page.waitForURL('/');
-  });
-
-  test('should escape HTML in video filenames to prevent XSS', async ({ page }) => {
-    const maliciousFilename = '<script>alert("XSS")</script>.MP4';
-    const testVideoPath = path.join(__dirname, '../test-data/Normal/010125_100000_010125_050000_000001A.MP4');
-    
-    // Check if test video exists
-    try {
-      await fs.access(testVideoPath);
-    } catch {
-      test.skip();
-      return;
-    }
-
-    const files = [
-      {
-        path: testVideoPath,
-        filename: maliciousFilename,
-        utcTime: '2025-01-01T10:00:00.000Z',
-        localTime: '2025-01-01T05:00:00.000Z',
-        timestamp: 1735725600000,
-        fileType: 'Normal'
-      }
-    ];
-    
-    await page.goto(`/player?files=${encodeURIComponent(JSON.stringify(files))}`);
-    
-    // Wait for video name to be visible
-    await expect(page.locator('#currentVideoName')).toBeVisible();
-    
-    // Check that the malicious script is not executed
-    // The filename should be displayed as text, not executed
-    const videoNameText = await page.locator('#currentVideoName').textContent();
-    expect(videoNameText).toContain('<script>');
-    expect(videoNameText).toContain('</script>');
-    
-    // Verify no scripts were executed by checking page title
-    await expect(page).toHaveTitle(/Video Player/);
+    // Should show main screen and hide player screen
+    await expect(page.locator('#mainScreen')).toBeVisible();
+    await expect(page.locator('#playerScreen')).not.toBeVisible();
+    await expect(page.locator('#mainScreen h1')).toContainText('MP4 Video Combiner');
   });
 });

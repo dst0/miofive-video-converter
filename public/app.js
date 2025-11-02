@@ -1,4 +1,5 @@
 import { initializeFolderBrowser } from './folder-browser.js';
+import { initPlayer, showPlayerScreen, hidePlayerScreen } from './player.js';
 
 let scannedFiles = [];
 let ffmpegAvailable = true;
@@ -9,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     loadSavedPaths();
     initializePreScanFilters();
     initializeFolderBrowser(); // Initialize folder browser from folder-browser.js
+    initPlayer(); // Initialize the player module
 
     // FFmpeg check
     fetch('/check-ffmpeg')
@@ -1031,9 +1033,6 @@ function playVideos() {
         return;
     }
 
-    // Encode the file list as URL parameter
-    const filesParam = encodeURIComponent(JSON.stringify(selectedFiles));
-    
-    // Open video player in new window/tab
-    window.open(`/player?files=${filesParam}`, '_blank');
+    // Show player screen instead of opening new window
+    showPlayerScreen(selectedFiles);
 }
