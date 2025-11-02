@@ -235,21 +235,31 @@ function switchToNextVideo() {
     
     // Start playback on new active player (only if video is ready)
     const newActivePlayer = videoPlayers[activePlayerIndex];
-    if (newActivePlayer.readyState >= 2) { // HAVE_CURRENT_DATA or better
+    if (newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         newActivePlayer.currentTime = 0;
         newActivePlayer.play().catch(err => {
             console.error('Error playing video:', err);
         });
     } else {
         // Wait for video to be ready before playing
+        let timeoutId;
         const playWhenReady = () => {
             newActivePlayer.removeEventListener('loadeddata', playWhenReady);
+            newActivePlayer.removeEventListener('error', playWhenReady);
+            clearTimeout(timeoutId);
             newActivePlayer.currentTime = 0;
             newActivePlayer.play().catch(err => {
                 console.error('Error playing video:', err);
             });
         };
         newActivePlayer.addEventListener('loadeddata', playWhenReady);
+        newActivePlayer.addEventListener('error', playWhenReady);
+        // Timeout after 10 seconds to prevent memory leak
+        timeoutId = setTimeout(() => {
+            newActivePlayer.removeEventListener('loadeddata', playWhenReady);
+            newActivePlayer.removeEventListener('error', playWhenReady);
+            console.error('Timeout waiting for video to load');
+        }, 10000);
     }
     
     // Preload the next video into the now-inactive player
@@ -674,7 +684,7 @@ function seekToGlobalTime(targetTime) {
         const checkLoaded = setInterval(() => {
             attempts++;
             const activePlayer = videoPlayers[activePlayerIndex];
-            if (activePlayer.readyState >= 2) { // HAVE_CURRENT_DATA or better
+            if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
                 clearInterval(checkLoaded);
                 activePlayer.currentTime = localTime;
                 updateCustomProgressBar();
