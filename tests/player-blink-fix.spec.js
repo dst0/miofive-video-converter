@@ -11,19 +11,18 @@ test.describe('Video Player - Block Blink Fix', () => {
         await page.goto('http://localhost:3000');
         
         // Scan for test videos
-        const testDataPath = path.join(__dirname, '..', 'test-data', 'Normal');
-        await page.fill('#folderPath', testDataPath);
-        await page.click('#scanBtn');
+        const testDataPath = path.join(__dirname, '..', 'test-data');
+        await page.locator('#folderPath').fill(testDataPath);
+        await page.locator('#scanBtn').click();
         
-        // Wait for scan results
-        await page.waitForSelector('.file-item', { timeout: 10000 });
+        // Wait for scan to complete and Play Videos button to appear
+        await page.locator('#playVideosBtn').waitFor({ state: 'visible', timeout: 10000 });
         
-        // Click "Select All" and then "Play Videos"
-        await page.click('button:has-text("Select All")');
-        await page.click('button:has-text("Play Videos")');
+        // Click Play Videos button
+        await page.locator('#playVideosBtn').click();
         
         // Wait for player screen to appear
-        await page.waitForSelector('#playerScreen', { state: 'visible', timeout: 5000 });
+        await page.locator('#playerScreen').waitFor({ state: 'visible', timeout: 10000 });
     });
 
     test('both video players should have position: absolute', async ({ page }) => {
