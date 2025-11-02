@@ -401,9 +401,9 @@ app.post('/combine', async (req, res) => {
     }
 });
 
-// Video player page endpoint
+// Video player page endpoint (redirect to main page for SPA)
 app.get('/player', (req, res) => {
-    res.sendFile(path.join(PUBLIC_DIR, 'player.html'));
+    res.redirect('/');
 });
 
 // Serve video files with range support for streaming
