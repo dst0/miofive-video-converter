@@ -1,6 +1,10 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
+// Constants
+const MIN_HEIGHT_PX = 300; // Must match CSS min-height value
+const HEIGHT_TOLERANCE = 0.9; // Accept 90% of min-height
+
 test.describe('Video Player - Block Blink Fix', () => {
     test.beforeEach(async ({ page }) => {
         // Start on the home page
@@ -71,8 +75,8 @@ test.describe('Video Player - Block Blink Fix', () => {
         // Height should remain the same
         expect(afterHeight).toBe(initialHeight);
         
-        // Height should be reasonable (greater than min-height)
-        expect(initialHeight).toBeGreaterThan(250);
+        // Height should be reasonable (greater than 90% of CSS min-height)
+        expect(initialHeight).toBeGreaterThan(MIN_HEIGHT_PX * HEIGHT_TOLERANCE);
     });
 
     test('video wrapper should have aspect-ratio set', async ({ page }) => {
@@ -81,8 +85,12 @@ test.describe('Video Player - Block Blink Fix', () => {
             return window.getComputedStyle(wrapper).aspectRatio;
         });
         
-        // Check that aspect-ratio is set (should be "16 / 9" or "auto")
-        expect(aspectRatio).toMatch(/16|9|auto/);
+        // Check that aspect-ratio is set and is reasonable for 16:9
+        // Accepts: "16/9", "16 / 9", decimal like "1.777...", or "auto"
+        const isValid = aspectRatio === 'auto' || 
+                        /^16\s*\/\s*9$/.test(aspectRatio) ||
+                        (parseFloat(aspectRatio) >= 1.7 && parseFloat(aspectRatio) <= 1.8);
+        expect(isValid).toBe(true);
     });
 
     test('video players should use object-fit: contain', async ({ page }) => {

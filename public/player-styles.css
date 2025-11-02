@@ -47,21 +47,27 @@
 
 /* Dual video player setup */
 .video-player {
-    width: 100%;
-    height: 100%;
-    display: block;
-    object-fit: contain;
+    /* Positioning */
     position: absolute;
     top: 0;
     left: 0;
+    z-index: 1;
+    
+    /* Dimensions */
+    width: 100%;
+    height: 100%;
+    
+    /* Display */
+    display: block;
+    object-fit: contain;
+    
+    /* Visibility */
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease;
-    z-index: 1;
 }
 
 .video-player.active-player {
-    position: absolute;
     opacity: 1;
     visibility: visible;
     z-index: 2;
