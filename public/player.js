@@ -102,7 +102,10 @@ export function initPlayer() {
                 const videoIdx = parseInt(player.dataset.videoIndex);
                 videoDurations[videoIdx] = player.duration || 0;
                 updateTotalDuration();
-                updateCustomProgressBar();
+                // Only update progress bar if this is the active player
+                if (index === activePlayerIndex) {
+                    updateCustomProgressBar();
+                }
             }
         });
     });
@@ -210,8 +213,11 @@ function switchToNextVideo() {
         return false;
     }
     
-    // Switch active player
+    // Pause and reset the previous player to prevent it from firing events
     const previousPlayerIndex = activePlayerIndex;
+    videoPlayers[previousPlayerIndex].pause();
+    
+    // Switch active player
     activePlayerIndex = 1 - activePlayerIndex;
     currentVideoIndex = nextVideoIndex;
     
@@ -227,11 +233,24 @@ function switchToNextVideo() {
     document.getElementById('prevBtn').disabled = currentVideoIndex === 0;
     document.getElementById('nextBtn').disabled = currentVideoIndex === videoFiles.length - 1;
     
-    // Start playback on new active player
-    videoPlayers[activePlayerIndex].currentTime = 0;
-    videoPlayers[activePlayerIndex].play().catch(err => {
-        console.error('Error playing video:', err);
-    });
+    // Start playback on new active player (only if video is ready)
+    const newActivePlayer = videoPlayers[activePlayerIndex];
+    if (newActivePlayer.readyState >= 2) { // HAVE_CURRENT_DATA or better
+        newActivePlayer.currentTime = 0;
+        newActivePlayer.play().catch(err => {
+            console.error('Error playing video:', err);
+        });
+    } else {
+        // Wait for video to be ready before playing
+        const playWhenReady = () => {
+            newActivePlayer.removeEventListener('loadeddata', playWhenReady);
+            newActivePlayer.currentTime = 0;
+            newActivePlayer.play().catch(err => {
+                console.error('Error playing video:', err);
+            });
+        };
+        newActivePlayer.addEventListener('loadeddata', playWhenReady);
+    }
     
     // Preload the next video into the now-inactive player
     preloadNextVideo();
@@ -244,6 +263,9 @@ function loadVideo(index) {
     if (index < 0 || index >= videoFiles.length) {
         return;
     }
+    
+    // Pause both players to prevent event conflicts
+    videoPlayers.forEach(player => player.pause());
     
     // If seeking backward or far forward, need to reload
     currentVideoIndex = index;
