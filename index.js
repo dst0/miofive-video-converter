@@ -401,11 +401,6 @@ app.post('/combine', async (req, res) => {
     }
 });
 
-// Video player page endpoint (redirect to main page for SPA)
-app.get('/player', (req, res) => {
-    res.redirect('/');
-});
-
 // Serve video files with range support for streaming
 app.get('/video', async (req, res) => {
     // Rate limiting check

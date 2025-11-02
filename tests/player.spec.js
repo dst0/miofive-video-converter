@@ -4,13 +4,6 @@ const fs = require('fs').promises;
 const path = require('path');
 
 test.describe('Video Player - API Tests', () => {
-  test('GET /player should redirect to main page (SPA)', async ({ request }) => {
-    const response = await request.get('/player', { maxRedirects: 0 });
-    
-    expect(response.status()).toBe(302); // Redirect
-    expect(response.headers()['location']).toBe('/');
-  });
-
   test('GET /video without path should return error', async ({ request }) => {
     const response = await request.get('/video');
     
