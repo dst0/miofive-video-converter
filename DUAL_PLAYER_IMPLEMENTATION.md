@@ -107,7 +107,6 @@ Modified files:
     object-fit: contain;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.3s ease;
     z-index: 1;
 }
 
