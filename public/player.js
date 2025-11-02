@@ -213,13 +213,16 @@ function switchToNextVideo() {
         return false;
     }
     
-    // Pause and reset the previous player to prevent it from firing events
+    // Store the previous player index before switching
     const previousPlayerIndex = activePlayerIndex;
-    videoPlayers[previousPlayerIndex].pause();
     
-    // Switch active player
+    // Switch active player BEFORE pausing the old one
+    // This prevents the pause event from triggering the button state update
     activePlayerIndex = 1 - activePlayerIndex;
     currentVideoIndex = nextVideoIndex;
+    
+    // Now pause the previous player (it's no longer active)
+    videoPlayers[previousPlayerIndex].pause();
     
     // Hide previous player, show new active player
     videoPlayers[previousPlayerIndex].classList.remove('active-player');
@@ -276,6 +279,10 @@ function loadVideo(index) {
     
     // Pause both players to prevent event conflicts
     videoPlayers.forEach(player => player.pause());
+    
+    // Update play/pause button to reflect paused state
+    document.getElementById('playPauseBtn').textContent = '▶ Play';
+    document.querySelector('#playPauseOverlayBtn .btn-icon').textContent = '▶';
     
     // If seeking backward or far forward, need to reload
     currentVideoIndex = index;
