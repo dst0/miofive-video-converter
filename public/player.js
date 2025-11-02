@@ -139,7 +139,8 @@ export function hidePlayerScreen() {
     // Pause playback
     videoPlayers.forEach(player => {
         player.pause();
-        player.src = '';
+        player.removeAttribute('src');
+        player.load(); // Reset the video element
     });
     
     // Reset state

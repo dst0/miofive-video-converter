@@ -191,7 +191,7 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     await expect(page.locator('.timeline-section')).toBeVisible();
     await expect(page.locator('#timelineTrack')).toBeVisible();
     // File markers should be present
-    await expect(page.locator('.file-marker')).toHaveCount({ gte: 1 });
+    await expect(page.locator('.file-marker')).toHaveCount(await page.locator('.file-checkbox:checked').count());
     await expect(page.locator('#playbackPosition')).toBeVisible();
     
     // Check controls
@@ -327,8 +327,7 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     
     // Click next
     await page.locator('#nextBtn').click();
-    // Wait for video 2 to load
-    await page.waitForTimeout(500); // Allow time for transition
+    // Wait for video 2 to load by checking progress text changes
     await expect(page.locator('#videoProgress')).toContainText('Video 2 of');
     
     // Both prev and next should be enabled
@@ -337,8 +336,7 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     
     // Click previous
     await page.locator('#prevBtn').click();
-    // Wait for video 1 to load
-    await page.waitForTimeout(500);
+    // Wait for video 1 to load by checking progress text changes
     await expect(page.locator('#videoProgress')).toContainText('Video 1 of');
   });
 
