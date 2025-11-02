@@ -15,11 +15,17 @@
     </div>
 
     <div class="video-wrapper">
-        <video id="videoPlayer1" class="video-player active-player" autoplay>
+        <video id="videoPlayer1" class="video-player active-player" autoplay 
+               controlsList="nodownload nofullscreen noremoteplayback" 
+               disablePictureInPicture 
+               disableRemotePlayback>
             <source id="videoSource1" type="video/mp4">
             Your browser does not support the video tag.
         </video>
-        <video id="videoPlayer2" class="video-player" preload="auto">
+        <video id="videoPlayer2" class="video-player" preload="auto" 
+               controlsList="nodownload nofullscreen noremoteplayback" 
+               disablePictureInPicture 
+               disableRemotePlayback>
             <source id="videoSource2" type="video/mp4">
             Your browser does not support the video tag.
         </video>
