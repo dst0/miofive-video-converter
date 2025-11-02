@@ -239,7 +239,7 @@ function switchToNextVideo() {
     currentVideoIndex = nextVideoIndex;
     
     // Now pause the previous player (it's no longer active)
-    videoPlayers[previousPlayerIndex].pause();
+    //videoPlayers[previousPlayerIndex].pause();
     
     // Hide previous player, show new active player
     videoPlayers[previousPlayerIndex].classList.remove('active-player');
