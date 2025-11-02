@@ -28,6 +28,7 @@ const OUTPUT_DIR = path.join(__dirname, 'test-data', 'Normal');
 
 // Base timestamp for filenames (Jan 1, 2025, 10:00:00 UTC)
 const BASE_UTC_TIME = new Date('2025-01-01T10:00:00Z');
+// Local time is UTC-5 to match the format used in the original test videos
 const BASE_LOCAL_TIME = new Date('2025-01-01T05:00:00'); // UTC-5
 
 /**
@@ -107,7 +108,7 @@ function generateVideo(number) {
             } else {
                 console.error(`  ✗ Failed to create ${filename}`);
                 if (stderr) {
-                    console.error(`  Error: ${stderr.substring(stderr.length - 200)}`);
+                    console.error(`  Error: ${stderr.slice(-200)}`);
                 }
                 resolve({ number, filename, success: false, error: `FFmpeg exited with code ${code}` });
             }
