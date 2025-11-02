@@ -165,9 +165,26 @@ function initializePlayer() {
         player.volume = 1.0;
     });
     
-    // Initialize video durations array
-    videoDurations = new Array(videoFiles.length).fill(0);
+    // Initialize video durations array from pre-loaded data if available
+    videoDurations = new Array(videoFiles.length);
     videoStartTimes = new Array(videoFiles.length).fill(0);
+    
+    // Use pre-loaded durations from scan if available
+    let hasPreloadedDurations = false;
+    for (let i = 0; i < videoFiles.length; i++) {
+        if (videoFiles[i].duration !== undefined && videoFiles[i].duration !== null) {
+            videoDurations[i] = videoFiles[i].duration;
+            hasPreloadedDurations = true;
+        } else {
+            videoDurations[i] = 1;
+        }
+    }
+    
+    // If we have pre-loaded durations, calculate total immediately
+    if (hasPreloadedDurations) {
+        updateTotalDuration();
+        console.log(`Using pre-loaded durations. Total: ${totalDuration.toFixed(2)}s`);
+    }
 }
 
 // Calculate total duration and start times for each video
