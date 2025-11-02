@@ -145,8 +145,8 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     // Main screen should be hidden
     await expect(page.locator('#mainScreen')).not.toBeVisible();
     
-    // Check player UI elements
-    await expect(page.locator('h1')).toContainText('Video Player');
+    // Check player UI elements (scope to player screen)
+    await expect(page.locator('#playerScreen h1')).toContainText('Video Player');
     await expect(page.locator('#backBtn')).toBeVisible();
   });
 
@@ -180,11 +180,11 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     await expect(page.locator('#currentVideoName')).toBeVisible();
     await expect(page.locator('#videoProgress')).toBeVisible();
     
-    // Check timeline
-    await expect(page.locator('.timeline-section')).toBeVisible();
+    // Check timeline (scope to player screen to avoid duplicate)
+    await expect(page.locator('#playerScreen .timeline-section')).toBeVisible();
     await expect(page.locator('#timelineTrack')).toBeVisible();
-    // File markers should be present
-    await expect(page.locator('.file-marker')).toHaveCount(await page.locator('.file-checkbox:checked').count());
+    // File markers should be present (scope to player screen)
+    await expect(page.locator('#playerScreen .file-marker')).toHaveCount(await page.locator('.file-checkbox:checked').count());
     await expect(page.locator('#playbackPosition')).toBeVisible();
     
     // Check controls
@@ -418,8 +418,8 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     await expect(page.locator('#timelineStart')).toBeVisible();
     await expect(page.locator('#timelineEnd')).toBeVisible();
     
-    // Check file markers are present
-    const markers = page.locator('.file-marker');
+    // Check file markers are present (scope to player screen)
+    const markers = page.locator('#playerScreen .file-marker');
     await expect(markers).toHaveCount(3);
     
     // Check that markers are visible
@@ -453,6 +453,6 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     // Should show main screen and hide player screen
     await expect(page.locator('#mainScreen')).toBeVisible();
     await expect(page.locator('#playerScreen')).not.toBeVisible();
-    await expect(page.locator('h1')).toContainText('MP4 Video Combiner');
+    await expect(page.locator('#mainScreen h1')).toContainText('MP4 Video Combiner');
   });
 });
