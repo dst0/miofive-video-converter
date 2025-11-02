@@ -39,26 +39,32 @@
     background: #000;
     border-radius: 8px;
     overflow: hidden;
+    /* Maintain aspect ratio for video container */
+    aspect-ratio: 16 / 9;
+    min-height: 300px;
+    max-height: 70vh;
 }
 
 /* Dual video player setup */
 .video-player {
     width: 100%;
-    height: auto;
+    height: 100%;
     display: block;
-    max-height: 70vh;
+    object-fit: contain;
     position: absolute;
     top: 0;
     left: 0;
     opacity: 0;
     visibility: hidden;
     transition: opacity 0.3s ease;
+    z-index: 1;
 }
 
 .video-player.active-player {
-    position: relative;
+    position: absolute;
     opacity: 1;
     visibility: visible;
+    z-index: 2;
 }
 
 /* Custom controls overlay */
