@@ -771,9 +771,10 @@ function takeScreenshot() {
         
         // Generate filename with timestamp and video info
         const currentFile = videoFiles[currentVideoIndex];
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+        const now = new Date();
+        const timestamp = now.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
         const videoName = currentFile ? currentFile.filename.replace(/\.MP4$/i, '') : 'video';
-        const currentTime = formatTime(activePlayer.currentTime).replace(':', '-');
+        const currentTime = formatTime(activePlayer.currentTime).replace(/:/g, '-');
         const filename = `screenshot_${videoName}_${currentTime}_${timestamp}.png`;
         
         // Convert canvas to blob and download
