@@ -456,6 +456,26 @@ function loadVideo(index, shouldPause = true) {
         const nextPlayerIndex = 1 - activePlayerIndex;
         loadVideoIntoPlayer(index + 1, nextPlayerIndex);
     }
+    
+    // If not pausing (initial load), ensure playback starts
+    if (!shouldPause) {
+        const activePlayer = videoPlayers[activePlayerIndex];
+        // Wait for video to be ready before playing
+        if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            activePlayer.play().catch(err => {
+                console.error('Error playing video on initial load:', err);
+            });
+        } else {
+            // Wait for video to load
+            const playWhenReady = () => {
+                activePlayer.removeEventListener('loadeddata', playWhenReady);
+                activePlayer.play().catch(err => {
+                    console.error('Error playing video on initial load:', err);
+                });
+            };
+            activePlayer.addEventListener('loadeddata', playWhenReady);
+        }
+    }
 }
 
 function setPlaybackBtnToPause() {
