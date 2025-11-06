@@ -129,7 +129,10 @@ test.describe('File Range Improvements', () => {
     const playbackPosition = page.locator('#playbackPosition');
     await expect(playbackPosition).toBeVisible();
     
-    // Pause the video first
+    // Wait for video to start playing and position to be established
+    await page.waitForTimeout(1000);
+    
+    // Pause the video
     await page.locator('#playPauseBtn').click();
     await page.waitForTimeout(200);
     
@@ -144,15 +147,17 @@ test.describe('File Range Improvements', () => {
     if (isEnabled) {
       await nextBtn.click();
       
-      // Wait for video to switch
-      await page.waitForTimeout(500);
+      // Wait for video to switch and position to update
+      await page.waitForTimeout(800);
       
       // Get position after switching video
       const newLeft = await playbackPosition.evaluate(el => el.style.left);
       const newPercent = parseFloat(newLeft) || 0;
       
       // Position should have changed (moved forward to next video)
+      // Each video is about 10% of the timeline (10 videos total)
       expect(newPercent).toBeGreaterThan(initialPercent);
+      expect(newPercent).toBeGreaterThan(5); // Should be at least 5% into timeline
     } else {
       // If we're on the last video, test passes as we verified the position exists
       console.log('Skipping seek test: already on last video');
@@ -226,6 +231,9 @@ test.describe('File Range Improvements', () => {
     // Wait for file markers to be rendered (scope to player screen)
     await expect(page.locator('#playerScreen .file-marker').first()).toBeVisible();
     
+    // Wait for the highlight to be applied (loadVideo is called asynchronously)
+    await page.waitForTimeout(800);
+    
     // First marker should have 'current-marker' class
     const firstMarker = page.locator('#playerScreen .file-marker').first();
     await expect(firstMarker).toHaveClass(/current-marker/);
@@ -236,7 +244,7 @@ test.describe('File Range Improvements', () => {
     
     if (isEnabled) {
       await nextBtn.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(800);
       
       // Second marker should now have 'current-marker' class
       const secondMarker = page.locator('#playerScreen .file-marker').nth(1);
