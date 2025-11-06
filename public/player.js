@@ -424,7 +424,6 @@ function initializeTimeline() {
         const rawPosition = ((new Date(file.utcTime).getTime() - minTime) / timelineData.range) * 100;
         // Validate and clamp position to prevent CSS injection
         const position = Math.max(0, Math.min(100, Number(rawPosition) || 0));
-        const clampedPosition = Math.max(0, Math.min(100, Number(position)));
         const fileType = (file.fileType || 'Other').toLowerCase();
         
         // Build enhanced tooltip content
@@ -439,7 +438,7 @@ function initializeTimeline() {
                      data-timestamp="${escapeHtml(timestamp)}"
                      data-duration="${escapeHtml(duration)}"
                      data-filetype="${escapeHtml(fileTypeLabel)}"
-                     style="left: ${clampedPosition}%" 
+                     style="left: ${position}%" 
                      title="${escapeHtml(tooltipText)}">
                      <div class="file-marker-tooltip">
                          <div class="tooltip-filename">${escapeHtml(file.filename)}</div>
