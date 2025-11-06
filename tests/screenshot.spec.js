@@ -49,7 +49,12 @@ test.describe('Video Player - Screenshot Feature', () => {
     
     // Wait for player to be ready
     await expect(page.locator('#playerScreen')).toBeVisible();
-    await page.waitForTimeout(1000); // Wait for video to start loading
+    
+    // Wait for video to be loaded and ready (check readyState)
+    await page.waitForFunction(() => {
+      const video = document.querySelector('#videoPlayer1');
+      return video && video.readyState >= 2; // HAVE_CURRENT_DATA or better
+    }, { timeout: 10000 });
     
     // Set up download listener
     const downloadPromise = page.waitForEvent('download');
@@ -81,7 +86,12 @@ test.describe('Video Player - Screenshot Feature', () => {
     
     // Wait for player to be ready
     await expect(page.locator('#playerScreen')).toBeVisible();
-    await page.waitForTimeout(1000); // Wait for video to start loading
+    
+    // Wait for video to be loaded and ready (check readyState)
+    await page.waitForFunction(() => {
+      const video = document.querySelector('#videoPlayer1');
+      return video && video.readyState >= 2; // HAVE_CURRENT_DATA or better
+    }, { timeout: 10000 });
     
     // Set up download listener
     const downloadPromise = page.waitForEvent('download');
@@ -112,7 +122,12 @@ test.describe('Video Player - Screenshot Feature', () => {
     
     // Wait for player to be ready
     await expect(page.locator('#playerScreen')).toBeVisible();
-    await page.waitForTimeout(1000); // Wait for video to start loading
+    
+    // Wait for video to be loaded and ready (check readyState)
+    await page.waitForFunction(() => {
+      const video = document.querySelector('#videoPlayer1');
+      return video && video.readyState >= 2; // HAVE_CURRENT_DATA or better
+    }, { timeout: 10000 });
     
     // Click screenshot button
     await page.locator('#screenshotBtn').click();
@@ -171,7 +186,12 @@ test.describe('Video Player - Screenshot Feature', () => {
     
     // Wait for player to be ready
     await expect(page.locator('#playerScreen')).toBeVisible();
-    await page.waitForTimeout(1000); // Wait for video to start loading
+    
+    // Wait for video to be loaded and ready (check readyState)
+    await page.waitForFunction(() => {
+      const video = document.querySelector('#videoPlayer1');
+      return video && video.readyState >= 2; // HAVE_CURRENT_DATA or better
+    }, { timeout: 10000 });
     
     // Get current video name
     const videoNameElement = await page.locator('#currentVideoName').textContent();
