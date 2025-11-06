@@ -66,7 +66,7 @@ When creating PRs, use this exact template:
 [Include only when relevant - use tables for before/after comparisons]
 | Before | After |
 |--------|-------|
-| [screenshot/description] | [screenshot/description] |
+| [screenshot or video/ description] | [screenshot or video/description] |
 ```
 
 ## Project-Specific Context
