@@ -240,8 +240,8 @@ export function showPlayerScreen(files) {
     initializeTimeline();
     initializeCustomControls();
 
-    // Load first video
-    loadVideo(0);
+    // Load first video (don't pause on initial load - allow autoplay)
+    loadVideo(0, false);
 }
 
 // Hide player screen and return to main
@@ -414,19 +414,21 @@ function switchToNextVideo() {
 }
 
 // Load a video by index (used for seeking/jumping)
-function loadVideo(index) {
+function loadVideo(index, shouldPause = true) {
     if (index < 0 || index >= videoFiles.length) {
         return;
     }
 
-    // Always pause when loading a new video (seeking/jumping)
-    setGlobalPlayerState('paused');
-    
-    // Pause both players to prevent event conflicts
-    videoPlayers.forEach((player) => player.pause());
-    
-    // Sync UI to paused state
-    syncUIWithPlayerState();
+    // Pause when seeking/jumping (but not on initial load)
+    if (shouldPause) {
+        setGlobalPlayerState('paused');
+        
+        // Pause both players to prevent event conflicts
+        videoPlayers.forEach((player) => player.pause());
+        
+        // Sync UI to paused state
+        syncUIWithPlayerState();
+    }
 
     // If seeking backward or far forward, need to reload
     currentVideoIndex = index;
