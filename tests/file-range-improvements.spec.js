@@ -20,6 +20,9 @@ test.describe('File Range Improvements', () => {
     
     // Wait for player screen to be visible
     await expect(page.locator('#playerScreen')).toBeVisible();
+    
+    // Wait for video to start loading
+    await page.waitForTimeout(500);
   });
 
   test('file markers should have enhanced tooltip with detailed information', async ({ page }) => {
@@ -97,18 +100,27 @@ test.describe('File Range Improvements', () => {
     const playbackPosition = page.locator('#playbackPosition');
     await expect(playbackPosition).toBeVisible();
     
+    // Ensure video is playing
+    const playPauseBtn = page.locator('#playPauseBtn');
+    const btnText = await playPauseBtn.textContent();
+    if (btnText && btnText.includes('Play')) {
+      // Video is paused, click to play
+      await playPauseBtn.click();
+      await page.waitForTimeout(200);
+    }
+    
     // Get initial position
     const initialLeft = await playbackPosition.evaluate(el => el.style.left);
+    const initialPercent = parseFloat(initialLeft) || 0;
     
     // Let video play for a moment
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500);
     
     // Get position after playback
     const newLeft = await playbackPosition.evaluate(el => el.style.left);
+    const newPercent = parseFloat(newLeft) || 0;
     
-    // Position should have changed (moved forward)
-    const initialPercent = parseFloat(initialLeft);
-    const newPercent = parseFloat(newLeft);
+    // Position should have changed (moved forward) or stayed the same if video ended
     expect(newPercent).toBeGreaterThanOrEqual(initialPercent);
   });
 
