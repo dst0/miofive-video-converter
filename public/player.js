@@ -14,6 +14,29 @@ let currentGlobalTime = 0; // Current playback time across all videos
 let isDraggingProgress = false; // Flag for progress bar dragging
 let isPlayerInitialized = false;
 
+// Detect supported playback rate range for the browser/device
+function detectPlaybackRateRange() {
+    try {
+        const v = document.createElement('video');
+        const test = [0.01, 0.02, 0.025, 0.03, 0.05, 0.075, 0.1, 0.25, 0.3, 0.5, 0.75, 1, 1.25, 1.5, 2, 3, 4, 5, 8, 10, 15, 16, 25, 50];
+        const ok = test.filter((r) => {
+            try {
+                v.playbackRate = r;
+                return v.playbackRate === r;
+            } catch {
+                return false;
+            }
+        });
+        return { min: Math.min(...ok), max: Math.max(...ok), supported: ok };
+    } catch (e) {
+        console.warn('Playback rate detection failed:', e);
+        return { min: 0.5, max: 2, supported: [0.5, 1, 1.5, 2] };
+    }
+}
+
+// Export the detected playback rate range
+export const PlaybackRateRange = detectPlaybackRateRange();
+
 // HTML escape function to prevent XSS
 function escapeHtml(text) {
     const div = document.createElement('div');
@@ -46,10 +69,21 @@ export function initPlayer() {
         togglePlayPause();
     });
 
+    // Configure speed controls based on detected playback rate range
+    const speedInput = document.getElementById('speedInput');
+    const speedSlider = document.getElementById('speedSlider');
+    
+    speedInput.min = PlaybackRateRange.min;
+    speedInput.max = PlaybackRateRange.max;
+    speedSlider.min = PlaybackRateRange.min;
+    speedSlider.max = PlaybackRateRange.max;
+    
+    console.log('Detected playback rate range:', PlaybackRateRange);
+
     // Speed control event listeners
     document.getElementById('speedInput').addEventListener('input', (e) => {
         const speed = parseFloat(e.target.value);
-        if (speed >= 0.1 && speed <= 50) {
+        if (speed >= PlaybackRateRange.min && speed <= PlaybackRateRange.max) {
             changePlaybackSpeed(speed);
         }
     });
@@ -59,11 +93,21 @@ export function initPlayer() {
         changePlaybackSpeed(speed);
     });
 
-    // Speed preset buttons
+    // Speed preset buttons - filter and disable unsupported rates
     document.querySelectorAll('.preset-speed-btn').forEach((btn) => {
+        const speed = parseFloat(btn.dataset.speed);
+        
+        // Disable button if speed is not supported
+        if (speed < PlaybackRateRange.min || speed > PlaybackRateRange.max) {
+            btn.disabled = true;
+            btn.title = `${speed}x not supported by this browser`;
+            btn.style.opacity = '0.5';
+        }
+        
         btn.addEventListener('click', () => {
-            const speed = parseFloat(btn.dataset.speed);
-            changePlaybackSpeed(speed);
+            if (!btn.disabled) {
+                changePlaybackSpeed(speed);
+            }
         });
     });
 
@@ -389,14 +433,17 @@ function togglePlayPause() {
 
 // Change playback speed
 function changePlaybackSpeed(speed) {
+    // Clamp speed to supported range
+    const clampedSpeed = Math.max(PlaybackRateRange.min, Math.min(PlaybackRateRange.max, speed));
+    
     videoPlayers.forEach((player) => {
-        player.playbackRate = speed;
+        player.playbackRate = clampedSpeed;
     });
 
     // Update speed display
-    document.getElementById('speedInput').value = speed;
-    document.getElementById('speedSlider').value = speed;
-    document.getElementById('speedValue').textContent = `${speed.toFixed(1)}x`;
+    document.getElementById('speedInput').value = clampedSpeed;
+    document.getElementById('speedSlider').value = clampedSpeed;
+    document.getElementById('speedValue').textContent = `${clampedSpeed.toFixed(1)}x`;
 }
 
 // Update video info display
