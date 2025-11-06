@@ -413,6 +413,54 @@
     z-index: 6;
 }
 
+/* Enhanced tooltip for file markers */
+.file-marker-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 11px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s, visibility 0.2s;
+    z-index: 1000;
+    margin-bottom: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.file-marker:hover .file-marker-tooltip {
+    opacity: 1;
+    visibility: visible;
+}
+
+.file-marker-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.9);
+}
+
+.tooltip-filename {
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: #ffd700;
+}
+
+.tooltip-info {
+    font-size: 10px;
+    line-height: 1.4;
+    color: #ddd;
+}
+
 /* Responsive Design for Player */
 @media (max-width: 768px) {
     .player-header {
