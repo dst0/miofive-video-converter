@@ -14,6 +14,9 @@ let currentGlobalTime = 0; // Current playback time across all videos
 let isDraggingProgress = false; // Flag for progress bar dragging
 let isPlayerInitialized = false;
 
+// Global player state - single source of truth for play/pause state
+let globalPlayerState = 'paused'; // 'playing', 'paused', or 'ended'
+
 // Detect supported playback rate range for the browser/device
 function detectPlaybackRateRange() {
     try {
@@ -115,7 +118,12 @@ export function initPlayer() {
     videoPlayers.forEach((player, index) => {
         player.addEventListener('ended', () => {
             if (index === activePlayerIndex) {
-                playNextVideo();
+                // Check if this is the last video
+                if (currentVideoIndex >= videoFiles.length - 1) {
+                    setGlobalPlayerState('ended');
+                } else {
+                    playNextVideo();
+                }
             }
         });
 
@@ -130,15 +138,18 @@ export function initPlayer() {
         player.addEventListener('play', () => {
             if (index === activePlayerIndex) {
                 console.log('play event triggered at player index', index);
+                setGlobalPlayerState('playing');
             }
-
-            // Update play/pause button to reflect paused state
-            setPlaybackBtnToPlay();
         });
 
         player.addEventListener('pause', () => {
             if (index === activePlayerIndex) {
                 console.log('pause event triggered at player index', index);
+                // Only update state if not ended
+                const activePlayer = videoPlayers[activePlayerIndex];
+                if (!activePlayer.ended) {
+                    setGlobalPlayerState('paused');
+                }
             }
         });
 
@@ -156,6 +167,49 @@ export function initPlayer() {
     });
 
     isPlayerInitialized = true;
+}
+
+// Set global player state and sync UI
+function setGlobalPlayerState(state) {
+    console.log(`Setting global player state: ${globalPlayerState} -> ${state}`);
+    globalPlayerState = state;
+    syncUIWithPlayerState();
+}
+
+// Sync UI buttons with current player state
+function syncUIWithPlayerState() {
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const overlayBtn = document.querySelector('#playPauseOverlayBtn .btn-icon');
+    
+    if (globalPlayerState === 'playing') {
+        playPauseBtn.textContent = '⏸ Pause';
+        overlayBtn.textContent = '⏸';
+    } else {
+        // paused or ended
+        playPauseBtn.textContent = '▶ Play';
+        overlayBtn.textContent = '▶';
+    }
+    
+    console.log(`UI synced to state: ${globalPlayerState}`);
+}
+
+// Apply global state to video player objects
+function applyStateToPlayers() {
+    const activePlayer = videoPlayers[activePlayerIndex];
+    
+    if (globalPlayerState === 'playing') {
+        if (activePlayer.paused) {
+            activePlayer.play().catch(err => {
+                console.error('Error playing video:', err);
+                setGlobalPlayerState('paused');
+            });
+        }
+    } else {
+        // paused or ended
+        if (!activePlayer.paused) {
+            activePlayer.pause();
+        }
+    }
 }
 
 function setPlaybackBtnToPlay() {
@@ -286,10 +340,13 @@ function preloadNextVideo() {
 function switchToNextVideo() {
     const nextVideoIndex = currentVideoIndex + 1;
     if (nextVideoIndex >= videoFiles.length) {
-        setPlaybackBtnToPause();
+        setGlobalPlayerState('ended');
         return false;
     }
 
+    // Remember if we were playing
+    const wasPlaying = globalPlayerState === 'playing';
+    
     // Store the previous player index before switching
     const previousPlayerIndex = activePlayerIndex;
 
@@ -316,35 +373,38 @@ function switchToNextVideo() {
     document.getElementById('nextBtn').disabled =
         currentVideoIndex === videoFiles.length - 1;
 
-    // Start playback on new active player (only if video is ready)
+    // Start playback on new active player if we were playing before
     const newActivePlayer = videoPlayers[activePlayerIndex];
-    if (newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-        newActivePlayer.currentTime = 0;
-        newActivePlayer.play().catch((err) => {
-            console.error('Error playing video:', err);
-            setPlaybackBtnToPause();
-        });
-    } else {
-        // Wait for video to be ready before playing
-        let timeoutId;
-        const playWhenReady = () => {
-            newActivePlayer.removeEventListener('loadeddata', playWhenReady);
-            newActivePlayer.removeEventListener('error', playWhenReady);
-            clearTimeout(timeoutId);
+    if (wasPlaying) {
+        if (newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
             newActivePlayer.currentTime = 0;
             newActivePlayer.play().catch((err) => {
                 console.error('Error playing video:', err);
-                setPlaybackBtnToPause();
+                setGlobalPlayerState('paused');
             });
-        };
-        newActivePlayer.addEventListener('loadeddata', playWhenReady);
-        newActivePlayer.addEventListener('error', playWhenReady);
-        // Timeout after 10 seconds to prevent memory leak
-        timeoutId = setTimeout(() => {
-            newActivePlayer.removeEventListener('loadeddata', playWhenReady);
-            newActivePlayer.removeEventListener('error', playWhenReady);
-            console.error('Timeout waiting for video to load');
-        }, 10000);
+        } else {
+            // Wait for video to be ready before playing
+            let timeoutId;
+            const playWhenReady = () => {
+                newActivePlayer.removeEventListener('loadeddata', playWhenReady);
+                newActivePlayer.removeEventListener('error', playWhenReady);
+                clearTimeout(timeoutId);
+                newActivePlayer.currentTime = 0;
+                newActivePlayer.play().catch((err) => {
+                    console.error('Error playing video:', err);
+                    setGlobalPlayerState('paused');
+                });
+            };
+            newActivePlayer.addEventListener('loadeddata', playWhenReady);
+            newActivePlayer.addEventListener('error', playWhenReady);
+            // Timeout after 10 seconds to prevent memory leak
+            timeoutId = setTimeout(() => {
+                newActivePlayer.removeEventListener('loadeddata', playWhenReady);
+                newActivePlayer.removeEventListener('error', playWhenReady);
+                console.error('Timeout waiting for video to load');
+                setGlobalPlayerState('paused');
+            }, 10000);
+        }
     }
 
     // Preload the next video into the now-inactive player
@@ -359,8 +419,14 @@ function loadVideo(index) {
         return;
     }
 
+    // Always pause when loading a new video (seeking/jumping)
+    setGlobalPlayerState('paused');
+    
     // Pause both players to prevent event conflicts
-    // videoPlayers.forEach((player) => player.pause());
+    videoPlayers.forEach((player) => player.pause());
+    
+    // Sync UI to paused state
+    syncUIWithPlayerState();
 
     // If seeking backward or far forward, need to reload
     currentVideoIndex = index;
@@ -423,11 +489,15 @@ function playPreviousVideo() {
 // Toggle play/pause
 function togglePlayPause() {
     const activePlayer = videoPlayers[activePlayerIndex];
-    if (activePlayer.paused) {
-        activePlayer.play();
+    
+    // Toggle based on global state
+    if (globalPlayerState === 'playing') {
+        setGlobalPlayerState('paused');
+        applyStateToPlayers();
     } else {
-        activePlayer.pause();
-        setPlaybackBtnToPause();
+        // paused or ended
+        setGlobalPlayerState('playing');
+        applyStateToPlayers();
     }
 }
 
@@ -718,6 +788,11 @@ function initializeCustomControls() {
     const startDrag = (e) => {
         isDragging = true;
         isDraggingProgress = true;
+        
+        // Pause playback when starting to seek
+        setGlobalPlayerState('paused');
+        applyStateToPlayers();
+        
         handleProgressDrag(e);
     };
 
@@ -741,7 +816,7 @@ function initializeCustomControls() {
             (e.clientX || e.changedTouches?.[0]?.clientX) - rect.left;
         const percent = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
 
-        // Seek to the clicked position
+        // Seek to the clicked position (will remain paused)
         seekToGlobalPercent(percent);
 
         setTimeout(() => {
