@@ -83,6 +83,23 @@ export function initPlayer() {
             }
         });
         
+        // Update position indicator immediately when seeking starts
+        player.addEventListener('seeking', () => {
+            if (index === activePlayerIndex) {
+                updatePlaybackPosition();
+                updateCustomProgressBar();
+            }
+        });
+        
+        // Update position indicator when seeking completes
+        player.addEventListener('seeked', () => {
+            if (index === activePlayerIndex) {
+                updatePlaybackPosition();
+                updateVideoInfo();
+                updateCustomProgressBar();
+            }
+        });
+        
         player.addEventListener('play', () => {
             if (index === activePlayerIndex) {
                 document.getElementById('playPauseBtn').textContent = '⏸ Pause';
@@ -402,17 +419,35 @@ function initializeTimeline() {
     document.getElementById('timelineStart').textContent = new Date(minTime).toLocaleString();
     document.getElementById('timelineEnd').textContent = new Date(maxTime).toLocaleString();
     
-    // Generate file markers
+    // Generate file markers with enhanced tooltips
     const fileMarkersHTML = videoFiles.map((file, index) => {
         const rawPosition = ((new Date(file.utcTime).getTime() - minTime) / timelineData.range) * 100;
         // Validate and clamp position to prevent CSS injection
         const position = Math.max(0, Math.min(100, Number(rawPosition) || 0));
         const clampedPosition = Math.max(0, Math.min(100, Number(position)));
         const fileType = (file.fileType || 'Other').toLowerCase();
+        
+        // Build enhanced tooltip content
+        const timestamp = new Date(file.utcTime).toLocaleString();
+        const duration = file.duration ? `${file.duration.toFixed(1)}s` : 'Unknown';
+        const fileTypeLabel = file.fileType || 'Other';
+        const tooltipText = `${file.filename}\nTime: ${timestamp}\nDuration: ${duration}\nType: ${fileTypeLabel}`;
+        
         return `<div class="file-marker file-marker-${escapeHtml(fileType)}" 
                      data-index="${index}" 
+                     data-filename="${escapeHtml(file.filename)}"
+                     data-timestamp="${escapeHtml(timestamp)}"
+                     data-duration="${escapeHtml(duration)}"
+                     data-filetype="${escapeHtml(fileTypeLabel)}"
                      style="left: ${clampedPosition}%" 
-                     title="${escapeHtml(file.filename)}"></div>`;
+                     title="${escapeHtml(tooltipText)}">
+                     <div class="file-marker-tooltip">
+                         <div class="tooltip-filename">${escapeHtml(file.filename)}</div>
+                         <div class="tooltip-info">Time: ${escapeHtml(timestamp)}</div>
+                         <div class="tooltip-info">Duration: ${escapeHtml(duration)}</div>
+                         <div class="tooltip-info">Type: ${escapeHtml(fileTypeLabel)}</div>
+                     </div>
+                 </div>`;
     }).join('');
     
     document.getElementById('fileMarkers').innerHTML = fileMarkersHTML;
