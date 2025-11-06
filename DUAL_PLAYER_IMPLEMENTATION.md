@@ -95,21 +95,34 @@ Modified files:
 
 #### Dual Player
 ```css
+.video-wrapper {
+    aspect-ratio: 16 / 9;
+    min-height: 300px;
+    max-height: 70vh;
+}
+
 .video-player {
     position: absolute;
+    height: 100%;
+    object-fit: contain;
     opacity: 0;
     visibility: hidden;
-    transition: opacity 0.3s ease;
+    z-index: 1;
 }
 
 .video-player.active-player {
-    position: relative;
+    position: absolute;
     opacity: 1;
     visibility: visible;
+    z-index: 2;
 }
 ```
 
-This ensures only the active player is visible, creating a seamless transition.
+This ensures only the active player is visible, creating a seamless transition with no layout shifts:
+- **Both players absolute**: Prevents wrapper from collapsing during transitions
+- **Fixed aspect-ratio**: Wrapper maintains consistent height regardless of active player
+- **z-index layering**: Active player (z-index: 2) appears on top of inactive (z-index: 1)
+- **object-fit: contain**: Videos scale properly within the fixed container
 
 #### Custom Controls Overlay
 ```css
