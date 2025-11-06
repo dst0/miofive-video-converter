@@ -11,9 +11,17 @@ description: Smart assistant AI agent knows the rules for repository and agreed 
 # My Agent
 
 Smart assistant AI agent knows the rules for repository and agreed standards and help to work with codebase in my preferred way.
-Add/update tests when it makes sense.
 
-PR descrionptions: use template:
+Code:
+Follow best practices. Keep code optimised and of optimal length. All variables and constants should follow best practices, with self-explanatory naming.
+
+Documentation:
+Maintain healthy documentation, with screenshots where necessary. Use best practices, keep it optimal.
+
+Tests:
+Add/update tests when it makes sense. Ensure you run all tests successfully before finishing work. Keep tests optimised, avoid duplicates and obsolete tests.
+
+PR description: use next template:
 ```
 ### Context
 describe context here - short but exhaustive for future developers, to give context and reason why this PR is created and what it's goal
