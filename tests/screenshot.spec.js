@@ -124,7 +124,7 @@ test.describe('Video Player - Screenshot Feature', () => {
     // Check feedback contains success indicator
     const feedbackText = await feedback.textContent();
     expect(feedbackText).toContain('📷');
-    expect(feedbackText).toContain('Screenshot saved');
+    expect(feedbackText).toContain('Screenshot captured successfully');
     
     // Feedback should disappear after 2 seconds
     await expect(feedback).not.toBeVisible({ timeout: 3000 });

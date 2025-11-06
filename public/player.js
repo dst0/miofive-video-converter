@@ -772,7 +772,14 @@ function takeScreenshot() {
         // Generate filename with timestamp and video info
         const currentFile = videoFiles[currentVideoIndex];
         const now = new Date();
-        const timestamp = now.toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+        // Format timestamp as YYYY-MM-DD_HH-MM-SS
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
         const videoName = currentFile ? currentFile.filename.replace(/\.MP4$/i, '') : 'video';
         const currentTime = formatTime(activePlayer.currentTime).replace(/:/g, '-');
         const filename = `screenshot_${videoName}_${currentTime}_${timestamp}.png`;
@@ -799,8 +806,8 @@ function takeScreenshot() {
                 URL.revokeObjectURL(url);
             }, 100);
             
-            // Show success feedback
-            showScreenshotFeedback(true, filename);
+            // Show success feedback (don't show full filename for security)
+            showScreenshotFeedback(true, 'Screenshot captured successfully');
             console.log('Screenshot saved:', filename);
         }, 'image/png');
         
@@ -830,7 +837,7 @@ function showScreenshotFeedback(success, message) {
         animation: fadeInOut 2s ease-in-out;
         pointer-events: none;
     `;
-    feedback.textContent = success ? `📷 Screenshot saved: ${message}` : `❌ ${message}`;
+    feedback.textContent = success ? `📷 ${message}` : `❌ ${message}`;
     
     // Add animation
     const style = document.createElement('style');
