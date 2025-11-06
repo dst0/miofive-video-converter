@@ -19,7 +19,7 @@ When working on this repository, you must adhere to the following guidelines:
 3. **Code Optimization**: Write efficient, maintainable code
    - Keep functions focused and single-purpose
    - Avoid duplication - extract reusable logic
-   - Optimize for readability first, performance second
+   - Optimize for readability first, performance second (except performance-critical code)
 4. **Error Handling**: Always implement proper error handling with descriptive messages
 
 ### Documentation Requirements
