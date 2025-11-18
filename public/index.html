@@ -95,7 +95,10 @@
 <div class="player-container" id="playerScreen" style="display: none;">
     <div class="player-header">
         <h1>Video Player</h1>
-        <button id="backBtn" class="back-btn">← Back to Main</button>
+        <div class="player-header-buttons">
+            <button id="exportVideosBtn" class="export-btn">💾 Export Videos</button>
+            <button id="backBtn" class="back-btn">← Back to Main</button>
+        </div>
     </div>
 
     <div class="video-wrapper">
@@ -193,7 +196,42 @@
             </div>
         </div>
     </div>
+
+    <!-- Export Videos Modal -->
+    <div id="exportModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Export Videos</h3>
+                <button type="button" class="close-btn" id="closeExportModalBtn">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="export-info">
+                    <p><strong>Total Videos:</strong> <span id="exportVideoCount">0</span></p>
+                    <p><strong>Total Duration:</strong> <span id="exportTotalDuration">00:00</span></p>
+                </div>
+                <div class="input-group folder-browser-group">
+                    <label>Output Folder:</label>
+                    <div class="folder-browser-container">
+                        <input type="text" id="exportOutputFolder" placeholder="No folder selected" readonly />
+                        <button type="button" id="exportBrowseFolderBtn" class="browse-btn">Browse</button>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label>Output Filename:</label>
+                    <input type="text" id="exportOutputFilename" placeholder="exported_video.mp4" />
+                </div>
+                <div id="exportStatus"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="exportConfirmBtn" class="primary">Export</button>
+                <button type="button" id="exportCancelBtn" class="secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
 </div>
+
+<!-- Snackbar container for notifications -->
+<div id="snackbar" class="snackbar"></div>
 
 <script type="module" src="app.js"></script>
 </body>

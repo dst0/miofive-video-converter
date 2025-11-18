@@ -992,3 +992,51 @@ button.play-button:hover {
 .filename-container input[type="text"] {
     flex: 1;
 }
+/* Snackbar Notification Styles */
+.snackbar {
+    visibility: hidden;
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    min-width: 300px;
+    max-width: 500px;
+    padding: 16px 24px;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10000;
+    opacity: 0;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+}
+
+.snackbar.show {
+    visibility: visible;
+    opacity: 1;
+}
+
+.snackbar.success {
+    background-color: #4caf50;
+    color: white;
+}
+
+.snackbar.error {
+    background-color: #f44336;
+    color: white;
+}
+
+.snackbar.info {
+    background-color: #2196f3;
+    color: white;
+}
+
+@media (max-width: 600px) {
+    .snackbar {
+        min-width: 250px;
+        max-width: 90%;
+        bottom: 20px;
+        padding: 12px 20px;
+        font-size: 13px;
+    }
+}

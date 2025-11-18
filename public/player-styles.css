@@ -16,6 +16,27 @@
     margin-bottom: 30px;
 }
 
+.player-header-buttons {
+    display: flex;
+    gap: 10px;
+}
+
+.export-btn {
+    background: #28a745;
+    padding: 10px 20px;
+    color: white;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.export-btn:hover {
+    background: #218838;
+}
+
 .back-btn {
     background: #6c757d;
     padding: 10px 20px;
@@ -504,4 +525,28 @@
     .volume-slider {
         width: 60px;
     }
+}
+
+/* Export modal specific styles */
+.export-info {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+}
+
+.export-info p {
+    margin-bottom: 8px;
+    color: #333;
+    font-size: 14px;
+}
+
+.export-info p:last-child {
+    margin-bottom: 0;
+}
+
+.export-info strong {
+    color: #667eea;
+    min-width: 120px;
+    display: inline-block;
 }

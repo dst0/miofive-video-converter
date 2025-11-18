@@ -58,8 +58,15 @@ function closeFolderBrowser() {
 // Select the current folder and close the browser
 function selectCurrentFolder() {
     if (currentBrowsePath) {
-        // Check if we're browsing for output folder or input folder
-        if (window.browsingForOutput) {
+        // Check if we're browsing for export (from player), output folder, or input folder
+        if (window.browsingForExport) {
+            const exportOutputFolderInput = document.getElementById('exportOutputFolder');
+            if (exportOutputFolderInput) {
+                exportOutputFolderInput.value = currentBrowsePath;
+                localStorage.setItem('mp4-combiner-output-folder', currentBrowsePath);
+            }
+            window.browsingForExport = false;
+        } else if (window.browsingForOutput) {
             const outputFolderInput = document.getElementById('outputFolder');
             if (outputFolderInput) {
                 outputFolderInput.value = currentBrowsePath;
