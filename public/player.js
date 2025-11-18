@@ -190,6 +190,18 @@ export function initPlayer() {
                 }
             }
         });
+
+        player.addEventListener('seeking', () => {
+            if (index === activePlayerIndex) {
+                updatePlaybackPosition();
+            }
+        });
+
+        player.addEventListener('seeked', () => {
+            if (index === activePlayerIndex) {
+                updatePlaybackPosition();
+            }
+        });
     });
 
     isPlayerInitialized = true;
@@ -482,6 +494,9 @@ function loadVideo(index, shouldPause = true) {
     // Highlight current file marker
     highlightCurrentMarker();
 
+    // Update playback position immediately
+    updatePlaybackPosition();
+
     // Preload next video if available
     if (index + 1 < videoFiles.length) {
         const nextPlayerIndex = 1 - activePlayerIndex;
@@ -521,6 +536,7 @@ function playNextVideo() {
     if (switchToNextVideo()) {
         updateVideoInfo();
         highlightCurrentMarker();
+        updatePlaybackPosition();
         updateCustomProgressBar();
         return;
     }
@@ -630,10 +646,24 @@ function initializeTimeline() {
                 Math.min(100, Number(position))
             );
             const fileType = (file.fileType || 'Other').toLowerCase();
+            const timestamp = new Date(file.utcTime).toLocaleString();
+            const duration = file.duration ? formatTime(file.duration) : 'Unknown';
+            const fileTypeDisplay = file.fileType || 'Other';
+            
             return `<div class="file-marker file-marker-${escapeHtml(fileType)}"
                      data-index="${index}"
-                     style="left: ${clampedPosition}%"
-                     title="${escapeHtml(file.filename)}"></div>`;
+                     data-filename="${escapeHtml(file.filename)}"
+                     data-timestamp="${escapeHtml(timestamp)}"
+                     data-duration="${escapeHtml(duration)}"
+                     data-filetype="${escapeHtml(fileTypeDisplay)}"
+                     style="left: ${clampedPosition}%">
+                     <div class="file-marker-tooltip">
+                         <div class="tooltip-filename">${escapeHtml(file.filename)}</div>
+                         <div class="tooltip-timestamp">⏰ ${escapeHtml(timestamp)}</div>
+                         <div class="tooltip-duration">⏱️ ${escapeHtml(duration)}</div>
+                         <div class="tooltip-filetype">📁 ${escapeHtml(fileTypeDisplay)}</div>
+                     </div>
+                 </div>`;
         })
         .join('');
 
@@ -644,12 +674,16 @@ function initializeTimeline() {
     document.getElementById('timeMarkers').innerHTML = timeMarkersHTML;
 
     // Add click handlers to file markers
-    document.querySelectorAll('.file-marker').forEach((marker) => {
+    const playerScreen = document.getElementById('playerScreen');
+    playerScreen.querySelectorAll('.file-marker').forEach((marker) => {
         marker.addEventListener('click', () => {
             const index = parseInt(marker.dataset.index);
             loadVideo(index);
         });
     });
+
+    // Highlight the first marker initially
+    highlightCurrentMarker();
 
     // Add click handler to timeline track for seeking
     document.getElementById('timelineTrack').addEventListener('click', (e) => {
@@ -768,12 +802,13 @@ function updatePlaybackPosition() {
 // Highlight current file marker
 function highlightCurrentMarker() {
     // Remove highlight from all markers
-    document.querySelectorAll('.file-marker').forEach((marker) => {
+    const playerScreen = document.getElementById('playerScreen');
+    playerScreen.querySelectorAll('.file-marker').forEach((marker) => {
         marker.classList.remove('current-marker');
     });
 
     // Add highlight to current marker
-    const currentMarker = document.querySelector(
+    const currentMarker = playerScreen.querySelector(
         `.file-marker[data-index="${currentVideoIndex}"]`
     );
     if (currentMarker) {

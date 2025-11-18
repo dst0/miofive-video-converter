@@ -439,6 +439,58 @@
     z-index: 6;
 }
 
+/* File marker tooltips */
+.file-marker-tooltip {
+    position: absolute;
+    bottom: 120%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.9);
+    color: white;
+    padding: 10px 12px;
+    border-radius: 6px;
+    font-size: 12px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+    z-index: 1000;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.file-marker-tooltip::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    border: 6px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.9);
+}
+
+.file-marker:hover .file-marker-tooltip {
+    opacity: 1;
+}
+
+.tooltip-filename {
+    color: #ffd700;
+    font-weight: 600;
+    margin-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 215, 0, 0.3);
+    padding-bottom: 4px;
+}
+
+.tooltip-timestamp,
+.tooltip-duration,
+.tooltip-filetype {
+    margin-bottom: 3px;
+    font-size: 11px;
+}
+
+.tooltip-filetype {
+    margin-bottom: 0;
+}
+
 /* Responsive Design for Player */
 @media (max-width: 768px) {
     .player-header {
