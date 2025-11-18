@@ -209,7 +209,8 @@ function loadVideoIntoPlayer(videoIndex, playerIndex) {
     
     // Set video source
     // In GitHub Pages demo mode, use relative path directly
-    const isGitHubPages = window.location.hostname.includes('github.io');
+    // Secure check: hostname must END with .github.io
+    const isGitHubPages = window.location.hostname.endsWith('.github.io');
     const videoURL = isGitHubPages 
         ? videoFile.path 
         : `/video?path=${encodeURIComponent(videoFile.path)}`;

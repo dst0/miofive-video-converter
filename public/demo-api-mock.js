@@ -5,7 +5,8 @@
 
 // Check if we're running on GitHub Pages
 export function isGitHubPages() {
-    return window.location.hostname.includes('github.io');
+    // More secure check: hostname must END with .github.io
+    return window.location.hostname.endsWith('.github.io');
 }
 
 // Mock test data - simulating the test-data folder structure
