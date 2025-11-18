@@ -7,3 +7,4 @@ playwright-report/
 playwright/.cache/
 screenshots/
 test-data/Normal.old/
+test-output/
