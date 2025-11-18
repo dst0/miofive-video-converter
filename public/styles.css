@@ -40,6 +40,17 @@ h1 {
     border-left: 4px solid #ffc107;
 }
 
+.demo-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px;
+    border-radius: 6px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 14px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
 .section {
     margin-bottom: 30px;
 }
