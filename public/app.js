@@ -64,8 +64,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // FFmpeg check
     fetch('/check-ffmpeg')
-        .then(r => r.json())
-        .then(data => {
+        .then((r) => r.json())
+        .then((data) => {
             ffmpegAvailable = data.available;
             if (!ffmpegAvailable) {
                 document.getElementById('ffmpegWarning').innerHTML = `
@@ -123,13 +123,16 @@ function savePaths() {
 
 // Initialize pre-scan filter functionality
 function initializePreScanFilters() {
-    const enableFiltersCheckbox = document.getElementById('enablePreScanFilters');
+    const enableFiltersCheckbox = document.getElementById(
+        'enablePreScanFilters'
+    );
     const filterControls = document.getElementById('preScanFilterControls');
     const startTimeInput = document.getElementById('preScanStartTime');
     const endTimeInput = document.getElementById('preScanEndTime');
 
     // Load saved filter state
-    const filtersEnabled = localStorage.getItem('pre-scan-filters-enabled') === 'true';
+    const filtersEnabled =
+        localStorage.getItem('pre-scan-filters-enabled') === 'true';
     const savedStartTime = localStorage.getItem('pre-scan-start-time');
     const savedEndTime = localStorage.getItem('pre-scan-end-time');
 
@@ -167,7 +170,7 @@ function initializePreScanFilters() {
     });
 
     // Preset buttons
-    document.querySelectorAll('.preset-btn').forEach(btn => {
+    document.querySelectorAll('.preset-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
             const preset = btn.dataset.preset;
             applyDatePreset(preset);
@@ -194,15 +197,43 @@ function applyDatePreset(preset) {
 
     switch (preset) {
         case 'today':
-            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+            startDate = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                0,
+                0,
+                0
+            );
+            endDate = new Date(
+                now.getFullYear(),
+                now.getMonth(),
+                now.getDate(),
+                23,
+                59,
+                59
+            );
             break;
 
         case 'yesterday':
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
-            startDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 0, 0, 0);
-            endDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate(), 23, 59, 59);
+            startDate = new Date(
+                yesterday.getFullYear(),
+                yesterday.getMonth(),
+                yesterday.getDate(),
+                0,
+                0,
+                0
+            );
+            endDate = new Date(
+                yesterday.getFullYear(),
+                yesterday.getMonth(),
+                yesterday.getDate(),
+                23,
+                59,
+                59
+            );
             break;
 
         case 'last7days':
@@ -242,14 +273,20 @@ function applyDatePreset(preset) {
 }
 
 function getPreScanFilterDates() {
-    const filtersEnabled = document.getElementById('enablePreScanFilters').checked;
+    const filtersEnabled = document.getElementById(
+        'enablePreScanFilters'
+    ).checked;
     if (!filtersEnabled) return { startTime: null, endTime: null };
 
     const startTimeInput = document.getElementById('preScanStartTime');
     const endTimeInput = document.getElementById('preScanEndTime');
 
-    const startTime = startTimeInput.value ? new Date(startTimeInput.value).toISOString() : null;
-    const endTime = endTimeInput.value ? new Date(endTimeInput.value).toISOString() : null;
+    const startTime = startTimeInput.value
+        ? new Date(startTimeInput.value).toISOString()
+        : null;
+    const endTime = endTimeInput.value
+        ? new Date(endTimeInput.value).toISOString()
+        : null;
 
     // Validate date range
     if (startTime && endTime && new Date(startTime) >= new Date(endTime)) {
@@ -271,7 +308,7 @@ function toggleSelectAll() {
     const selectAllCheckbox = document.getElementById('selectAll');
     const fileCheckboxes = document.querySelectorAll('.file-checkbox');
 
-    fileCheckboxes.forEach(checkbox => {
+    fileCheckboxes.forEach((checkbox) => {
         checkbox.checked = selectAllCheckbox.checked;
     });
     updateTimelineSelection();
@@ -281,7 +318,9 @@ function updateSelectAllState() {
     const fileCheckboxes = document.querySelectorAll('.file-checkbox');
     const selectAllCheckbox = document.getElementById('selectAll');
 
-    const checkedCount = Array.from(fileCheckboxes).filter(cb => cb.checked).length;
+    const checkedCount = Array.from(fileCheckboxes).filter(
+        (cb) => cb.checked
+    ).length;
 
     if (checkedCount === 0) {
         selectAllCheckbox.checked = false;
@@ -302,7 +341,11 @@ function generateTimeMarkers(minTime, maxTime) {
     const endDate = new Date(maxTime);
 
     // Start from the first day
-    const currentDate = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate());
+    const currentDate = new Date(
+        startDate.getFullYear(),
+        startDate.getMonth(),
+        startDate.getDate()
+    );
 
     while (currentDate <= endDate) {
         const dayStart = new Date(currentDate);
@@ -316,8 +359,13 @@ function generateTimeMarkers(minTime, maxTime) {
             const midnight = new Date(currentDate);
             midnight.setHours(0, 0, 0, 0);
 
-            if (midnight.getTime() >= minTime && midnight.getTime() <= maxTime) {
-                const position = ((midnight.getTime() - minTime) / (maxTime - minTime)) * 100;
+            if (
+                midnight.getTime() >= minTime &&
+                midnight.getTime() <= maxTime
+            ) {
+                const position =
+                    ((midnight.getTime() - minTime) / (maxTime - minTime)) *
+                    100;
                 const dateStr = midnight.toLocaleDateString();
                 const timeStr = midnight.toLocaleTimeString();
                 markers.push(`
@@ -332,7 +380,8 @@ function generateTimeMarkers(minTime, maxTime) {
             noon.setHours(12, 0, 0, 0);
 
             if (noon.getTime() >= minTime && noon.getTime() <= maxTime) {
-                const position = ((noon.getTime() - minTime) / (maxTime - minTime)) * 100;
+                const position =
+                    ((noon.getTime() - minTime) / (maxTime - minTime)) * 100;
                 const dateStr = noon.toLocaleDateString();
                 const timeStr = noon.toLocaleTimeString();
                 markers.push(`
@@ -350,15 +399,19 @@ function generateTimeMarkers(minTime, maxTime) {
 
             // Morning half-day zone
             if (morningStart < morningEnd) {
-                const startPos = ((morningStart - minTime) / (maxTime - minTime)) * 100;
-                const endPos = ((morningEnd - minTime) / (maxTime - minTime)) * 100;
+                const startPos =
+                    ((morningStart - minTime) / (maxTime - minTime)) * 100;
+                const endPos =
+                    ((morningEnd - minTime) / (maxTime - minTime)) * 100;
                 const width = endPos - startPos;
 
                 halfDayZones.push(`
-                    <div class="half-day-zone" 
-                         data-start="${morningStart}" 
-                         data-end="${morningEnd}" 
-                         data-label="Morning ${new Date(morningStart).toLocaleDateString()}"
+                    <div class="half-day-zone"
+                         data-start="${morningStart}"
+                         data-end="${morningEnd}"
+                         data-label="Morning ${new Date(
+                             morningStart
+                         ).toLocaleDateString()}"
                          style="left: ${startPos}%; width: ${width}%">
                     </div>
                 `);
@@ -366,15 +419,19 @@ function generateTimeMarkers(minTime, maxTime) {
 
             // Evening half-day zone
             if (eveningStart < eveningEnd) {
-                const startPos = ((eveningStart - minTime) / (maxTime - minTime)) * 100;
-                const endPos = ((eveningEnd - minTime) / (maxTime - minTime)) * 100;
+                const startPos =
+                    ((eveningStart - minTime) / (maxTime - minTime)) * 100;
+                const endPos =
+                    ((eveningEnd - minTime) / (maxTime - minTime)) * 100;
                 const width = endPos - startPos;
 
                 halfDayZones.push(`
-                    <div class="half-day-zone" 
-                         data-start="${eveningStart}" 
-                         data-end="${eveningEnd}" 
-                         data-label="Evening ${new Date(eveningStart).toLocaleDateString()}"
+                    <div class="half-day-zone"
+                         data-start="${eveningStart}"
+                         data-end="${eveningEnd}"
+                         data-label="Evening ${new Date(
+                             eveningStart
+                         ).toLocaleDateString()}"
                          style="left: ${startPos}%; width: ${width}%">
                     </div>
                 `);
@@ -391,7 +448,7 @@ function generateTimeMarkers(minTime, maxTime) {
 function createTimeline(files) {
     if (files.length === 0) return '';
 
-    const times = files.map(f => new Date(f.utcTime).getTime());
+    const times = files.map((f) => new Date(f.utcTime).getTime());
     const minTime = Math.min(...times);
     const maxTime = Math.max(...times);
     const timeRange = maxTime - minTime;
@@ -405,14 +462,21 @@ function createTimeline(files) {
         minTime: actualMin,
         maxTime: actualMax,
         range: actualMax - actualMin,
-        files: files
+        files: files,
     };
 
-    const fileMarkers = files.map((file, index) => {
-        const position = ((new Date(file.utcTime).getTime() - actualMin) / (actualMax - actualMin)) * 100;
-        const fileType = file.fileType || 'Other';
-        return `<div class="file-marker file-marker-${fileType.toLowerCase()}" data-index="${index}" data-directory="${fileType}" style="left: ${position}%" title="${file.filename} (${fileType})&#10;Click to select ±3 minute range"></div>`;
-    }).join('');
+    const fileMarkers = files
+        .map((file, index) => {
+            const position =
+                ((new Date(file.utcTime).getTime() - actualMin) /
+                    (actualMax - actualMin)) *
+                100;
+            const fileType = file.fileType || 'Other';
+            return `<div class="file-marker file-marker-${fileType.toLowerCase()}" data-index="${index}" data-directory="${fileType}" style="left: ${position}%" title="${
+                file.filename
+            } (${fileType})&#10;Click to select ±3 minute range"></div>`;
+        })
+        .join('');
 
     // Generate time markers for midnight and noon
     const timeMarkers = generateTimeMarkers(actualMin, actualMax);
@@ -429,8 +493,12 @@ function createTimeline(files) {
             </div>
             <div class="timeline-container">
                 <div class="timeline-labels">
-                    <span class="timeline-label-start">${new Date(actualMin).toLocaleString()}</span>
-                    <span class="timeline-label-end">${new Date(actualMax).toLocaleString()}</span>
+                    <span class="timeline-label-start">${new Date(
+                        actualMin
+                    ).toLocaleString()}</span>
+                    <span class="timeline-label-end">${new Date(
+                        actualMax
+                    ).toLocaleString()}</span>
                 </div>
                 <div class="timeline-track">
                     <div class="timeline-background"></div>
@@ -446,8 +514,12 @@ function createTimeline(files) {
                 </div>
                 <div class="timeline-info">
                     <div class="range-display">
-                        <span>Start: <span id="rangeStartDisplay">${new Date(actualMin).toLocaleString()}</span></span>
-                        <span>End: <span id="rangeEndDisplay">${new Date(actualMax).toLocaleString()}</span></span>
+                        <span>Start: <span id="rangeStartDisplay">${new Date(
+                            actualMin
+                        ).toLocaleString()}</span></span>
+                        <span>End: <span id="rangeEndDisplay">${new Date(
+                            actualMax
+                        ).toLocaleString()}</span></span>
                         <button id="resetRange" class="reset-btn">Reset Range</button>
                     </div>
                 </div>
@@ -474,13 +546,18 @@ function setTimelineIconStyle(style = 'default') {
     const rangeHandles = document.querySelectorAll('.range-handle');
 
     // Remove existing style classes
-    rangeHandles.forEach(handle => {
-        handle.classList.remove('arrow-style', 'double-arrow-style', 'geometric-style', 'bracket-style');
+    rangeHandles.forEach((handle) => {
+        handle.classList.remove(
+            'arrow-style',
+            'double-arrow-style',
+            'geometric-style',
+            'bracket-style'
+        );
     });
 
     // Apply new style
     if (style !== 'default') {
-        rangeHandles.forEach(handle => {
+        rangeHandles.forEach((handle) => {
             handle.classList.add(`${style}-style`);
         });
     }
@@ -513,19 +590,31 @@ function initializeTimeline() {
         snapPoints.length = 0;
 
         // Add noon and midnight markers as snap points
-        document.querySelectorAll('.time-marker.noon, .time-marker.midnight').forEach(marker => {
-            const left = parseFloat(marker.style.left);
-            const time = parseInt(marker.dataset.time);
-            snapPoints.push({ percent: left, time, element: marker, type: 'time-marker' });
-        });
+        document
+            .querySelectorAll('.time-marker.noon, .time-marker.midnight')
+            .forEach((marker) => {
+                const left = parseFloat(marker.style.left);
+                const time = parseInt(marker.dataset.time);
+                snapPoints.push({
+                    percent: left,
+                    time,
+                    element: marker,
+                    type: 'time-marker',
+                });
+            });
 
         // Add file markers as snap points
-        document.querySelectorAll('.file-marker').forEach(marker => {
+        document.querySelectorAll('.file-marker').forEach((marker) => {
             const left = parseFloat(marker.style.left);
             const fileIndex = parseInt(marker.dataset.index);
             const file = scannedFiles[fileIndex];
             const time = new Date(file.utcTime).getTime();
-            snapPoints.push({ percent: left, time, element: marker, type: 'file-marker' });
+            snapPoints.push({
+                percent: left,
+                time,
+                element: marker,
+                type: 'file-marker',
+            });
         });
     }
 
@@ -552,7 +641,7 @@ function initializeTimeline() {
         let nearestSnap = null;
         let minDistance = SNAP_THRESHOLD;
 
-        snapPoints.forEach(snap => {
+        snapPoints.forEach((snap) => {
             const distance = Math.abs(snap.percent - percent);
             if (distance < minDistance) {
                 minDistance = distance;
@@ -564,11 +653,17 @@ function initializeTimeline() {
     }
 
     function updateRangeDisplay() {
-        const startTime = timelineData.minTime + (startPercent / 100) * timelineData.range;
-        const endTime = timelineData.minTime + (endPercent / 100) * timelineData.range;
+        const startTime =
+            timelineData.minTime + (startPercent / 100) * timelineData.range;
+        const endTime =
+            timelineData.minTime + (endPercent / 100) * timelineData.range;
 
-        document.getElementById('rangeStartDisplay').textContent = new Date(startTime).toLocaleString();
-        document.getElementById('rangeEndDisplay').textContent = new Date(endTime).toLocaleString();
+        document.getElementById('rangeStartDisplay').textContent = new Date(
+            startTime
+        ).toLocaleString();
+        document.getElementById('rangeEndDisplay').textContent = new Date(
+            endTime
+        ).toLocaleString();
 
         // Update manual inputs
         manualStartInput.value = formatDateTimeLocal(new Date(startTime));
@@ -583,8 +678,20 @@ function initializeTimeline() {
     }
 
     function setRangeFromTimes(startTime, endTime) {
-        const newStartPercent = Math.max(0, Math.min(100, ((startTime - timelineData.minTime) / timelineData.range) * 100));
-        const newEndPercent = Math.max(0, Math.min(100, ((endTime - timelineData.minTime) / timelineData.range) * 100));
+        const newStartPercent = Math.max(
+            0,
+            Math.min(
+                100,
+                ((startTime - timelineData.minTime) / timelineData.range) * 100
+            )
+        );
+        const newEndPercent = Math.max(
+            0,
+            Math.min(
+                100,
+                ((endTime - timelineData.minTime) / timelineData.range) * 100
+            )
+        );
 
         startPercent = newStartPercent;
         endPercent = newEndPercent;
@@ -622,7 +729,10 @@ function initializeTimeline() {
         if (!isDragging || !dragTarget) return;
 
         const rect = track.getBoundingClientRect();
-        let percent = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+        let percent = Math.max(
+            0,
+            Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)
+        );
 
         // Check for magnetic snapping (only to files and noon/midnight markers)
         const nearestSnap = findNearestSnapPoint(percent);
@@ -658,7 +768,9 @@ function initializeTimeline() {
     }
 
     // Event listeners for handles
-    rangeStart.addEventListener('mousedown', (e) => handleMouseDown(e, rangeStart));
+    rangeStart.addEventListener('mousedown', (e) =>
+        handleMouseDown(e, rangeStart)
+    );
     rangeEnd.addEventListener('mousedown', (e) => handleMouseDown(e, rangeEnd));
 
     document.addEventListener('mousemove', handleMouseMove);
@@ -680,11 +792,11 @@ function initializeTimeline() {
             const fileIndex = parseInt(fileMarker.dataset.index);
             const file = scannedFiles[fileIndex];
             const fileTime = new Date(file.utcTime).getTime();
-            
+
             // Calculate -3 and +3 minutes range
-            const rangeStart = fileTime - (MINI_RANGE_MINUTES * 60 * 1000);
-            const rangeEnd = fileTime + (MINI_RANGE_MINUTES * 60 * 1000);
-            
+            const rangeStart = fileTime - MINI_RANGE_MINUTES * 60 * 1000;
+            const rangeEnd = fileTime + MINI_RANGE_MINUTES * 60 * 1000;
+
             setRangeFromTimes(rangeStart, rangeEnd);
         } else if (timeMarker && timeMarker.dataset.time) {
             const markerTime = parseInt(timeMarker.dataset.time);
@@ -750,7 +862,9 @@ function filterFilesByTimeRange(startTime, endTime) {
     });
 
     // Update file markers visibility
-    const fileMarkers = document.querySelectorAll('.file-marker');
+    const fileMarkers = document.querySelectorAll(
+        '.player-container .file-marker'
+    );
     fileMarkers.forEach((marker, index) => {
         const file = scannedFiles[index];
         const fileTime = new Date(file.utcTime).getTime();
@@ -765,7 +879,7 @@ function filterFilesByTimeRange(startTime, endTime) {
     }
 
     updateSelectAllState();
-    
+
     // Auto-fill filename when range changes
     autoFillFilename();
 }
@@ -780,12 +894,14 @@ async function scanFolder() {
     const resultsDiv = document.getElementById('results');
 
     if (!folderPath) {
-        resultsDiv.innerHTML = '<div class="error">Please select a folder</div>';
+        resultsDiv.innerHTML =
+            '<div class="error">Please select a folder</div>';
         return;
     }
 
     if (includeChannels.length === 0) {
-        resultsDiv.innerHTML = '<div class="error">Select at least one channel (A/B)</div>';
+        resultsDiv.innerHTML =
+            '<div class="error">Select at least one channel (A/B)</div>';
         return;
     }
 
@@ -793,7 +909,8 @@ async function scanFolder() {
     const filterDates = getPreScanFilterDates();
     if (filterDates === null) return; // Validation failed
 
-    resultsDiv.innerHTML = '<div class="loading"><div class="spinner"></div>Scanning...</div>';
+    resultsDiv.innerHTML =
+        '<div class="loading"><div class="spinner"></div>Scanning...</div>';
 
     try {
         const response = await fetch('/scan', {
@@ -803,8 +920,8 @@ async function scanFolder() {
                 folderPath,
                 startTime: filterDates.startTime,
                 endTime: filterDates.endTime,
-                channels: includeChannels
-            })
+                channels: includeChannels,
+            }),
         });
 
         const data = await response.json();
@@ -826,19 +943,26 @@ async function scanFolder() {
             return;
         }
 
-        const filesList = data.files.map((f, index) => `
+        const filesList = data.files
+            .map(
+                (f, index) => `
       <div class="file-item">
         <label class="file-checkbox-label">
           <input type="checkbox" class="file-checkbox" data-index="${index}" checked />
           <div class="file-info">
             <div class="file-path">${f.filename}</div>
-            <div class="file-time">UTC: ${new Date(f.utcTime).toLocaleString()}</div>
+            <div class="file-time">UTC: ${new Date(
+                f.utcTime
+            ).toLocaleString()}</div>
           </div>
         </label>
-      </div>`).join('');
+      </div>`
+            )
+            .join('');
 
         // Get saved output path
-        const savedOutputPath = localStorage.getItem('mp4-combiner-output-path') || '';
+        const savedOutputPath =
+            localStorage.getItem('mp4-combiner-output-path') || '';
 
         const timelineHTML = createTimeline(data.files);
 
@@ -875,7 +999,9 @@ async function scanFolder() {
           </div>
           <div class="input-group button-group">
             <button class="play-button" id="playVideosBtn">▶ Play Videos</button>
-            <button class="secondary" id="combineBtn" ${!ffmpegAvailable ? 'disabled' : ''}>Combine</button>
+            <button class="secondary" id="combineBtn" ${
+                !ffmpegAvailable ? 'disabled' : ''
+            }>Combine</button>
           </div>
           <div id="combineStatus"></div>
         </div>
@@ -887,78 +1013,102 @@ async function scanFolder() {
         }, 100);
 
         // Add event listeners for checkboxes
-        document.getElementById('selectAll').addEventListener('change', toggleSelectAll);
+        document
+            .getElementById('selectAll')
+            .addEventListener('change', toggleSelectAll);
 
         const fileCheckboxes = document.querySelectorAll('.file-checkbox');
-        fileCheckboxes.forEach(checkbox => {
+        fileCheckboxes.forEach((checkbox) => {
             checkbox.addEventListener('change', updateSelectAllState);
         });
 
         // Initialize output folder/filename with saved values
-        const savedOutputFolder = localStorage.getItem('mp4-combiner-output-folder') || '';
-        const savedOutputFilename = localStorage.getItem('mp4-combiner-output-filename') || '';
-        
+        const savedOutputFolder =
+            localStorage.getItem('mp4-combiner-output-folder') || '';
+        const savedOutputFilename =
+            localStorage.getItem('mp4-combiner-output-filename') || '';
+
         document.getElementById('outputFolder').value = savedOutputFolder;
         document.getElementById('outputFilename').value = savedOutputFilename;
 
         // Add event listeners for output folder and filename
-        document.getElementById('browseOutputFolderBtn').addEventListener('click', openOutputFolderBrowser);
-        document.getElementById('outputFolder').addEventListener('input', saveOutputSettings);
-        document.getElementById('outputFilename').addEventListener('input', saveOutputSettings);
+        document
+            .getElementById('browseOutputFolderBtn')
+            .addEventListener('click', openOutputFolderBrowser);
+        document
+            .getElementById('outputFolder')
+            .addEventListener('input', saveOutputSettings);
+        document
+            .getElementById('outputFilename')
+            .addEventListener('input', saveOutputSettings);
 
-        document.getElementById('combineBtn').addEventListener('click', combineVideos);
-        document.getElementById('playVideosBtn').addEventListener('click', playVideos);
-        
+        document
+            .getElementById('combineBtn')
+            .addEventListener('click', combineVideos);
+        document
+            .getElementById('playVideosBtn')
+            .addEventListener('click', playVideos);
+
         // Auto-fill filename initially if folder is set
         if (savedOutputFolder) {
             autoFillFilename();
         }
     } catch (err) {
-        resultsDiv.innerHTML = '<div class="error">Failed to scan folder.</div>';
+        resultsDiv.innerHTML =
+            '<div class="error">Failed to scan folder.</div>';
     }
 }
 
 async function combineVideos() {
     const outputFolder = document.getElementById('outputFolder').value.trim();
-    const outputFilename = document.getElementById('outputFilename').value.trim();
+    const outputFilename = document
+        .getElementById('outputFilename')
+        .value.trim();
     const statusDiv = document.getElementById('combineStatus');
 
     if (!outputFolder) {
-        statusDiv.innerHTML = '<div class="error">Please select an output folder</div>';
+        statusDiv.innerHTML =
+            '<div class="error">Please select an output folder</div>';
         return;
     }
 
     if (!outputFilename) {
-        statusDiv.innerHTML = '<div class="error">Please enter an output filename</div>';
+        statusDiv.innerHTML =
+            '<div class="error">Please enter an output filename</div>';
         return;
     }
 
     // Construct the full output path (browser-compatible)
     const separator = outputFolder.includes('\\') ? '\\' : '/';
-    const outputPath = outputFolder.endsWith(separator) 
-        ? `${outputFolder}${outputFilename}` 
+    const outputPath = outputFolder.endsWith(separator)
+        ? `${outputFolder}${outputFilename}`
         : `${outputFolder}${separator}${outputFilename}`;
 
     // Get only checked and visible files
-    const checkedFileIndexes = Array.from(document.querySelectorAll('.file-checkbox:checked'))
-        .filter(cb => cb.closest('.file-item').style.display !== 'none')
-        .map(cb => parseInt(cb.dataset.index));
+    const checkedFileIndexes = Array.from(
+        document.querySelectorAll('.file-checkbox:checked')
+    )
+        .filter((cb) => cb.closest('.file-item').style.display !== 'none')
+        .map((cb) => parseInt(cb.dataset.index));
 
-    const selectedFiles = checkedFileIndexes.map(index => scannedFiles[index]);
+    const selectedFiles = checkedFileIndexes.map(
+        (index) => scannedFiles[index]
+    );
 
     if (selectedFiles.length === 0) {
-        statusDiv.innerHTML = '<div class="error">No files selected for combining</div>';
+        statusDiv.innerHTML =
+            '<div class="error">No files selected for combining</div>';
         return;
     }
 
     statusDiv.innerHTML = `<div class="loading"><div class="spinner"></div>Combining ${selectedFiles.length} file(s)...</div>`;
 
     try {
-        const filePaths = selectedFiles.map(f => f.path);
+        const filePaths = selectedFiles.map((f) => f.path);
         const response = await fetch('/combine', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ files: filePaths, outputPath })
+            body: JSON.stringify({ files: filePaths, outputPath }),
         });
 
         const data = await response.json();
@@ -969,7 +1119,8 @@ async function combineVideos() {
 
         statusDiv.innerHTML = `<div class="success">✅ Combined ${selectedFiles.length} file(s)!<br>${data.output}</div>`;
     } catch {
-        statusDiv.innerHTML = '<div class="error">Failed to combine videos.</div>';
+        statusDiv.innerHTML =
+            '<div class="error">Failed to combine videos.</div>';
     }
 }
 
@@ -977,11 +1128,11 @@ async function combineVideos() {
 function saveOutputSettings() {
     const outputFolder = document.getElementById('outputFolder')?.value;
     const outputFilename = document.getElementById('outputFilename')?.value;
-    
+
     if (outputFolder && outputFolder.trim()) {
         localStorage.setItem('mp4-combiner-output-folder', outputFolder);
     }
-    
+
     if (outputFilename && outputFilename.trim()) {
         localStorage.setItem('mp4-combiner-output-filename', outputFilename);
     }
@@ -991,7 +1142,7 @@ function saveOutputSettings() {
 function openOutputFolderBrowser() {
     // Set a flag to indicate we're browsing for output folder
     window.browsingForOutput = true;
-    
+
     // Reuse the existing folder browser
     const browseFolderBtn = document.getElementById('browseFolderBtn');
     browseFolderBtn.click();
@@ -1000,18 +1151,22 @@ function openOutputFolderBrowser() {
 // Auto-fill the filename based on selected files
 async function autoFillFilename() {
     const outputFolder = document.getElementById('outputFolder')?.value?.trim();
-    
+
     // Silently return if no output folder is set (auto-fill will happen when folder is selected)
     if (!outputFolder) {
         return;
     }
 
     // Get only checked and visible files
-    const checkedFileIndexes = Array.from(document.querySelectorAll('.file-checkbox:checked'))
-        .filter(cb => cb.closest('.file-item').style.display !== 'none')
-        .map(cb => parseInt(cb.dataset.index));
+    const checkedFileIndexes = Array.from(
+        document.querySelectorAll('.file-checkbox:checked')
+    )
+        .filter((cb) => cb.closest('.file-item').style.display !== 'none')
+        .map((cb) => parseInt(cb.dataset.index));
 
-    const selectedFiles = checkedFileIndexes.map(index => scannedFiles[index]);
+    const selectedFiles = checkedFileIndexes.map(
+        (index) => scannedFiles[index]
+    );
 
     if (selectedFiles.length === 0) {
         return;
@@ -1019,7 +1174,7 @@ async function autoFillFilename() {
 
     // Generate filename based on date range and channels
     const filename = generateFilename(selectedFiles, outputFolder);
-    
+
     const outputFilenameInput = document.getElementById('outputFilename');
     if (outputFilenameInput) {
         outputFilenameInput.value = filename;
@@ -1030,21 +1185,25 @@ async function autoFillFilename() {
 // Generate filename with date range and counter
 function generateFilename(selectedFiles, outputFolder) {
     // Sort files by timestamp
-    const sortedFiles = [...selectedFiles].sort((a, b) => 
-        new Date(a.utcTime).getTime() - new Date(b.utcTime).getTime()
+    const sortedFiles = [...selectedFiles].sort(
+        (a, b) => new Date(a.utcTime).getTime() - new Date(b.utcTime).getTime()
     );
-    
+
     // Get start and end dates
     const startDate = new Date(sortedFiles[0].utcTime);
     const endDate = new Date(sortedFiles[sortedFiles.length - 1].utcTime);
-    
+
     // Format dates in human-readable short format
     const startStr = formatShortDate(startDate);
     const endStr = formatShortDate(endDate);
-    
+
     // Determine channels
-    const hasA = selectedFiles.some(f => f.filename.toUpperCase().endsWith('A.MP4'));
-    const hasB = selectedFiles.some(f => f.filename.toUpperCase().endsWith('B.MP4'));
+    const hasA = selectedFiles.some((f) =>
+        f.filename.toUpperCase().endsWith('A.MP4')
+    );
+    const hasB = selectedFiles.some((f) =>
+        f.filename.toUpperCase().endsWith('B.MP4')
+    );
     let channelStr = '';
     if (hasA && hasB) {
         channelStr = '_Front-Back-cam';
@@ -1053,7 +1212,7 @@ function generateFilename(selectedFiles, outputFolder) {
     } else if (hasB) {
         channelStr = '_Back-cam';
     }
-    
+
     // Build base filename
     let baseFilename;
     if (startStr === endStr) {
@@ -1061,7 +1220,7 @@ function generateFilename(selectedFiles, outputFolder) {
     } else {
         baseFilename = `combined_from_${startStr}_to_${endStr}${channelStr}`;
     }
-    
+
     // We'll check for existing files on the server side
     // For now, return the base filename
     return baseFilename + '.mp4';
@@ -1070,23 +1229,40 @@ function generateFilename(selectedFiles, outputFolder) {
 // Format date in human-readable format: YYYY-MMM-DD_HH-MM
 function formatShortDate(date) {
     const year = date.getFullYear();
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const monthNames = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+    ];
     const month = monthNames[date.getMonth()];
     const day = String(date.getDate()).padStart(2, '0');
     const hours = String(date.getHours()).padStart(2, '0');
     const minutes = String(date.getMinutes()).padStart(2, '0');
-    
+
     return `${year}-${month}-${day}_${hours}-${minutes}`;
 }
 
 // Play videos in custom video player
 function playVideos() {
     // Get only checked and visible files
-    const checkedFileIndexes = Array.from(document.querySelectorAll('.file-checkbox:checked'))
-        .filter(cb => cb.closest('.file-item').style.display !== 'none')
-        .map(cb => parseInt(cb.dataset.index));
+    const checkedFileIndexes = Array.from(
+        document.querySelectorAll('.file-checkbox:checked')
+    )
+        .filter((cb) => cb.closest('.file-item').style.display !== 'none')
+        .map((cb) => parseInt(cb.dataset.index));
 
-    const selectedFiles = checkedFileIndexes.map(index => scannedFiles[index]);
+    const selectedFiles = checkedFileIndexes.map(
+        (index) => scannedFiles[index]
+    );
 
     if (selectedFiles.length === 0) {
         alert('Please select at least one video to play');
