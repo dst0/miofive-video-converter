@@ -202,6 +202,13 @@ export function initPlayer() {
                 updatePlaybackPosition();
             }
         });
+
+        // Add click handler to toggle play/pause
+        player.addEventListener('click', () => {
+            if (index === activePlayerIndex) {
+                togglePlayPause();
+            }
+        });
     });
 
     isPlayerInitialized = true;
@@ -778,21 +785,25 @@ function generateTimeMarkers(minTime, maxTime) {
 
 // Update playback position indicator on timeline
 function updatePlaybackPosition() {
-    if (!timelineData) return;
+    if (!timelineData || totalDuration === 0) return;
 
     const activePlayer = videoPlayers[activePlayerIndex];
-    const currentFile = videoFiles[currentVideoIndex];
+    const videoIdx = parseInt(activePlayer.dataset.videoIndex);
 
-    if (!currentFile) return;
+    if (isNaN(videoIdx) || videoDurations[videoIdx] === undefined) return;
 
-    // Calculate the time offset of current video in the overall timeline
-    const videoStartTime = new Date(currentFile.utcTime).getTime();
-    const currentVideoTime = activePlayer.currentTime * 1000; // Convert to milliseconds
-    const totalTime = videoStartTime + currentVideoTime;
+    // Calculate current global playback time (not UTC time)
+    const globalTime = videoStartTimes[videoIdx] + activePlayer.currentTime;
+    
+    // Map global playback time to timeline position
+    // Timeline represents UTC timestamps, but we want smooth progression
+    // Map from [0, totalDuration] to [minTime, maxTime]
+    const timelinePosition = timelineData.minTime + 
+        (globalTime / totalDuration) * timelineData.range;
 
     // Calculate position percentage
     const position =
-        ((totalTime - timelineData.minTime) / timelineData.range) * 100;
+        ((timelinePosition - timelineData.minTime) / timelineData.range) * 100;
 
     // Update position indicator
     const playbackPosition = document.getElementById('playbackPosition');
