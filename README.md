@@ -211,3 +211,5 @@ Dmytro Stepanov (dst0)
 ## Contributing
 
 Issues and pull requests are welcome!
+
+<!-- TEST COMMENT: This line added to validate PR workflow integration - can be safely removed -->
