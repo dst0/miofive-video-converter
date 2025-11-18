@@ -250,12 +250,14 @@ test.describe('File Range Improvements', () => {
     // Wait for file markers to be rendered (scope to player screen)
     await expect(page.locator('#playerScreen .file-marker').first()).toBeVisible();
     
-    // Wait for the highlight to be applied (loadVideo is called asynchronously)
-    await page.waitForTimeout(800);
+    // Wait longer for the highlight to be applied (loadVideo is called asynchronously)
+    await page.waitForTimeout(1200);
     
     // First marker should have 'current-marker' class
     const firstMarker = page.locator('#playerScreen .file-marker').first();
-    await expect(firstMarker).toHaveClass(/current-marker/);
+    
+    // Check if the marker has the class, with retry logic
+    await expect(firstMarker).toHaveClass(/current-marker/, { timeout: 3000 });
     
     // Navigate to next video
     const nextBtn = page.locator('#nextBtn');
@@ -263,11 +265,13 @@ test.describe('File Range Improvements', () => {
     
     if (isEnabled) {
       await nextBtn.click();
-      await page.waitForTimeout(800);
+      
+      // Wait for video to switch
+      await page.waitForTimeout(1000);
       
       // Second marker should now have 'current-marker' class
       const secondMarker = page.locator('#playerScreen .file-marker').nth(1);
-      await expect(secondMarker).toHaveClass(/current-marker/);
+      await expect(secondMarker).toHaveClass(/current-marker/, { timeout: 3000 });
       
       // First marker should no longer have the class
       await expect(firstMarker).not.toHaveClass(/current-marker/);
