@@ -273,11 +273,7 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     await expect(page.locator('#speedInput')).toBeVisible();
     await expect(page.locator('#speedInput')).toHaveValue('1.0');
     await expect(page.locator('#speedSlider')).toBeVisible();
-    // Slider value should be close to '1' (may vary slightly based on min/max range)
-    const sliderValue = await page.locator('#speedSlider').inputValue();
-    const sliderFloat = parseFloat(sliderValue);
-    expect(sliderFloat).toBeGreaterThanOrEqual(0.9);
-    expect(sliderFloat).toBeLessThanOrEqual(1.1);
+    await expect(page.locator('#speedSlider')).toHaveValue('1');
   });
 
   test('should navigate between multiple videos', async ({ page }) => {

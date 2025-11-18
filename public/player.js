@@ -72,15 +72,7 @@ export function initPlayer() {
         togglePlayPause();
     });
 
-    // Configure speed controls based on detected playback rate range
-    const speedInput = document.getElementById('speedInput');
-    const speedSlider = document.getElementById('speedSlider');
-    
-    speedInput.min = PlaybackRateRange.min;
-    speedInput.max = PlaybackRateRange.max;
-    speedSlider.min = PlaybackRateRange.min;
-    speedSlider.max = PlaybackRateRange.max;
-    
+    // Log detected playback rate range (but don't modify slider min/max)
     console.log('Detected playback rate range:', PlaybackRateRange);
 
     // Speed control event listeners
