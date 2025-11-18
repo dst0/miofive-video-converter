@@ -1,5 +1,6 @@
 import { initializeFolderBrowser } from './folder-browser.js';
 import { initPlayer, showPlayerScreen, hidePlayerScreen } from './player.js';
+import { setupDemoMode, isGitHubPages } from './demo-api-mock.js';
 
 let scannedFiles = [];
 let ffmpegAvailable = true;
@@ -8,6 +9,9 @@ let demoMode = false;
 let demoPath = null;
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Setup demo mode for GitHub Pages
+    setupDemoMode();
+    
     // Check demo mode first
     fetch('/demo-mode')
         .then(r => r.json())
@@ -20,10 +24,23 @@ document.addEventListener('DOMContentLoaded', () => {
                 const container = document.querySelector('.container');
                 const banner = document.createElement('div');
                 banner.className = 'demo-banner';
-                banner.innerHTML = `
-                    <strong>🎭 Demo Mode</strong> - 
-                    You're viewing a limited demo. Only test-data directory is accessible for exploring the app's features.
-                `;
+                
+                // Different banner for GitHub Pages vs local demo
+                if (isGitHubPages()) {
+                    banner.innerHTML = `
+                        <strong>🎭 GitHub Pages Demo</strong> - 
+                        This is an interactive demo with sample data. Video combining is disabled. 
+                        <a href="https://github.com/dst0/miofive-video-converter" target="_blank" style="color: white; text-decoration: underline;">
+                            Get the full version on GitHub →
+                        </a>
+                    `;
+                } else {
+                    banner.innerHTML = `
+                        <strong>🎭 Demo Mode</strong> - 
+                        You're viewing a limited demo. Only test-data directory is accessible for exploring the app's features.
+                    `;
+                }
+                
                 container.insertBefore(banner, container.firstChild);
                 
                 // Pre-populate folder path with demo data
