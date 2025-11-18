@@ -47,6 +47,22 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Show snackbar notification
+function showSnackbar(message, type = 'info', duration = 3000) {
+    const snackbar = document.getElementById('snackbar');
+    if (!snackbar) return;
+    
+    // Set message and type
+    snackbar.textContent = message;
+    snackbar.className = 'snackbar'; // Reset classes
+    snackbar.classList.add('show', type);
+    
+    // Auto-hide after duration
+    setTimeout(() => {
+        snackbar.classList.remove('show');
+    }, duration);
+}
+
 // Initialize the player module (called once on page load)
 export function initPlayer() {
     // Initialize dual players references
@@ -59,7 +75,25 @@ export function initPlayer() {
     document.getElementById('backBtn').addEventListener('click', () => {
         hidePlayerScreen();
     });
-
+    
+    // Set up event listener for export button
+    document.getElementById('exportVideosBtn').addEventListener('click', () => {
+        openExportModal();
+    });
+    
+    // Set up export modal event listeners
+    document.getElementById('closeExportModalBtn').addEventListener('click', closeExportModal);
+    document.getElementById('exportCancelBtn').addEventListener('click', closeExportModal);
+    document.getElementById('exportConfirmBtn').addEventListener('click', performExport);
+    document.getElementById('exportBrowseFolderBtn').addEventListener('click', openExportFolderBrowser);
+    
+    // Close modal when clicking outside
+    document.getElementById('exportModal').addEventListener('click', (e) => {
+        if (e.target.id === 'exportModal') {
+            closeExportModal();
+        }
+    });
+    
     document.getElementById('prevBtn').addEventListener('click', () => {
         playPreviousVideo();
     });
@@ -754,6 +788,7 @@ function initializeCustomControls() {
     const playPauseOverlayBtn = document.getElementById('playPauseOverlayBtn');
     const muteBtn = document.getElementById('muteBtn');
     const volumeSlider = document.getElementById('volumeSlider');
+    const screenshotBtn = document.getElementById('screenshotBtn');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
 
     // Play/Pause button
@@ -787,7 +822,13 @@ function initializeCustomControls() {
         muteBtn.querySelector('.btn-icon').textContent =
             volume === 0 ? '🔇' : '🔊';
     });
-
+    
+    // Screenshot button
+    screenshotBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        takeScreenshot();
+    });
+    
     // Fullscreen button
     fullscreenBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -853,6 +894,9 @@ function initializeCustomControls() {
     progressContainer.addEventListener('touchstart', startDrag);
     document.addEventListener('touchmove', handleProgressDrag);
     document.addEventListener('touchend', endDrag);
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', handleKeyboardShortcuts);
 }
 
 // Update custom progress bar based on current playback
@@ -931,5 +975,250 @@ function seekToGlobalTime(targetTime) {
         const activePlayer = videoPlayers[activePlayerIndex];
         activePlayer.currentTime = localTime;
         updateCustomProgressBar();
+    }
+}
+
+// Handle keyboard shortcuts
+function handleKeyboardShortcuts(e) {
+    // Only handle shortcuts when player screen is visible
+    const playerScreen = document.getElementById('playerScreen');
+    if (!playerScreen || playerScreen.style.display === 'none') {
+        return;
+    }
+    
+    // Ignore shortcuts when typing in input fields
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+    }
+    
+    // 'S' key for screenshot
+    if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        takeScreenshot();
+    }
+}
+
+// Take screenshot of current video frame
+function takeScreenshot() {
+    const activePlayer = videoPlayers[activePlayerIndex];
+    
+    // Check if video is loaded
+    if (!activePlayer || activePlayer.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        console.warn('Video not ready for screenshot');
+        showScreenshotFeedback(false, 'Video not ready');
+        return;
+    }
+    
+    try {
+        // Create a canvas element
+        const canvas = document.createElement('canvas');
+        canvas.width = activePlayer.videoWidth;
+        canvas.height = activePlayer.videoHeight;
+        
+        // Draw the current video frame to the canvas
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(activePlayer, 0, 0, canvas.width, canvas.height);
+        
+        // Generate filename with timestamp and video info
+        const currentFile = videoFiles[currentVideoIndex];
+        const now = new Date();
+        // Format timestamp as YYYY-MM-DD_HH-MM-SS
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+        const videoName = currentFile ? currentFile.filename.replace(/\.MP4$/i, '') : 'video';
+        const currentTime = formatTime(activePlayer.currentTime).replace(/:/g, '-');
+        const filename = `screenshot_${videoName}_${currentTime}_${timestamp}.png`;
+        
+        // Convert canvas to blob and download
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                console.error('Failed to create screenshot blob');
+                showScreenshotFeedback(false, 'Failed to create screenshot');
+                return;
+            }
+            
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            
+            // Show success feedback (don't show full filename for security)
+            showScreenshotFeedback(true, 'Screenshot captured successfully');
+            console.log('Screenshot saved:', filename);
+        }, 'image/png');
+        
+    } catch (err) {
+        console.error('Error taking screenshot:', err);
+        showScreenshotFeedback(false, 'Error: ' + err.message);
+    }
+}
+
+// Show visual feedback when screenshot is taken
+function showScreenshotFeedback(success, message) {
+    // Create feedback element
+    const feedback = document.createElement('div');
+    feedback.className = 'screenshot-feedback';
+    feedback.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: ${success ? 'rgba(0, 128, 0, 0.9)' : 'rgba(255, 0, 0, 0.9)'};
+        color: white;
+        padding: 20px 40px;
+        border-radius: 10px;
+        font-size: 18px;
+        font-weight: bold;
+        z-index: 10000;
+        animation: fadeInOut 2s ease-in-out;
+        pointer-events: none;
+    `;
+    feedback.textContent = success ? `📷 ${message}` : `❌ ${message}`;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+    `;
+    
+    if (!document.querySelector('style[data-screenshot-animation]')) {
+        style.setAttribute('data-screenshot-animation', 'true');
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(feedback);
+    
+    // Remove after animation
+    setTimeout(() => {
+        document.body.removeChild(feedback);
+    }, 2000);
+}
+
+// Export functionality
+function openExportModal() {
+    const modal = document.getElementById('exportModal');
+    
+    // Update export info
+    document.getElementById('exportVideoCount').textContent = videoFiles.length;
+    document.getElementById('exportTotalDuration').textContent = formatTime(totalDuration);
+    
+    // Load saved output folder
+    const savedOutputFolder = localStorage.getItem('mp4-combiner-output-folder') || '';
+    document.getElementById('exportOutputFolder').value = savedOutputFolder;
+    
+    // Generate default filename based on current date/time
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const defaultFilename = `exported_${year}-${month}-${day}_${hours}-${minutes}.mp4`;
+    
+    document.getElementById('exportOutputFilename').value = defaultFilename;
+    
+    // Clear any previous status
+    document.getElementById('exportStatus').innerHTML = '';
+    
+    // Show modal
+    modal.style.display = 'flex';
+}
+
+function closeExportModal() {
+    const modal = document.getElementById('exportModal');
+    modal.style.display = 'none';
+}
+
+function openExportFolderBrowser() {
+    // Set flag to indicate we're browsing for export output
+    window.browsingForExport = true;
+    
+    // Trigger the folder browser
+    const browseFolderBtn = document.getElementById('browseFolderBtn');
+    browseFolderBtn.click();
+}
+
+async function performExport() {
+    const outputFolder = document.getElementById('exportOutputFolder').value.trim();
+    const outputFilename = document.getElementById('exportOutputFilename').value.trim();
+    const statusDiv = document.getElementById('exportStatus');
+    
+    // Validate inputs
+    if (!outputFolder) {
+        statusDiv.innerHTML = '<div class="error">Please select an output folder</div>';
+        return;
+    }
+    
+    if (!outputFilename) {
+        statusDiv.innerHTML = '<div class="error">Please enter an output filename</div>';
+        return;
+    }
+    
+    // Construct the full output path
+    const separator = outputFolder.includes('\\') ? '\\' : '/';
+    const outputPath = outputFolder.endsWith(separator) 
+        ? `${outputFolder}${outputFilename}` 
+        : `${outputFolder}${separator}${outputFilename}`;
+    
+    // Get all video file paths
+    const filePaths = videoFiles.map(f => f.path);
+    
+    // Disable export button during export
+    const exportBtn = document.getElementById('exportConfirmBtn');
+    exportBtn.disabled = true;
+    
+    statusDiv.innerHTML = `<div class="loading"><div class="spinner"></div>Exporting ${videoFiles.length} video(s)...</div>`;
+    
+    try {
+        const response = await fetch('/combine', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ files: filePaths, outputPath })
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            // Show error snackbar
+            showSnackbar(`Export failed: ${data.error}`, 'error', 5000);
+            closeExportModal();
+            exportBtn.disabled = false;
+            return;
+        }
+        
+        // Save output folder to localStorage
+        localStorage.setItem('mp4-combiner-output-folder', outputFolder);
+        
+        // Show success snackbar with output path
+        showSnackbar(`✅ Export successful! Saved to: ${data.output}`, 'success', 5000);
+        
+        // Close modal immediately
+        closeExportModal();
+        exportBtn.disabled = false;
+        
+    } catch (error) {
+        // Show network error snackbar
+        showSnackbar('Export failed: Network error', 'error', 5000);
+        closeExportModal();
+        exportBtn.disabled = false;
     }
 }
