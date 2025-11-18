@@ -247,6 +247,12 @@ app.get('/check-ffmpeg', async (req, res) => {
 
 // Check if demo mode is enabled
 app.get('/demo-mode', (req, res) => {
+    // Rate limiting check (for consistency, though this endpoint is very lightweight)
+    const clientId = req.ip || req.connection.remoteAddress;
+    if (!checkRateLimit(clientId)) {
+        return res.status(429).json({error: 'Too many requests. Please try again later.'});
+    }
+    
     res.json({
         enabled: DEMO_MODE,
         demoPath: DEMO_MODE ? TEST_DATA_DIR : null
