@@ -1,0 +1,237 @@
+name: Deploy Demo to GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: "pages-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --user root
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install FFmpeg
+      run: |
+        apt-get update && apt-get install -y ffmpeg && apt-get clean && rm -rf /var/lib/apt/lists/*
+    
+    - name: Setup Node.js
+      run: |
+        node --version
+        npm --version
+        ffmpeg -version
+    
+    - name: Cache npm dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Create deployment package
+      run: |
+        mkdir -p _site
+        cp -r public _site/
+        cp index.js _site/
+        cp package*.json _site/
+        cp -r test-data _site/
+        cp install-ffmpeg.js _site/
+        
+        # Create a start script for the demo
+        cat > _site/start-demo.sh << 'EOF'
+        #!/bin/bash
+        export DEMO_MODE=true
+        export PORT=8080
+        npm install --production
+        node index.js
+        EOF
+        chmod +x _site/start-demo.sh
+        
+        # Create a README for the demo
+        cat > _site/DEMO-README.md << 'EOF'
+        # Miofive Video Converter - Demo Deployment
+        
+        This is a demo deployment of the Miofive Video Converter.
+        
+        ## Running the Demo
+        
+        To run this demo locally:
+        
+        1. Install Node.js (v14 or higher)
+        2. Run: `DEMO_MODE=true npm start`
+        
+        The demo mode restricts access to only the test-data directory.
+        
+        ## Features to Try
+        
+        - Scan the test-data/Normal folder for videos
+        - View videos in the player
+        - Test the timeline navigation
+        - Try combining videos (note: combining is disabled in web deployments)
+        
+        For the full application, see: https://github.com/dst0/miofive-video-converter
+        EOF
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v5
+      
+    - name: Create static info page
+      run: |
+        cat > _site/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html lang="en">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Miofive Video Converter - Demo</title>
+            <style>
+                body {
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    min-height: 100vh;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    margin: 0;
+                    padding: 20px;
+                }
+                .container {
+                    max-width: 800px;
+                    background: white;
+                    border-radius: 12px;
+                    padding: 40px;
+                    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+                }
+                h1 {
+                    color: #333;
+                    margin-bottom: 20px;
+                }
+                .demo-badge {
+                    display: inline-block;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 8px 16px;
+                    border-radius: 20px;
+                    font-size: 14px;
+                    margin-bottom: 20px;
+                }
+                p {
+                    color: #666;
+                    line-height: 1.6;
+                    margin-bottom: 15px;
+                }
+                .button {
+                    display: inline-block;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 12px 24px;
+                    border-radius: 6px;
+                    text-decoration: none;
+                    margin-top: 20px;
+                    transition: transform 0.2s;
+                }
+                .button:hover {
+                    transform: translateY(-2px);
+                }
+                .note {
+                    background: #f8f9fa;
+                    padding: 15px;
+                    border-radius: 6px;
+                    margin-top: 20px;
+                    border-left: 4px solid #667eea;
+                }
+                ul {
+                    margin-left: 20px;
+                }
+                li {
+                    margin-bottom: 8px;
+                }
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <span class="demo-badge">🎭 Demo Deployment</span>
+                <h1>Miofive Video Converter</h1>
+                <p>A web-based tool to scan, organize, and combine video files from Miofive S1 Ultra dashcam recordings.</p>
+                
+                <div class="note">
+                    <strong>About This Demo:</strong>
+                    <p>This is a static demo deployment on GitHub Pages. The full application is a Node.js server that needs to run locally to access your dashcam's microSD card.</p>
+                    
+                    <p><strong>To use the actual application:</strong></p>
+                    <ul>
+                        <li>Clone the repository from GitHub</li>
+                        <li>Install Node.js and run <code>npm install</code></li>
+                        <li>Insert your dashcam's microSD card</li>
+                        <li>Run <code>npm start</code> to launch the local server</li>
+                        <li>Open http://localhost:3000 in your browser</li>
+                    </ul>
+                </div>
+                
+                <a href="https://github.com/dst0/miofive-video-converter" class="button">View on GitHub →</a>
+            </div>
+        </body>
+        </html>
+        EOF
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: '_site'
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+    
+    - name: Comment PR with deployment URL
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const deploymentUrl = '${{ steps.deployment.outputs.page_url }}';
+          const comment = `## 🎭 Demo Deployment
+          
+          Your demo has been deployed! 
+          
+          🔗 **Demo URL:** ${deploymentUrl}
+          
+          > **Note:** This is a static demo page. The full application requires running locally with Node.js to access your dashcam files.
+          
+          ### To test the full application locally:
+          \`\`\`bash
+          git checkout ${{ github.head_ref }}
+          DEMO_MODE=true npm start
+          \`\`\`
+          Then open http://localhost:3000 in your browser.`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
