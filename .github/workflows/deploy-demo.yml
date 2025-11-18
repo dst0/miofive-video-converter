@@ -97,6 +97,7 @@ jobs:
         EOF
     
     - name: Setup Pages
+      if: github.ref == 'refs/heads/main'
       uses: actions/configure-pages@v5
       
     - name: Create static info page
@@ -199,26 +200,27 @@ jobs:
         EOF
     
     - name: Upload artifact
+      if: github.ref == 'refs/heads/main'
       uses: actions/upload-pages-artifact@v3
       with:
         path: '_site'
     
     - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main'
       id: deployment
       uses: actions/deploy-pages@v4
     
-    - name: Comment PR with deployment URL
+    - name: Comment PR with deployment info
       if: github.event_name == 'pull_request'
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
-          const deploymentUrl = '${{ steps.deployment.outputs.page_url }}';
-          const comment = `## 🎭 Demo Deployment
+          const comment = `## ✅ Build Successful
           
-          Your demo has been deployed! 
+          The demo deployment workflow completed successfully, but deployment to GitHub Pages only happens when changes are merged to \`main\`.
           
-          🔗 **Demo URL:** ${deploymentUrl}
+          🔗 **Live Demo:** https://dst0.github.io/miofive-video-converter/
           
           > **Note:** This is a static demo page. The full application requires running locally with Node.js to access your dashcam files.
           
