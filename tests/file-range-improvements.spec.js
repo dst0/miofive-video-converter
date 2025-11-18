@@ -130,38 +130,57 @@ test.describe('File Range Improvements', () => {
     await expect(playbackPosition).toBeVisible();
     
     // Wait for video to start playing and position to be established
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1500);
     
-    // Pause the video
-    await page.locator('#playPauseBtn').click();
-    await page.waitForTimeout(200);
-    
-    // Get initial position
-    const initialLeft = await playbackPosition.evaluate(el => el.style.left);
-    const initialPercent = parseFloat(initialLeft) || 0;
-    
-    // Click on the next button to move to the next video (this causes a bigger position change)
+    // Check if next button is available
     const nextBtn = page.locator('#nextBtn');
     const isEnabled = await nextBtn.isEnabled();
     
-    if (isEnabled) {
-      await nextBtn.click();
-      
-      // Wait for video to switch and position to update
-      await page.waitForTimeout(800);
-      
-      // Get position after switching video
-      const newLeft = await playbackPosition.evaluate(el => el.style.left);
-      const newPercent = parseFloat(newLeft) || 0;
-      
-      // Position should have changed (moved forward to next video)
-      // Each video is about 10% of the timeline (10 videos total)
-      expect(newPercent).toBeGreaterThan(initialPercent);
-      expect(newPercent).toBeGreaterThan(5); // Should be at least 5% into timeline
-    } else {
-      // If we're on the last video, test passes as we verified the position exists
-      console.log('Skipping seek test: already on last video');
+    if (!isEnabled) {
+      console.log('Skipping seek test: no next video available');
+      return;
     }
+    
+    // Get current video info before switching
+    const videoProgressBefore = await page.locator('#videoProgress').textContent();
+    
+    // Pause the video before switching
+    const playPauseBtn = page.locator('#playPauseBtn');
+    const btnText = await playPauseBtn.textContent();
+    if (btnText && btnText.includes('Pause')) {
+      await playPauseBtn.click();
+      await page.waitForTimeout(300);
+    }
+    
+    // Get initial position (should be near start of first video)
+    const initialLeft = await playbackPosition.evaluate(el => el.style.left);
+    const initialPercent = parseFloat(initialLeft) || 0;
+    
+    // Click next to move to the next video
+    await nextBtn.click();
+    
+    // Wait for video to switch (check that video progress text changes)
+    await page.waitForTimeout(500);
+    const videoProgressAfter = await page.locator('#videoProgress').textContent();
+    
+    // Ensure we actually switched videos
+    expect(videoProgressAfter).not.toBe(videoProgressBefore);
+    
+    // Wait a bit more for position to update
+    await page.waitForTimeout(800);
+    
+    // Get position after switching video
+    const newLeft = await playbackPosition.evaluate(el => el.style.left);
+    const newPercent = parseFloat(newLeft) || 0;
+    
+    // Debug info
+    console.log(`Initial position: ${initialPercent}%, New position: ${newPercent}%`);
+    console.log(`Video progress: ${videoProgressBefore} -> ${videoProgressAfter}`);
+    
+    // Position should have changed (moved forward to next video)
+    // Each video is about 10% of the timeline (10 videos total)
+    expect(newPercent).toBeGreaterThan(initialPercent);
+    expect(newPercent).toBeGreaterThan(5); // Should be at least 5% into timeline
   });
 
   test('playback position should sync with timeline when switching videos', async ({ page }) => {

@@ -368,6 +368,9 @@ function loadVideo(index) {
     // Highlight current file marker
     highlightCurrentMarker();
     
+    // Update playback position on timeline
+    updatePlaybackPosition();
+    
     // Preload next video if available
     if (index + 1 < videoFiles.length) {
         const nextPlayerIndex = 1 - activePlayerIndex;
@@ -382,6 +385,7 @@ function playNextVideo() {
         updateVideoInfo();
         highlightCurrentMarker();
         updateCustomProgressBar();
+        updatePlaybackPosition(); // Add this to update timeline position
         return;
     }
     
