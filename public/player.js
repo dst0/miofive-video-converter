@@ -588,6 +588,7 @@ function initializeCustomControls() {
     const playPauseOverlayBtn = document.getElementById('playPauseOverlayBtn');
     const muteBtn = document.getElementById('muteBtn');
     const volumeSlider = document.getElementById('volumeSlider');
+    const screenshotBtn = document.getElementById('screenshotBtn');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
     
     // Play/Pause button
@@ -617,6 +618,12 @@ function initializeCustomControls() {
             player.muted = false;
         });
         muteBtn.querySelector('.btn-icon').textContent = volume === 0 ? '🔇' : '🔊';
+    });
+    
+    // Screenshot button
+    screenshotBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        takeScreenshot();
     });
     
     // Fullscreen button
@@ -678,6 +685,9 @@ function initializeCustomControls() {
     progressContainer.addEventListener('touchstart', startDrag);
     document.addEventListener('touchmove', handleProgressDrag);
     document.addEventListener('touchend', endDrag);
+    
+    // Keyboard shortcuts
+    document.addEventListener('keydown', handleKeyboardShortcuts);
 }
 
 // Update custom progress bar based on current playback
@@ -755,6 +765,141 @@ function seekToGlobalTime(targetTime) {
         activePlayer.currentTime = localTime;
         updateCustomProgressBar();
     }
+}
+
+// Handle keyboard shortcuts
+function handleKeyboardShortcuts(e) {
+    // Only handle shortcuts when player screen is visible
+    const playerScreen = document.getElementById('playerScreen');
+    if (!playerScreen || playerScreen.style.display === 'none') {
+        return;
+    }
+    
+    // Ignore shortcuts when typing in input fields
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        return;
+    }
+    
+    // 'S' key for screenshot
+    if (e.key === 's' || e.key === 'S') {
+        e.preventDefault();
+        takeScreenshot();
+    }
+}
+
+// Take screenshot of current video frame
+function takeScreenshot() {
+    const activePlayer = videoPlayers[activePlayerIndex];
+    
+    // Check if video is loaded
+    if (!activePlayer || activePlayer.readyState < HTMLMediaElement.HAVE_CURRENT_DATA) {
+        console.warn('Video not ready for screenshot');
+        showScreenshotFeedback(false, 'Video not ready');
+        return;
+    }
+    
+    try {
+        // Create a canvas element
+        const canvas = document.createElement('canvas');
+        canvas.width = activePlayer.videoWidth;
+        canvas.height = activePlayer.videoHeight;
+        
+        // Draw the current video frame to the canvas
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(activePlayer, 0, 0, canvas.width, canvas.height);
+        
+        // Generate filename with timestamp and video info
+        const currentFile = videoFiles[currentVideoIndex];
+        const now = new Date();
+        // Format timestamp as YYYY-MM-DD_HH-MM-SS
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        const timestamp = `${year}-${month}-${day}_${hours}-${minutes}-${seconds}`;
+        const videoName = currentFile ? currentFile.filename.replace(/\.MP4$/i, '') : 'video';
+        const currentTime = formatTime(activePlayer.currentTime).replace(/:/g, '-');
+        const filename = `screenshot_${videoName}_${currentTime}_${timestamp}.png`;
+        
+        // Convert canvas to blob and download
+        canvas.toBlob((blob) => {
+            if (!blob) {
+                console.error('Failed to create screenshot blob');
+                showScreenshotFeedback(false, 'Failed to create screenshot');
+                return;
+            }
+            
+            // Create download link
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Clean up
+            setTimeout(() => {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            }, 100);
+            
+            // Show success feedback (don't show full filename for security)
+            showScreenshotFeedback(true, 'Screenshot captured successfully');
+            console.log('Screenshot saved:', filename);
+        }, 'image/png');
+        
+    } catch (err) {
+        console.error('Error taking screenshot:', err);
+        showScreenshotFeedback(false, 'Error: ' + err.message);
+    }
+}
+
+// Show visual feedback when screenshot is taken
+function showScreenshotFeedback(success, message) {
+    // Create feedback element
+    const feedback = document.createElement('div');
+    feedback.className = 'screenshot-feedback';
+    feedback.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: ${success ? 'rgba(0, 128, 0, 0.9)' : 'rgba(255, 0, 0, 0.9)'};
+        color: white;
+        padding: 20px 40px;
+        border-radius: 10px;
+        font-size: 18px;
+        font-weight: bold;
+        z-index: 10000;
+        animation: fadeInOut 2s ease-in-out;
+        pointer-events: none;
+    `;
+    feedback.textContent = success ? `📷 ${message}` : `❌ ${message}`;
+    
+    // Add animation
+    const style = document.createElement('style');
+    style.textContent = `
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+            20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+        }
+    `;
+    
+    if (!document.querySelector('style[data-screenshot-animation]')) {
+        style.setAttribute('data-screenshot-animation', 'true');
+        document.head.appendChild(style);
+    }
+    
+    document.body.appendChild(feedback);
+    
+    // Remove after animation
+    setTimeout(() => {
+        document.body.removeChild(feedback);
+    }, 2000);
 }
 
 // Export functionality
