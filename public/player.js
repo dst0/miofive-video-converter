@@ -321,7 +321,12 @@ function loadVideoIntoPlayer(videoIndex, playerIndex) {
     const source = videoSources[playerIndex];
 
     // Set video source
-    const videoURL = `/video?path=${encodeURIComponent(videoFile.path)}`;
+    // In GitHub Pages demo mode, use relative path directly
+    // Secure check: hostname must END with .github.io
+    const isGitHubPages = window.location.hostname.endsWith('.github.io');
+    const videoURL = isGitHubPages 
+        ? videoFile.path 
+        : `/video?path=${encodeURIComponent(videoFile.path)}`;
     source.src = videoURL;
     player.dataset.videoIndex = videoIndex;
     player.load();

@@ -1,0 +1,116 @@
+name: Deploy Demo to GitHub Pages
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: "pages-${{ github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    
+    container:
+      image: mcr.microsoft.com/playwright:v1.56.1-noble
+      options: --user root
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install FFmpeg
+      run: |
+        apt-get update && apt-get install -y ffmpeg && apt-get clean && rm -rf /var/lib/apt/lists/*
+    
+    - name: Setup Node.js
+      run: |
+        node --version
+        npm --version
+        ffmpeg -version
+    
+    - name: Cache npm dependencies
+      uses: actions/cache@v4
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-node-
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Create deployment package
+      run: |
+        mkdir -p _site
+        
+        # Copy the actual web application files
+        cp -r public/* _site/
+        
+        # Copy test data for the demo
+        cp -r test-data _site/
+        
+        # Create a demo-specific index page wrapper that shows the app
+        # The app will detect GitHub Pages and use mock APIs
+        echo "Demo deployment created with test data"
+    
+    - name: Setup Pages
+      uses: actions/configure-pages@v5
+    
+    - name: Upload artifact
+      uses: actions/upload-pages-artifact@v3
+      with:
+        path: '_site'
+    
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
+    
+    - name: Comment PR with deployment URL
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+        script: |
+          const deploymentUrl = '${{ steps.deployment.outputs.page_url }}';
+          const comment = `## 🎭 Interactive Demo Deployed!
+          
+          Your interactive demo has been deployed to GitHub Pages! 
+          
+          🔗 **Demo URL:** ${deploymentUrl}
+          
+          ### What's in the demo:
+          - ✅ Fully interactive web application
+          - ✅ Browse and scan test data videos
+          - ✅ View videos in the built-in player
+          - ✅ Test timeline navigation and filtering
+          - ❌ Video combining is disabled (no backend processing)
+          
+          > **Note:** This demo uses client-side mocks for all API calls. For full functionality including video combining, clone the repository and run locally with Node.js.
+          
+          ### To test the full application locally:
+          \`\`\`bash
+          git checkout ${{ github.head_ref }}
+          npm install
+          npm start
+          \`\`\`
+          Then open http://localhost:3000 in your browser.`;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
