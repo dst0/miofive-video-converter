@@ -21,6 +21,22 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
+// Show snackbar notification
+function showSnackbar(message, type = 'info', duration = 3000) {
+    const snackbar = document.getElementById('snackbar');
+    if (!snackbar) return;
+    
+    // Set message and type
+    snackbar.textContent = message;
+    snackbar.className = 'snackbar'; // Reset classes
+    snackbar.classList.add('show', type);
+    
+    // Auto-hide after duration
+    setTimeout(() => {
+        snackbar.classList.remove('show');
+    }, duration);
+}
+
 // Initialize the player module (called once on page load)
 export function initPlayer() {
     // Initialize dual players references
@@ -826,7 +842,9 @@ async function performExport() {
         const data = await response.json();
         
         if (!response.ok) {
-            statusDiv.innerHTML = `<div class="error">Export failed: ${data.error}</div>`;
+            // Show error snackbar
+            showSnackbar(`Export failed: ${data.error}`, 'error', 5000);
+            closeExportModal();
             exportBtn.disabled = false;
             return;
         }
@@ -834,16 +852,17 @@ async function performExport() {
         // Save output folder to localStorage
         localStorage.setItem('mp4-combiner-output-folder', outputFolder);
         
-        statusDiv.innerHTML = `<div class="success">✅ Export successful!<br>${escapeHtml(data.output)}</div>`;
+        // Show success snackbar with output path
+        showSnackbar(`✅ Export successful! Saved to: ${data.output}`, 'success', 5000);
         
-        // Close modal after 2 seconds
-        setTimeout(() => {
-            closeExportModal();
-            exportBtn.disabled = false;
-        }, 2000);
+        // Close modal immediately
+        closeExportModal();
+        exportBtn.disabled = false;
         
     } catch (error) {
-        statusDiv.innerHTML = '<div class="error">Export failed: Network error</div>';
+        // Show network error snackbar
+        showSnackbar('Export failed: Network error', 'error', 5000);
+        closeExportModal();
         exportBtn.disabled = false;
     }
 }
