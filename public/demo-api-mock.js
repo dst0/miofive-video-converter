@@ -167,7 +167,7 @@ export class DemoAPI {
      * Mock /scan endpoint
      */
     static async scan(data) {
-        const { folderPath, channels = ['A', 'B'], startTime, endTime } = data;
+        const { channels = ['A', 'B'], startTime, endTime } = data;
 
         // Filter files by channel
         let files = MOCK_VIDEO_FILES.filter(file => {
@@ -269,14 +269,27 @@ export function setupDemoMode() {
                             headers: { 'Content-Type': 'application/json' }
                         });
                     }
+                    // If combine succeeds, return a 200 OK response
+                    return new Response(JSON.stringify({ success: true }), {
+                        status: 200,
+                        headers: { 'Content-Type': 'application/json' }
+                    });
                 }
 
                 // Video streaming - handled differently
-                if (url.startsWith('/video/')) {
+                if (url.startsWith('/video?')) {
                     // In demo mode, videos are served as static files
-                    // Convert /video/path to actual path
-                    const videoPath = url.replace('/video/', '');
-                    return originalFetch(videoPath, options);
+                    // Extract the 'path' query parameter
+                    const urlObj = new URL(url, window.location.origin);
+                    const videoPath = urlObj.searchParams.get('path');
+                    if (videoPath) {
+                        return originalFetch(videoPath, options);
+                    } else {
+                        return new Response(JSON.stringify({ error: 'Missing video path' }), {
+                            status: 400,
+                            headers: { 'Content-Type': 'application/json' }
+                        });
+                    }
                 }
             } catch (error) {
                 return new Response(JSON.stringify({ error: error.message }), {
