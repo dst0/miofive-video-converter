@@ -4,9 +4,42 @@ import { initPlayer, showPlayerScreen, hidePlayerScreen } from './player.js';
 let scannedFiles = [];
 let ffmpegAvailable = true;
 let timelineData = null;
+let demoMode = false;
+let demoPath = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Load saved values
+    // Check demo mode first
+    fetch('/demo-mode')
+        .then(r => r.json())
+        .then(data => {
+            demoMode = data.enabled;
+            demoPath = data.demoPath;
+            
+            if (demoMode) {
+                // Show demo mode banner
+                const container = document.querySelector('.container');
+                const banner = document.createElement('div');
+                banner.className = 'demo-banner';
+                banner.innerHTML = `
+                    <strong>🎭 Demo Mode</strong> - 
+                    You're viewing a limited demo. Only test-data directory is accessible for exploring the app's features.
+                `;
+                container.insertBefore(banner, container.firstChild);
+                
+                // Pre-populate folder path with demo data
+                if (demoPath) {
+                    const folderPathInput = document.getElementById('folderPath');
+                    const normalPath = demoPath + '/Normal';
+                    folderPathInput.value = normalPath;
+                    // Don't save demo path to localStorage
+                }
+            }
+        })
+        .catch(err => {
+            console.error('Failed to check demo mode:', err);
+        });
+    
+    // Load saved values (only if not in demo mode)
     loadSavedPaths();
     initializePreScanFilters();
     initializeFolderBrowser(); // Initialize folder browser from folder-browser.js
@@ -32,6 +65,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Function to load saved path values from localStorage
 function loadSavedPaths() {
+    // Don't load saved paths in demo mode
+    if (demoMode) {
+        return;
+    }
+    
     const savedFolderPath = localStorage.getItem('mp4-combiner-folder-path');
 
     if (savedFolderPath) {
@@ -41,6 +79,11 @@ function loadSavedPaths() {
 
 // Function to save path values to localStorage
 function savePaths() {
+    // Don't save paths in demo mode
+    if (demoMode) {
+        return;
+    }
+    
     const folderPath = document.getElementById('folderPath').value;
 
     if (folderPath.trim()) {
