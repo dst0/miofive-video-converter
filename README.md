@@ -117,6 +117,22 @@ The result is a continuous video file that's much easier to review, share, or ar
 
 ## Usage
 
+### Demo Mode
+
+Try the application with test data without needing a real dashcam SD card:
+
+```bash
+DEMO_MODE=true npm start
+```
+
+In demo mode:
+- The application restricts access to only the `test-data` directory
+- Pre-populated with sample videos for testing
+- Perfect for exploring features before using with real dashcam footage
+- A demo banner appears in the UI to indicate you're in demo mode
+
+Visit the [live demo deployment](#) to see the application in action (demo mode enabled).
+
 ### Running the Application
 
 This server is designed to run on a system where the microSD card from your Miofive S1 Ultra dashcam is inserted (via USB card reader or built-in SD card slot).

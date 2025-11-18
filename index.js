@@ -11,6 +11,8 @@ const app = express();
 const PORT = 3000;
 
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const DEMO_MODE = process.env.DEMO_MODE === 'true';
+const TEST_DATA_DIR = path.join(__dirname, 'test-data');
 
 // MP4 duration extraction configuration
 const MP4_HEADER_BUFFER_SIZE = 1024 * 1024; // 1MB should be enough for headers
@@ -243,12 +245,74 @@ app.get('/check-ffmpeg', async (req, res) => {
     res.json({available});
 });
 
+// Check if demo mode is enabled
+app.get('/demo-mode', (req, res) => {
+    // Rate limiting check (for consistency, though this endpoint is very lightweight)
+    const clientId = req.ip || req.connection.remoteAddress;
+    if (!checkRateLimit(clientId)) {
+        return res.status(429).json({error: 'Too many requests. Please try again later.'});
+    }
+    
+    res.json({
+        enabled: DEMO_MODE,
+        demoPath: DEMO_MODE ? TEST_DATA_DIR : null
+    });
+});
+
 // List directories endpoint
 app.post('/list-directories', async (req, res) => {
     // Rate limiting check
     const clientId = req.ip || req.connection.remoteAddress;
     if (!checkRateLimit(clientId)) {
         return res.status(429).json({error: 'Too many requests. Please try again later.'});
+    }
+    
+    // In demo mode, only allow access to test-data directory
+    if (DEMO_MODE) {
+        const {path: dirPath} = req.body;
+        
+        // If no path, return test-data as root
+        if (!dirPath) {
+            return res.json({
+                directories: [{
+                    name: 'test-data (Demo)',
+                    path: TEST_DATA_DIR,
+                    type: 'demo'
+                }]
+            });
+        }
+        
+        // Normalize path and ensure it's within test-data
+        const normalizedPath = path.resolve(dirPath);
+        const normalizedTestData = path.resolve(TEST_DATA_DIR);
+        
+        if (!normalizedPath.startsWith(normalizedTestData)) {
+            return res.status(403).json({error: 'Access denied in demo mode. Only test-data directory is accessible.'});
+        }
+        
+        try {
+            await fs.access(normalizedPath);
+            const stat = await fs.stat(normalizedPath);
+            
+            if (!stat.isDirectory()) {
+                return res.status(400).json({error: 'Path is not a directory'});
+            }
+            
+            const entries = await fs.readdir(normalizedPath, {withFileTypes: true});
+            
+            const directories = entries
+                .filter(entry => entry.isDirectory() && !entry.name.startsWith('.'))
+                .map(entry => ({
+                    name: entry.name,
+                    path: path.join(normalizedPath, entry.name),
+                    type: 'folder'
+                }))
+                .sort((a, b) => a.name.localeCompare(b.name));
+            
+            return res.json({directories});
+        } catch (err) {
+            return res.status(400).json({error: 'Unable to access directory', message: err.message});
+        }
     }
     
     const {path: dirPath} = req.body;
@@ -393,6 +457,17 @@ app.post('/list-directories', async (req, res) => {
 app.post('/scan', async (req, res) => {
     const {folderPath, startTime, endTime, channels, includeDurations = true} = req.body;
     if (!folderPath) return res.status(400).json({error: 'Folder path is required'});
+    
+    // In demo mode, only allow scanning test-data directory
+    if (DEMO_MODE) {
+        const normalizedPath = path.resolve(folderPath);
+        const normalizedTestData = path.resolve(TEST_DATA_DIR);
+        
+        if (!normalizedPath.startsWith(normalizedTestData)) {
+            return res.status(403).json({error: 'Access denied in demo mode. Only test-data directory is accessible.'});
+        }
+    }
+    
     const includeA = channels?.includes('A');
     const includeB = channels?.includes('B');
 
@@ -520,6 +595,16 @@ app.get('/video', async (req, res) => {
         return res.status(400).json({error: 'Video path is required'});
     }
     
+    // In demo mode, only allow access to test-data videos
+    if (DEMO_MODE) {
+        const normalizedPath = path.resolve(videoPath);
+        const normalizedTestData = path.resolve(TEST_DATA_DIR);
+        
+        if (!normalizedPath.startsWith(normalizedTestData)) {
+            return res.status(403).json({error: 'Access denied in demo mode. Only test-data videos are accessible.'});
+        }
+    }
+    
     try {
         // Normalize and resolve the path to prevent directory traversal attacks
         const normalizedPath = path.resolve(videoPath);
@@ -588,6 +673,10 @@ async function startServer() {
     const hasFFmpeg = await checkFFmpeg();
     app.listen(PORT, () => {
         console.log(`\n✅ Server running at http://localhost:${PORT}\n`);
+        if (DEMO_MODE) {
+            console.log('🎭 Demo Mode is ENABLED');
+            console.log(`   Only test-data directory is accessible: ${TEST_DATA_DIR}\n`);
+        }
         if (hasFFmpeg) {
             console.log('✅ FFmpeg is installed and ready');
         } else {
