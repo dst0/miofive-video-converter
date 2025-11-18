@@ -262,10 +262,11 @@ test.describe('Video Player Export Functionality', () => {
         // Click export button
         await page.click('#exportConfirmBtn');
 
-        // Wait for export to complete (should show success message)
-        await page.waitForSelector('#exportStatus .success', { timeout: 30000 });
-        const successText = await page.locator('#exportStatus .success').textContent();
-        expect(successText).toContain('Export successful');
+        // Wait for modal to close and snackbar to appear
+        await page.waitForSelector('#exportModal', { state: 'hidden', timeout: 5000 });
+        await page.waitForSelector('#snackbar.show.success', { timeout: 30000 });
+        const snackbarText = await page.locator('#snackbar').textContent();
+        expect(snackbarText).toContain('Export successful');
 
         // Verify file was created
         const outputPath = path.join(TEST_OUTPUT_DIR, testFilename);
@@ -303,8 +304,9 @@ test.describe('Video Player Export Functionality', () => {
         // Click export button
         await page.click('#exportConfirmBtn');
 
-        // Wait for export to complete
-        await page.waitForSelector('#exportStatus .success', { timeout: 30000 });
+        // Wait for modal to close and snackbar to appear
+        await page.waitForSelector('#exportModal', { state: 'hidden', timeout: 5000 });
+        await page.waitForSelector('#snackbar.show.success', { timeout: 30000 });
 
         // Verify localStorage was updated
         const savedFolder = await page.evaluate(() => {
