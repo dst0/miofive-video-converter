@@ -372,8 +372,11 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     const playbackRate = await page.locator('#videoPlayer1').evaluate(el => el.playbackRate);
     expect(playbackRate).toBe(2);
     
-    // Change speed to 0.5x using slider
-    await page.locator('#speedSlider').fill('0.5');
+    // Change speed to 0.5x using slider (use evaluate to set value)
+    await page.locator('#speedSlider').evaluate((el) => {
+      el.value = '0.5';
+      el.dispatchEvent(new Event('input', { bubbles: true }));
+    });
     
     // Wait a bit for the speed to be applied
     await page.waitForTimeout(100);
