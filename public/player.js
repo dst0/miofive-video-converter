@@ -17,6 +17,9 @@ let isPlayerInitialized = false;
 // Global player state - single source of truth for play/pause state
 let globalPlayerState = 'paused'; // 'playing', 'paused', or 'ended'
 
+// Track pending play promises to prevent race conditions
+let pendingPlayPromises = [null, null]; // Track play() promises for each player
+
 // Detect supported playback rate range for the browser/device
 function detectPlaybackRateRange() {
     try {
@@ -238,21 +241,71 @@ function syncUIWithPlayerState() {
     console.log(`UI synced to state: ${globalPlayerState}`);
 }
 
+// Safely play a video player, tracking the promise to prevent race conditions
+async function safePlay(playerIndex) {
+    const player = videoPlayers[playerIndex];
+    
+    // If there's a pending play promise, wait for it first
+    if (pendingPlayPromises[playerIndex]) {
+        try {
+            await pendingPlayPromises[playerIndex];
+        } catch (err) {
+            // Ignore errors from previous play attempts
+        }
+    }
+    
+    // Start new play operation
+    if (player.paused) {
+        const playPromise = player.play();
+        pendingPlayPromises[playerIndex] = playPromise;
+        
+        try {
+            await playPromise;
+            pendingPlayPromises[playerIndex] = null;
+        } catch (err) {
+            pendingPlayPromises[playerIndex] = null;
+            throw err;
+        }
+    }
+}
+
+// Safely pause a video player, waiting for any pending play operations
+async function safePause(playerIndex) {
+    const player = videoPlayers[playerIndex];
+    
+    // Wait for any pending play promise to complete or fail
+    if (pendingPlayPromises[playerIndex]) {
+        try {
+            await pendingPlayPromises[playerIndex];
+        } catch (err) {
+            // Ignore errors from play attempts - we're pausing anyway
+        }
+        pendingPlayPromises[playerIndex] = null;
+    }
+    
+    // Now safe to pause
+    if (!player.paused) {
+        player.pause();
+    }
+}
+
 // Apply global state to video player objects
-function applyStateToPlayers() {
+async function applyStateToPlayers() {
     const activePlayer = videoPlayers[activePlayerIndex];
     
     if (globalPlayerState === 'playing') {
         if (activePlayer.paused) {
-            activePlayer.play().catch(err => {
+            try {
+                await safePlay(activePlayerIndex);
+            } catch (err) {
                 console.error('Error playing video:', err);
                 setGlobalPlayerState('paused');
-            });
+            }
         }
     } else {
         // paused or ended
         if (!activePlayer.paused) {
-            activePlayer.pause();
+            await safePause(activePlayerIndex);
         }
     }
 }
@@ -290,13 +343,19 @@ export function showPlayerScreen(files) {
 }
 
 // Hide player screen and return to main
-export function hidePlayerScreen() {
-    // Pause playback
+export async function hidePlayerScreen() {
+    // Safely pause both players
+    await Promise.all([
+        safePause(0),
+        safePause(1)
+    ]);
+    
+    // Clean up video sources
     videoPlayers.forEach((player) => {
-        player.pause();
         player.removeAttribute('src');
         player.load(); // Reset the video element
     });
+    
     setPlaybackBtnToPause();
 
     // Reset state
@@ -305,6 +364,7 @@ export function hidePlayerScreen() {
     videoDurations = [];
     videoStartTimes = [];
     totalDuration = 0;
+    pendingPlayPromises = [null, null]; // Reset play promises
 
     // Hide player screen and show main screen
     document.getElementById('playerScreen').style.display = 'none';
@@ -387,7 +447,7 @@ function preloadNextVideo() {
 }
 
 // Switch to the next video (seamless transition using dual players)
-function switchToNextVideo() {
+async function switchToNextVideo() {
     const nextVideoIndex = currentVideoIndex + 1;
     if (nextVideoIndex >= videoFiles.length) {
         setGlobalPlayerState('ended');
@@ -405,8 +465,8 @@ function switchToNextVideo() {
     activePlayerIndex = 1 - activePlayerIndex;
     currentVideoIndex = nextVideoIndex;
 
-    // Now pause the previous player (it's no longer active)
-    videoPlayers[previousPlayerIndex].pause();
+    // Now safely pause the previous player (it's no longer active)
+    await safePause(previousPlayerIndex);
 
     // Hide previous player, show new active player
     videoPlayers[previousPlayerIndex].classList.remove('active-player');
@@ -428,22 +488,26 @@ function switchToNextVideo() {
     if (wasPlaying) {
         if (newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
             newActivePlayer.currentTime = 0;
-            newActivePlayer.play().catch((err) => {
+            try {
+                await safePlay(activePlayerIndex);
+            } catch (err) {
                 console.error('Error playing video:', err);
                 setGlobalPlayerState('paused');
-            });
+            }
         } else {
             // Wait for video to be ready before playing
             let timeoutId;
-            const playWhenReady = () => {
+            const playWhenReady = async () => {
                 newActivePlayer.removeEventListener('loadeddata', playWhenReady);
                 newActivePlayer.removeEventListener('error', playWhenReady);
                 clearTimeout(timeoutId);
                 newActivePlayer.currentTime = 0;
-                newActivePlayer.play().catch((err) => {
+                try {
+                    await safePlay(activePlayerIndex);
+                } catch (err) {
                     console.error('Error playing video:', err);
                     setGlobalPlayerState('paused');
-                });
+                }
             };
             newActivePlayer.addEventListener('loadeddata', playWhenReady);
             newActivePlayer.addEventListener('error', playWhenReady);
@@ -464,7 +528,7 @@ function switchToNextVideo() {
 }
 
 // Load a video by index (used for seeking/jumping)
-function loadVideo(index, shouldPause = true) {
+async function loadVideo(index, shouldPause = true) {
     if (index < 0 || index >= videoFiles.length) {
         return;
     }
@@ -473,8 +537,11 @@ function loadVideo(index, shouldPause = true) {
     if (shouldPause) {
         setGlobalPlayerState('paused');
         
-        // Pause both players to prevent event conflicts
-        videoPlayers.forEach((player) => player.pause());
+        // Safely pause both players to prevent event conflicts
+        await Promise.all([
+            safePause(0),
+            safePause(1)
+        ]);
         
         // Sync UI to paused state
         syncUIWithPlayerState();
@@ -515,16 +582,20 @@ function loadVideo(index, shouldPause = true) {
         const activePlayer = videoPlayers[activePlayerIndex];
         // Wait for video to be ready before playing
         if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-            activePlayer.play().catch(err => {
+            try {
+                await safePlay(activePlayerIndex);
+            } catch (err) {
                 console.error('Error playing video on initial load:', err);
-            });
+            }
         } else {
             // Wait for video to load
-            const playWhenReady = () => {
+            const playWhenReady = async () => {
                 activePlayer.removeEventListener('loadeddata', playWhenReady);
-                activePlayer.play().catch(err => {
+                try {
+                    await safePlay(activePlayerIndex);
+                } catch (err) {
                     console.error('Error playing video on initial load:', err);
-                });
+                }
             };
             activePlayer.addEventListener('loadeddata', playWhenReady);
         }
