@@ -18,6 +18,7 @@ let isPlayerInitialized = false;
 let globalPlayerState = 'paused'; // 'playing', 'paused', or 'ended'
 
 // Track pending play promises to prevent race conditions
+// This prevents AbortError when play() is interrupted by pause() or another play()
 let pendingPlayPromises = [null, null]; // Track play() promises for each player
 
 // Detect supported playback rate range for the browser/device
@@ -75,8 +76,12 @@ export function initPlayer() {
     videoSources[1] = document.getElementById('videoSource2');
 
     // Set up event listeners for back button
-    document.getElementById('backBtn').addEventListener('click', () => {
-        hidePlayerScreen();
+    document.getElementById('backBtn').addEventListener('click', async () => {
+        try {
+            await hidePlayerScreen();
+        } catch (err) {
+            console.error('Error hiding player screen:', err);
+        }
     });
     
     // Set up event listener for export button
@@ -97,16 +102,28 @@ export function initPlayer() {
         }
     });
     
-    document.getElementById('prevBtn').addEventListener('click', () => {
-        playPreviousVideo();
+    document.getElementById('prevBtn').addEventListener('click', async () => {
+        try {
+            await playPreviousVideo();
+        } catch (err) {
+            console.error('Error playing previous video:', err);
+        }
     });
 
-    document.getElementById('nextBtn').addEventListener('click', () => {
-        playNextVideo();
+    document.getElementById('nextBtn').addEventListener('click', async () => {
+        try {
+            await playNextVideo();
+        } catch (err) {
+            console.error('Error playing next video:', err);
+        }
     });
 
-    document.getElementById('playPauseBtn').addEventListener('click', () => {
-        togglePlayPause();
+    document.getElementById('playPauseBtn').addEventListener('click', async () => {
+        try {
+            await togglePlayPause();
+        } catch (err) {
+            console.error('Error toggling play/pause:', err);
+        }
     });
 
     // Log detected playback rate range (but don't modify slider min/max)
@@ -145,13 +162,17 @@ export function initPlayer() {
 
     // Video player events for both players
     videoPlayers.forEach((player, index) => {
-        player.addEventListener('ended', () => {
+        player.addEventListener('ended', async () => {
             if (index === activePlayerIndex) {
                 // Check if this is the last video
                 if (currentVideoIndex >= videoFiles.length - 1) {
                     setGlobalPlayerState('ended');
                 } else {
-                    playNextVideo();
+                    try {
+                        await playNextVideo();
+                    } catch (err) {
+                        console.error('Error auto-playing next video:', err);
+                    }
                 }
             }
         });
@@ -207,9 +228,13 @@ export function initPlayer() {
         });
 
         // Add click handler to toggle play/pause
-        player.addEventListener('click', () => {
+        player.addEventListener('click', async () => {
             if (index === activePlayerIndex) {
-                togglePlayPause();
+                try {
+                    await togglePlayPause();
+                } catch (err) {
+                    console.error('Error toggling play/pause:', err);
+                }
             }
         });
     });
@@ -241,7 +266,14 @@ function syncUIWithPlayerState() {
     console.log(`UI synced to state: ${globalPlayerState}`);
 }
 
-// Safely play a video player, tracking the promise to prevent race conditions
+/**
+ * Safely play a video player, tracking the promise to prevent race conditions.
+ * Waits for any pending play() operations to complete before starting a new one.
+ * This prevents AbortError when play() requests are interrupted.
+ * 
+ * @param {number} playerIndex - Index of the player (0 or 1)
+ * @throws {Error} If the play operation fails
+ */
 async function safePlay(playerIndex) {
     const player = videoPlayers[playerIndex];
     
@@ -269,7 +301,13 @@ async function safePlay(playerIndex) {
     }
 }
 
-// Safely pause a video player, waiting for any pending play operations
+/**
+ * Safely pause a video player, waiting for any pending play operations.
+ * Ensures that any in-flight play() promise completes or fails before pausing.
+ * This prevents AbortError when pause() interrupts a play() request.
+ * 
+ * @param {number} playerIndex - Index of the player (0 or 1)
+ */
 async function safePause(playerIndex) {
     const player = videoPlayers[playerIndex];
     
@@ -609,9 +647,9 @@ function setPlaybackBtnToPause() {
 }
 
 // Play next video
-function playNextVideo() {
+async function playNextVideo() {
     // Try seamless transition first
-    if (switchToNextVideo()) {
+    if (await switchToNextVideo()) {
         updateVideoInfo();
         highlightCurrentMarker();
         updatePlaybackPosition();
@@ -627,24 +665,24 @@ function playNextVideo() {
 }
 
 // Play previous video
-function playPreviousVideo() {
+async function playPreviousVideo() {
     if (currentVideoIndex > 0) {
-        loadVideo(currentVideoIndex - 1);
+        await loadVideo(currentVideoIndex - 1);
     }
 }
 
 // Toggle play/pause
-function togglePlayPause() {
+async function togglePlayPause() {
     const activePlayer = videoPlayers[activePlayerIndex];
     
     // Toggle based on global state
     if (globalPlayerState === 'playing') {
         setGlobalPlayerState('paused');
-        applyStateToPlayers();
+        await applyStateToPlayers();
     } else {
         // paused or ended
         setGlobalPlayerState('playing');
-        applyStateToPlayers();
+        await applyStateToPlayers();
     }
 }
 
@@ -909,9 +947,13 @@ function initializeCustomControls() {
     const fullscreenBtn = document.getElementById('fullscreenBtn');
 
     // Play/Pause button
-    playPauseOverlayBtn.addEventListener('click', (e) => {
+    playPauseOverlayBtn.addEventListener('click', async (e) => {
         e.stopPropagation();
-        togglePlayPause();
+        try {
+            await togglePlayPause();
+        } catch (err) {
+            console.error('Error toggling play/pause:', err);
+        }
     });
 
     // Mute button
@@ -962,13 +1004,13 @@ function initializeCustomControls() {
     // Progress bar seeking
     let isDragging = false;
 
-    const startDrag = (e) => {
+    const startDrag = async (e) => {
         isDragging = true;
         isDraggingProgress = true;
         
         // Pause playback when starting to seek
         setGlobalPlayerState('paused');
-        applyStateToPlayers();
+        await applyStateToPlayers();
         
         handleProgressDrag(e);
     };

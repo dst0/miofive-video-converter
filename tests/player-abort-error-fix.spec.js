@@ -1,4 +1,16 @@
 // @ts-check
+/**
+ * Tests for AbortError fix in video player
+ * 
+ * These tests verify that the promise tracking implementation prevents
+ * AbortError exceptions that occur when play() requests are interrupted
+ * by pause() calls or other play() requests.
+ * 
+ * The fix implements:
+ * - pendingPlayPromises array to track ongoing play() operations
+ * - safePlay() function that waits for pending operations
+ * - safePause() function that coordinates with pending play operations
+ */
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
