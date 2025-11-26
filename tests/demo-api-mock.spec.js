@@ -125,6 +125,24 @@ test.describe('Demo API Mock Module Tests', () => {
         expect(result.files.every(f => f.channel === 'A')).toBe(true);
     });
 
+    test('DemoAPI.scan() should include duration property for all files', async ({ page }) => {
+        await page.goto('/');
+        
+        const result = await page.evaluate(async () => {
+            const module = await import('/demo-api-mock.js');
+            return await module.DemoAPI.scan({ 
+                folderPath: 'test-data/Normal',
+                channels: ['A', 'B']
+            });
+        });
+        
+        expect(result.files).toHaveLength(10);
+        // Every file should have a duration property
+        expect(result.files.every(f => f.hasOwnProperty('duration'))).toBe(true);
+        // Every duration should be 2 seconds
+        expect(result.files.every(f => f.duration === 2)).toBe(true);
+    });
+
     test('DemoAPI.scan() should filter by date range', async ({ page }) => {
         await page.goto('/');
         
