@@ -792,9 +792,13 @@ function initializeTimeline() {
     // Add click handlers to file markers
     const playerScreen = document.getElementById('playerScreen');
     playerScreen.querySelectorAll('.file-marker').forEach((marker) => {
-        marker.addEventListener('click', () => {
+        marker.addEventListener('click', async () => {
             const index = parseInt(marker.dataset.index);
-            loadVideo(index);
+            try {
+                await loadVideo(index);
+            } catch (err) {
+                console.error('Error loading video from marker:', err);
+            }
         });
     });
 
@@ -802,7 +806,7 @@ function initializeTimeline() {
     highlightCurrentMarker();
 
     // Add click handler to timeline track for seeking
-    document.getElementById('timelineTrack').addEventListener('click', (e) => {
+    document.getElementById('timelineTrack').addEventListener('click', async (e) => {
         if (e.target.classList.contains('file-marker')) return; // Already handled
 
         const rect = e.currentTarget.getBoundingClientRect();
@@ -826,7 +830,11 @@ function initializeTimeline() {
             }
         }
 
-        loadVideo(closestIndex);
+        try {
+            await loadVideo(closestIndex);
+        } catch (err) {
+            console.error('Error loading video from timeline:', err);
+        }
     });
 }
 
@@ -1026,7 +1034,7 @@ function initializeCustomControls() {
         updateProgressBarVisual(percent);
     };
 
-    const endDrag = (e) => {
+    const endDrag = async (e) => {
         if (!isDragging) return;
         isDragging = false;
 
@@ -1036,7 +1044,11 @@ function initializeCustomControls() {
         const percent = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
 
         // Seek to the clicked position (will remain paused)
-        seekToGlobalPercent(percent);
+        try {
+            await seekToGlobalPercent(percent);
+        } catch (err) {
+            console.error('Error seeking:', err);
+        }
 
         setTimeout(() => {
             isDraggingProgress = false;
@@ -1090,13 +1102,13 @@ function updateProgressBarVisual(percent) {
 }
 
 // Seek to a specific percentage of the total duration
-function seekToGlobalPercent(percent) {
+async function seekToGlobalPercent(percent) {
     const targetTime = (percent / 100) * totalDuration;
-    seekToGlobalTime(targetTime);
+    await seekToGlobalTime(targetTime);
 }
 
 // Seek to a specific time in the global timeline
-function seekToGlobalTime(targetTime) {
+async function seekToGlobalTime(targetTime) {
     // Find which video this time corresponds to
     let targetVideoIndex = 0;
     let localTime = targetTime;
@@ -1112,7 +1124,7 @@ function seekToGlobalTime(targetTime) {
     // If we need to change videos
     if (targetVideoIndex !== currentVideoIndex) {
         currentVideoIndex = targetVideoIndex;
-        loadVideo(targetVideoIndex);
+        await loadVideo(targetVideoIndex);
 
         // Wait for video to load, then seek (with timeout to prevent memory leak)
         let attempts = 0;
