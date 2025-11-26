@@ -20,70 +20,80 @@ const MOCK_VIDEO_FILES = [
         path: `${DEMO_NORMAL_PATH}/010125_100000_010125_050000_000001A.MP4`,
         utcTime: '2025-01-01T10:00:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100100_010125_050100_000002A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100100_010125_050100_000002A.MP4`,
         utcTime: '2025-01-01T10:01:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100200_010125_050200_000003A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100200_010125_050200_000003A.MP4`,
         utcTime: '2025-01-01T10:02:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100300_010125_050300_000004A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100300_010125_050300_000004A.MP4`,
         utcTime: '2025-01-01T10:03:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100400_010125_050400_000005A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100400_010125_050400_000005A.MP4`,
         utcTime: '2025-01-01T10:04:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100500_010125_050500_000006A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100500_010125_050500_000006A.MP4`,
         utcTime: '2025-01-01T10:05:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100600_010125_050600_000007A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100600_010125_050600_000007A.MP4`,
         utcTime: '2025-01-01T10:06:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100700_010125_050700_000008A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100700_010125_050700_000008A.MP4`,
         utcTime: '2025-01-01T10:07:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100800_010125_050800_000009A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100800_010125_050800_000009A.MP4`,
         utcTime: '2025-01-01T10:08:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100900_010125_050900_000010A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100900_010125_050900_000010A.MP4`,
         utcTime: '2025-01-01T10:09:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     }
 ];
 
