@@ -1126,21 +1126,35 @@ async function seekToGlobalTime(targetTime) {
         currentVideoIndex = targetVideoIndex;
         await loadVideo(targetVideoIndex);
 
-        // Wait for video to load, then seek (with timeout to prevent memory leak)
-        let attempts = 0;
-        const maxAttempts = 100; // 5 seconds max (100 * 50ms)
-        const checkLoaded = setInterval(() => {
-            attempts++;
+        // Wait for video to load, then seek (Promise-based with timeout)
+        await new Promise((resolve) => {
             const activePlayer = videoPlayers[activePlayerIndex];
+            
+            // If already ready, seek immediately
             if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-                clearInterval(checkLoaded);
                 activePlayer.currentTime = localTime;
                 updateCustomProgressBar();
-            } else if (attempts >= maxAttempts) {
-                clearInterval(checkLoaded);
-                console.error('Timeout waiting for video to load');
+                resolve();
+                return;
             }
-        }, 50);
+            
+            // Otherwise wait for video to be ready
+            let attempts = 0;
+            const maxAttempts = 100; // 5 seconds max (100 * 50ms)
+            const checkLoaded = setInterval(() => {
+                attempts++;
+                if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+                    clearInterval(checkLoaded);
+                    activePlayer.currentTime = localTime;
+                    updateCustomProgressBar();
+                    resolve();
+                } else if (attempts >= maxAttempts) {
+                    clearInterval(checkLoaded);
+                    console.error('Timeout waiting for video to load');
+                    resolve(); // Still resolve to prevent hanging
+                }
+            }, 50);
+        });
     } else {
         // Same video, just seek
         const activePlayer = videoPlayers[activePlayerIndex];
