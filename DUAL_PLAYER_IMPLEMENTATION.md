@@ -58,8 +58,10 @@ Modified files:
 
 #### Video Management
 - `loadVideoIntoPlayer(videoIndex, playerIndex)` - Loads a video into a specific player
-- `switchToNextVideo()` - Seamlessly transitions to the next video
+- `switchToNextVideo(isUserAction)` - Seamlessly transitions to the next video. When `isUserAction=true`, pauses the previous player; when `false` (default), skips explicit pause for smoother auto-advance.
 - `preloadNextVideo()` - Preloads the next video in the inactive player
+- `playNextVideo()` - Called for auto-advance (ended event); does not pause previous player
+- `userPlayNextVideo()` - Called for user-initiated navigation (Next button); pauses previous player
 
 #### Playback Controls
 - `initializeCustomControls()` - Sets up custom control overlay
@@ -160,6 +162,19 @@ When playing 10 one-minute videos:
    - System calculates: 50% of 600s = 300s = 5 minutes
    - Loads video #5 and seeks to 0:00 of that video
    - Seamless playback continues
+
+## Pause Behavior During Player Switches
+
+The dual-player system distinguishes between **auto-advance** and **user-initiated navigation** when switching videos:
+
+| Trigger | Function Called | `pause()` on Previous Player? |
+|---------|-----------------|-------------------------------|
+| Video ended event (auto-advance) | `playNextVideo()` → `switchToNextVideo(false)` | No |
+| User clicks Next button | `userPlayNextVideo()` → `switchToNextVideo(true)` | Yes |
+
+**Rationale:**
+- **Auto-advance**: During automatic multi-file playback, the previous player naturally stops when its video ends. Calling `pause()` explicitly is unnecessary and could cause playback glitches.
+- **User navigation**: When users click the Next button, they expect immediate, clean transitions. Explicitly pausing the previous player ensures a consistent state.
 
 ## Benefits
 

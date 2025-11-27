@@ -98,8 +98,10 @@ export function initPlayer() {
         playPreviousVideo();
     });
 
+    // Next button uses userPlayNextVideo() to explicitly pause the previous player.
+    // This is user-initiated navigation, distinct from auto-advance via ended event.
     document.getElementById('nextBtn').addEventListener('click', () => {
-        playNextVideo();
+        userPlayNextVideo();
     });
 
     document.getElementById('playPauseBtn').addEventListener('click', () => {
@@ -386,8 +388,18 @@ function preloadNextVideo() {
     }
 }
 
-// Switch to the next video (seamless transition using dual players)
-function switchToNextVideo() {
+/**
+ * Switch to the next video (seamless transition using dual players)
+ * 
+ * @param {boolean} isUserAction - When true, pause() is called on the previous player.
+ *   This should be set to true for user-initiated actions (e.g., clicking Next button)
+ *   and false (default) for automatic transitions (e.g., video ended event).
+ *   
+ *   Rationale: During automatic multi-file playback, avoiding explicit pause() calls
+ *   prevents potential playback glitches. User-initiated navigation explicitly pauses
+ *   the previous player to ensure a clean state.
+ */
+function switchToNextVideo(isUserAction = false) {
     const nextVideoIndex = currentVideoIndex + 1;
     if (nextVideoIndex >= videoFiles.length) {
         setGlobalPlayerState('ended');
@@ -405,8 +417,11 @@ function switchToNextVideo() {
     activePlayerIndex = 1 - activePlayerIndex;
     currentVideoIndex = nextVideoIndex;
 
-    // Now pause the previous player (it's no longer active)
-    videoPlayers[previousPlayerIndex].pause();
+    // Only pause the previous player for user-initiated actions.
+    // Auto-advance transitions skip explicit pause() to prevent playback glitches.
+    if (isUserAction) {
+        videoPlayers[previousPlayerIndex].pause();
+    }
 
     // Hide previous player, show new active player
     videoPlayers[previousPlayerIndex].classList.remove('active-player');
@@ -537,10 +552,36 @@ function setPlaybackBtnToPause() {
     console.log('Set play/pause button to Pause state');
 }
 
-// Play next video
+/**
+ * Play next video - called for automatic transitions (video ended event).
+ * Uses switchToNextVideo() with isUserAction=false, meaning the previous
+ * player is NOT explicitly paused during the transition.
+ */
 function playNextVideo() {
-    // Try seamless transition first
+    // Try seamless transition first (auto-advance, no explicit pause)
     if (switchToNextVideo()) {
+        updateVideoInfo();
+        highlightCurrentMarker();
+        updatePlaybackPosition();
+        updateCustomProgressBar();
+        return;
+    }
+
+    // If no next video, just ensure UI is updated
+    if (currentVideoIndex >= videoFiles.length - 1) {
+        // Already at last video
+        return;
+    }
+}
+
+/**
+ * User-initiated play next video - called when user clicks the Next button.
+ * Uses switchToNextVideo(true) with isUserAction=true, meaning the previous
+ * player IS explicitly paused to ensure a clean state.
+ */
+function userPlayNextVideo() {
+    // Try seamless transition with explicit pause on previous player (user action)
+    if (switchToNextVideo(true)) {
         updateVideoInfo();
         highlightCurrentMarker();
         updatePlaybackPosition();
