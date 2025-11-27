@@ -553,6 +553,17 @@ function setPlaybackBtnToPause() {
 }
 
 /**
+ * Helper to update UI after switching videos.
+ * Called after a successful switchToNextVideo() transition.
+ */
+function updateUIAfterSwitch() {
+    updateVideoInfo();
+    highlightCurrentMarker();
+    updatePlaybackPosition();
+    updateCustomProgressBar();
+}
+
+/**
  * Play next video - called for automatic transitions (video ended event).
  * Uses switchToNextVideo() with isUserAction=false, meaning the previous
  * player is NOT explicitly paused during the transition.
@@ -560,18 +571,9 @@ function setPlaybackBtnToPause() {
 function playNextVideo() {
     // Try seamless transition first (auto-advance, no explicit pause)
     if (switchToNextVideo()) {
-        updateVideoInfo();
-        highlightCurrentMarker();
-        updatePlaybackPosition();
-        updateCustomProgressBar();
-        return;
+        updateUIAfterSwitch();
     }
-
-    // If no next video, just ensure UI is updated
-    if (currentVideoIndex >= videoFiles.length - 1) {
-        // Already at last video
-        return;
-    }
+    // If no next video or already at last video, nothing to do
 }
 
 /**
@@ -582,18 +584,9 @@ function playNextVideo() {
 function userPlayNextVideo() {
     // Try seamless transition with explicit pause on previous player (user action)
     if (switchToNextVideo(true)) {
-        updateVideoInfo();
-        highlightCurrentMarker();
-        updatePlaybackPosition();
-        updateCustomProgressBar();
-        return;
+        updateUIAfterSwitch();
     }
-
-    // If no next video, just ensure UI is updated
-    if (currentVideoIndex >= videoFiles.length - 1) {
-        // Already at last video
-        return;
-    }
+    // If no next video or already at last video, nothing to do
 }
 
 // Play previous video
