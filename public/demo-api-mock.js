@@ -12,6 +12,7 @@ export function isGitHubPages() {
 // Mock test data - simulating the test-data folder structure
 const DEMO_BASE_PATH = 'test-data';
 const DEMO_NORMAL_PATH = `${DEMO_BASE_PATH}/Normal`;
+const DEMO_VIDEO_DURATION_SECONDS = 2;
 
 // Mock video files list (matching actual test-data/Normal folder)
 const MOCK_VIDEO_FILES = [
@@ -85,7 +86,10 @@ const MOCK_VIDEO_FILES = [
         fileType: 'Normal',
         channel: 'A'
     }
-];
+].map(file => ({
+    ...file,
+    duration: DEMO_VIDEO_DURATION_SECONDS
+}));
 
 /**
  * Mock API class that mimics backend endpoints

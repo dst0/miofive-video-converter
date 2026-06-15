@@ -21,6 +21,7 @@ let globalPlayerState = 'paused'; // 'playing', 'paused', or 'ended'
 
 const SEEK_STEP_SECONDS = 5;
 const LARGE_SEEK_STEP_SECONDS = 30;
+const PLAYBACK_SPEED_PRESETS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 25, 50];
 
 // Detect supported playback rate range for the browser/device
 function detectPlaybackRateRange() {
@@ -256,6 +257,70 @@ function updateSpeedPresetState(speed) {
     });
 }
 
+function getSupportedSpeedPresets() {
+    return PLAYBACK_SPEED_PRESETS.filter(
+        (speed) => speed >= PlaybackRateRange.min && speed <= PlaybackRateRange.max
+    );
+}
+
+function getNearestSupportedSpeed(speed) {
+    const supportedSpeeds = getSupportedSpeedPresets();
+    return supportedSpeeds.reduce((nearest, candidate) => (
+        Math.abs(candidate - speed) < Math.abs(nearest - speed) ? candidate : nearest
+    ), supportedSpeeds[0] || 1);
+}
+
+function getAdjacentPlaybackSpeed(currentSpeed, direction) {
+    const supportedSpeeds = getSupportedSpeedPresets();
+    if (supportedSpeeds.length === 0) return currentSpeed;
+
+    if (direction > 0) {
+        return supportedSpeeds.find((speed) => speed > currentSpeed + 0.001) || supportedSpeeds[supportedSpeeds.length - 1];
+    }
+
+    for (let i = supportedSpeeds.length - 1; i >= 0; i--) {
+        if (supportedSpeeds[i] < currentSpeed - 0.001) {
+            return supportedSpeeds[i];
+        }
+    }
+
+    return supportedSpeeds[0];
+}
+
+function getSelectedPlaybackSpeed() {
+    const speedInput = document.getElementById('speedInput');
+    const inputSpeed = Number(speedInput?.value);
+    if (Number.isFinite(inputSpeed)) return inputSpeed;
+
+    const activePlayer = videoPlayers[activePlayerIndex];
+    return Number.isFinite(activePlayer?.playbackRate) ? activePlayer.playbackRate : 1;
+}
+
+function updateOverlaySpeedControls(speed) {
+    const speedDisplayBtn = document.getElementById('speedDisplayBtn');
+    const speedDownBtn = document.getElementById('speedDownBtn');
+    const speedUpBtn = document.getElementById('speedUpBtn');
+    const supportedSpeeds = getSupportedSpeedPresets();
+    const minSpeed = supportedSpeeds[0] || PlaybackRateRange.min;
+    const maxSpeed = supportedSpeeds[supportedSpeeds.length - 1] || PlaybackRateRange.max;
+    const speedText = `${speed.toFixed(1)}x`;
+
+    if (speedDisplayBtn) {
+        speedDisplayBtn.setAttribute('aria-label', `Reset playback speed from ${speedText} to 1.0x`);
+        speedDisplayBtn.title = `Reset playback speed to 1.0x (currently ${speedText})`;
+    }
+
+    if (speedDownBtn) {
+        speedDownBtn.disabled = speed <= minSpeed + 0.001;
+        speedDownBtn.setAttribute('aria-label', `Decrease playback speed from ${speedText}`);
+    }
+
+    if (speedUpBtn) {
+        speedUpBtn.disabled = speed >= maxSpeed - 0.001;
+        speedUpBtn.setAttribute('aria-label', `Increase playback speed from ${speedText}`);
+    }
+}
+
 // Initialize the player module (called once on page load)
 export function initPlayer() {
     // Initialize dual players references
@@ -393,6 +458,7 @@ export function initPlayer() {
                 // Only update progress bar if this is the active player
                 if (index === activePlayerIndex) {
                     updateCustomProgressBar();
+                    updateVideoInfo();
                 }
             }
         });
@@ -601,6 +667,7 @@ function loadVideoIntoPlayer(videoIndex, playerIndex) {
     source.src = videoURL;
     player.dataset.videoIndex = videoIndex;
     player.load();
+    player.playbackRate = getNearestSupportedSpeed(getSelectedPlaybackSpeed());
 }
 
 // Preload the next video into the inactive player
@@ -815,6 +882,7 @@ function changePlaybackSpeed(speed) {
         .setAttribute('aria-valuetext', `${clampedSpeed.toFixed(1)}x`);
     document.getElementById('speedValue').textContent = `${clampedSpeed.toFixed(1)}x`;
     updateSpeedPresetState(clampedSpeed);
+    updateOverlaySpeedControls(clampedSpeed);
 }
 
 // Update video info display
@@ -1206,6 +1274,9 @@ function initializeCustomControls() {
     const playPauseOverlayBtn = document.getElementById('playPauseOverlayBtn');
     const muteBtn = document.getElementById('muteBtn');
     const volumeSlider = document.getElementById('volumeSlider');
+    const speedDownBtn = document.getElementById('speedDownBtn');
+    const speedDisplayBtn = document.getElementById('speedDisplayBtn');
+    const speedUpBtn = document.getElementById('speedUpBtn');
     const screenshotBtn = document.getElementById('screenshotBtn');
     const fullscreenBtn = document.getElementById('fullscreenBtn');
 
@@ -1231,6 +1302,21 @@ function initializeCustomControls() {
         muteBtn.querySelector('.btn-icon').textContent =
             volume === 0 ? '🔇' : '🔊';
         syncMuteButtonState();
+    });
+
+    speedDownBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        changePlaybackSpeed(getAdjacentPlaybackSpeed(getSelectedPlaybackSpeed(), -1));
+    });
+
+    speedDisplayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        changePlaybackSpeed(1);
+    });
+
+    speedUpBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        changePlaybackSpeed(getAdjacentPlaybackSpeed(getSelectedPlaybackSpeed(), 1));
     });
     
     // Screenshot button
@@ -1328,6 +1414,7 @@ function initializeCustomControls() {
     updateProgressAccessibility();
     syncMuteButtonState();
     syncFullscreenButtonState();
+    updateOverlaySpeedControls(getSelectedPlaybackSpeed());
 }
 
 // Update custom progress bar based on current playback

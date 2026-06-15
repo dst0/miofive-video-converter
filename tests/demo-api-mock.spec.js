@@ -108,6 +108,7 @@ test.describe('Demo API Mock Module Tests', () => {
         expect(result).toHaveProperty('files');
         expect(result.count).toBe(10); // All 10 test files
         expect(result.files).toHaveLength(10);
+        expect(result.files.every(file => file.duration === 2)).toBe(true);
     });
 
     test('DemoAPI.scan() should filter by channel A', async ({ page }) => {

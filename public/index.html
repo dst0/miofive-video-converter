@@ -146,8 +146,16 @@
                     </button>
                     <input type="range" id="volumeSlider" min="0" max="100" value="100" class="volume-slider" aria-label="Volume" aria-valuetext="100 percent">
                 </div>
-                <div class="speed-display">
-                    <span id="speedValue" aria-live="polite">1.0x</span>
+                <div class="overlay-speed-control" role="group" aria-label="Playback speed controls">
+                    <button id="speedDownBtn" class="speed-step-btn" type="button" aria-label="Decrease playback speed" title="Slower">
+                        <span aria-hidden="true">−</span>
+                    </button>
+                    <button id="speedDisplayBtn" class="speed-display" type="button" aria-label="Reset playback speed to 1.0x" title="Reset playback speed to 1.0x">
+                        <span id="speedValue" aria-live="polite">1.0x</span>
+                    </button>
+                    <button id="speedUpBtn" class="speed-step-btn" type="button" aria-label="Increase playback speed" title="Faster">
+                        <span aria-hidden="true">+</span>
+                    </button>
                 </div>
                 <button id="screenshotBtn" class="overlay-btn" type="button" aria-label="Take screenshot" title="Take Screenshot (S)">
                     <span class="btn-icon" aria-hidden="true">📷</span>

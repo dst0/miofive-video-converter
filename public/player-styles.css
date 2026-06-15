@@ -190,7 +190,7 @@
     background: #667eea;
     border-radius: 4px;
     pointer-events: none;
-    transition: width 0.1s linear;
+    transition: none;
 }
 
 .progress-bar-handle {
@@ -203,7 +203,7 @@
     border-radius: 50%;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
     cursor: grab;
-    transition: transform 0.2s;
+    transition: none;
 }
 
 .progress-bar-handle:hover {
@@ -308,17 +308,59 @@
 }
 
 /* Speed display */
-.speed-display {
-    color: white;
-    font-size: 16px;
-    font-weight: 600;
+.overlay-speed-control {
     margin-left: auto;
     min-height: var(--player-control-size);
+    display: inline-grid;
+    grid-template-columns: var(--player-control-size) minmax(64px, auto) var(--player-control-size);
+    align-items: center;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12);
+    overflow: hidden;
+}
+
+.speed-display,
+.speed-step-btn {
+    color: white;
+    background: transparent;
+    border: none;
+    cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
+    font-family: inherit;
+    min-height: var(--player-control-size);
+    transition: background 0.15s ease;
+}
+
+.speed-display {
+    font-size: 16px;
+    font-weight: 600;
     min-width: 64px;
+    padding: 6px 12px;
     text-align: center;
+}
+
+.speed-step-btn {
+    font-size: 20px;
+    font-weight: 700;
+    min-width: var(--player-control-size);
+    padding: 0;
+}
+
+.speed-display:hover,
+.speed-step-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.25);
+}
+
+.speed-display:active,
+.speed-step-btn:active:not(:disabled) {
+    background: rgba(255, 255, 255, 0.35);
+}
+
+.speed-step-btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 /* Video info overlay */
@@ -776,24 +818,26 @@
 
     .control-buttons-row {
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         align-items: center;
         width: 100%;
         gap: 8px;
     }
 
     .overlay-btn,
-    .speed-display {
+    .overlay-speed-control {
         width: 100%;
         min-width: 0;
         height: 44px;
         min-height: 44px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
         padding: 0;
         line-height: 1;
         border-radius: 8px;
+    }
+
+    .overlay-speed-control {
+        grid-column: span 2;
+        grid-template-columns: 28px minmax(0, 1fr) 28px;
     }
 
     .play-pause-btn {
@@ -808,10 +852,21 @@
         display: none;
     }
 
-    .speed-display {
+    .overlay-speed-control {
         margin-left: 0;
         background: rgba(255, 255, 255, 0.12);
+    }
+
+    .speed-display {
         font-size: 14px;
+        min-width: 0;
+        padding: 0 2px;
+        width: 100%;
+    }
+
+    .speed-step-btn {
+        min-width: 0;
+        width: 100%;
     }
 
     .timeline-section,

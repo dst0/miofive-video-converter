@@ -270,6 +270,48 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     expect(layout.headerButtonHeightDelta).toBeLessThanOrEqual(1);
   });
 
+  test('should keep compact overlay speed text centered without overlap', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openPlayer(page, 3);
+
+    const layout = await page.evaluate(() => {
+      const rect = (selector) => {
+        const el = document.querySelector(selector);
+        const r = el.getBoundingClientRect();
+        return {
+          left: r.left,
+          right: r.right,
+          width: r.width,
+          center: r.left + r.width / 2
+        };
+      };
+
+      const group = rect('.overlay-speed-control');
+      const display = rect('#speedDisplayBtn');
+      const text = rect('#speedValue');
+      const down = rect('#speedDownBtn');
+      const up = rect('#speedUpBtn');
+
+      return {
+        displayCenteredInGroup: Math.abs(display.center - group.center),
+        textCenteredInDisplay: Math.abs(text.center - display.center),
+        downDisplayGap: display.left - down.right,
+        displayUpGap: up.left - display.right,
+        textFitsDisplay: text.left >= display.left && text.right <= display.right,
+        groupWidth: group.width,
+        displayWidth: display.width,
+        textWidth: text.width
+      };
+    });
+
+    expect(layout.displayCenteredInGroup).toBeLessThanOrEqual(1);
+    expect(layout.textCenteredInDisplay).toBeLessThanOrEqual(1);
+    expect(layout.downDisplayGap).toBeGreaterThanOrEqual(-0.5);
+    expect(layout.displayUpGap).toBeGreaterThanOrEqual(-0.5);
+    expect(layout.textFitsDisplay).toBe(true);
+    expect(layout.displayWidth).toBeGreaterThan(layout.textWidth);
+  });
+
   test('should keep desktop player controls visually consistent', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await openPlayer(page, 3);
@@ -492,6 +534,44 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     // Verify the playback rate is set
     const playbackRate2 = await page.locator('#videoPlayer1').evaluate(el => el.playbackRate);
     expect(playbackRate2).toBe(0.5);
+  });
+
+  test('should adjust playback speed from video overlay controls', async ({ page }) => {
+    await openPlayer(page, 1);
+
+    await expect(page.locator('#speedDisplayBtn')).toBeVisible();
+    await expect(page.locator('#speedValue')).toHaveText('1.0x');
+
+    await page.locator('#speedUpBtn').click();
+    await expect(page.locator('#speedValue')).toHaveText('2.0x');
+    await expect.poll(() => page.locator('#videoPlayer1').evaluate(el => el.playbackRate)).toBe(2);
+
+    await page.locator('#speedDownBtn').click();
+    await expect(page.locator('#speedValue')).toHaveText('1.0x');
+    await expect.poll(() => page.locator('#videoPlayer1').evaluate(el => el.playbackRate)).toBe(1);
+
+    await page.locator('#speedDownBtn').click();
+    await expect(page.locator('#speedValue')).toHaveText('0.5x');
+    await expect.poll(() => page.locator('#videoPlayer1').evaluate(el => el.playbackRate)).toBe(0.5);
+
+    await page.locator('#speedDisplayBtn').click();
+    await expect(page.locator('#speedValue')).toHaveText('1.0x');
+    await expect.poll(() => page.locator('#videoPlayer1').evaluate(el => el.playbackRate)).toBe(1);
+  });
+
+  test('should not animate bottom playback progress during playback updates', async ({ page }) => {
+    await openPlayer(page, 3);
+
+    const progressTransition = await page.locator('#progressPlayed').evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return {
+        property: style.transitionProperty,
+        duration: style.transitionDuration
+      };
+    });
+
+    expect(progressTransition.property).toBe('none');
+    expect(progressTransition.duration).toBe('0s');
   });
 
   test('should display timeline with file markers', async ({ page }) => {
