@@ -2,6 +2,8 @@ node_modules/
 filelist.txt
 *.log
 .DS_Store
+.pdev/
+.pi/
 test-results/
 playwright-report/
 playwright/.cache/
