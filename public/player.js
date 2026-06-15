@@ -13,9 +13,14 @@ let isSeekingGlobal = false; // Flag for global seeking
 let currentGlobalTime = 0; // Current playback time across all videos
 let isDraggingProgress = false; // Flag for progress bar dragging
 let isPlayerInitialized = false;
+let areCustomControlsInitialized = false;
+let lastFocusedElementBeforeExport = null;
 
 // Global player state - single source of truth for play/pause state
 let globalPlayerState = 'paused'; // 'playing', 'paused', or 'ended'
+
+const SEEK_STEP_SECONDS = 5;
+const LARGE_SEEK_STEP_SECONDS = 30;
 
 // Detect supported playback rate range for the browser/device
 function detectPlaybackRateRange() {
@@ -63,6 +68,194 @@ function showSnackbar(message, type = 'info', duration = 3000) {
     }, duration);
 }
 
+function isPlayerScreenVisible() {
+    const playerScreen = document.getElementById('playerScreen');
+    return playerScreen && playerScreen.style.display !== 'none';
+}
+
+function isExportModalOpen() {
+    const modal = document.getElementById('exportModal');
+    return modal && modal.style.display !== 'none';
+}
+
+function isTextEntryTarget(target) {
+    if (!(target instanceof Element)) return false;
+    const tagName = target.tagName;
+    return (
+        tagName === 'INPUT' ||
+        tagName === 'TEXTAREA' ||
+        tagName === 'SELECT' ||
+        target.isContentEditable
+    );
+}
+
+function isNativeInteractiveTarget(target) {
+    if (!(target instanceof Element)) return false;
+    return Boolean(
+        target.closest(
+            'button, a[href], input, select, textarea, [role="button"], [role="slider"]'
+        )
+    );
+}
+
+function shouldIgnoreWrapperClick(target) {
+    if (!(target instanceof Element)) return true;
+    return Boolean(
+        target.closest(
+            'button, a[href], input, select, textarea, label, .progress-bar-container, .progress-bar-handle'
+        )
+    );
+}
+
+function updatePlaybackControlAccessibility() {
+    const isPlaying = globalPlayerState === 'playing';
+    const label = isPlaying ? 'Pause video' : 'Play video';
+    const playPauseBtn = document.getElementById('playPauseBtn');
+    const playPauseOverlayBtn = document.getElementById('playPauseOverlayBtn');
+    const videoWrapper = document.getElementById('videoWrapper');
+
+    [playPauseBtn, playPauseOverlayBtn].forEach((button) => {
+        if (!button) return;
+        button.setAttribute('aria-label', label);
+        button.setAttribute('aria-pressed', String(isPlaying));
+        button.title = label;
+    });
+
+    if (videoWrapper) {
+        videoWrapper.setAttribute(
+            'aria-label',
+            isPlaying ? 'Video playback area. Video is playing.' : 'Video playback area. Video is paused.'
+        );
+    }
+}
+
+function updateNavigationButtonStates() {
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    if (!prevBtn || !nextBtn) return;
+
+    prevBtn.disabled = currentVideoIndex === 0;
+    nextBtn.disabled = currentVideoIndex === videoFiles.length - 1;
+    prevBtn.setAttribute('aria-disabled', String(prevBtn.disabled));
+    nextBtn.setAttribute('aria-disabled', String(nextBtn.disabled));
+}
+
+function updateActivePlayerAccessibility() {
+    videoPlayers.forEach((player, index) => {
+        if (!player) return;
+        const isActive = index === activePlayerIndex;
+        const filename = videoFiles[currentVideoIndex]?.filename || 'selected video';
+        player.setAttribute('aria-hidden', String(!isActive));
+        player.setAttribute(
+            'aria-label',
+            isActive ? `Current video: ${filename}` : 'Preloaded next video'
+        );
+    });
+}
+
+function syncMuteButtonState() {
+    const activePlayer = videoPlayers[activePlayerIndex];
+    const muteBtn = document.getElementById('muteBtn');
+    const volumeSlider = document.getElementById('volumeSlider');
+    if (!activePlayer || !muteBtn || !volumeSlider) return;
+
+    const isMuted = activePlayer.muted || activePlayer.volume === 0;
+    muteBtn.querySelector('.btn-icon').textContent = isMuted ? '🔇' : '🔊';
+    muteBtn.setAttribute('aria-pressed', String(isMuted));
+    muteBtn.setAttribute('aria-label', isMuted ? 'Unmute audio' : 'Mute audio');
+    muteBtn.title = isMuted ? 'Unmute audio' : 'Mute audio';
+    volumeSlider.setAttribute(
+        'aria-valuetext',
+        `${Math.round(activePlayer.volume * 100)} percent${isMuted ? ', muted' : ''}`
+    );
+}
+
+function setMuted(muted) {
+    videoPlayers.forEach((player) => {
+        if (player) player.muted = muted;
+    });
+    syncMuteButtonState();
+}
+
+function toggleMute() {
+    const activePlayer = videoPlayers[activePlayerIndex];
+    if (!activePlayer) return;
+    setMuted(!(activePlayer.muted || activePlayer.volume === 0));
+}
+
+function syncFullscreenButtonState() {
+    const fullscreenBtn = document.getElementById('fullscreenBtn');
+    if (!fullscreenBtn) return;
+    const isFullscreen = Boolean(document.fullscreenElement);
+    fullscreenBtn.setAttribute('aria-pressed', String(isFullscreen));
+    fullscreenBtn.setAttribute(
+        'aria-label',
+        isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'
+    );
+    fullscreenBtn.title = isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen';
+}
+
+function toggleFullscreen() {
+    const videoWrapper = document.getElementById('videoWrapper');
+    if (!videoWrapper) return;
+
+    if (!document.fullscreenElement) {
+        videoWrapper.requestFullscreen().catch((err) => {
+            console.error('Error entering fullscreen:', err);
+        });
+    } else {
+        document.exitFullscreen();
+    }
+}
+
+function handlePlayPromiseError(err, message = 'Error playing video:') {
+    if (err?.name === 'NotAllowedError') {
+        setGlobalPlayerState('paused');
+        return;
+    }
+
+    console.error(message, err);
+    setGlobalPlayerState('paused');
+}
+
+function clampGlobalTime(value) {
+    return Math.max(0, Math.min(totalDuration || 0, value));
+}
+
+function seekBySeconds(deltaSeconds) {
+    if (!totalDuration) return;
+    seekToGlobalTime(clampGlobalTime(currentGlobalTime + deltaSeconds));
+}
+
+function getCurrentPreciseGlobalTime() {
+    const activePlayer = videoPlayers[activePlayerIndex];
+    if (activePlayer && Number.isFinite(activePlayer.currentTime)) {
+        return clampGlobalTime((videoStartTimes[currentVideoIndex] || 0) + activePlayer.currentTime);
+    }
+
+    return currentGlobalTime;
+}
+
+function updateProgressAccessibility(previewTime = currentGlobalTime) {
+    const progressContainer = document.getElementById('progressBarContainer');
+    if (!progressContainer) return;
+
+    const safeTime = clampGlobalTime(previewTime);
+    progressContainer.setAttribute('aria-valuemax', String(Math.round(totalDuration || 0)));
+    progressContainer.setAttribute('aria-valuenow', String(Math.round(safeTime)));
+    progressContainer.setAttribute(
+        'aria-valuetext',
+        `${formatTime(safeTime)} of ${formatTime(totalDuration || 0)}`
+    );
+}
+
+function updateSpeedPresetState(speed) {
+    document.querySelectorAll('.preset-speed-btn').forEach((btn) => {
+        const presetSpeed = parseFloat(btn.dataset.speed);
+        btn.setAttribute('aria-pressed', String(presetSpeed === speed));
+    });
+}
+
 // Initialize the player module (called once on page load)
 export function initPlayer() {
     // Initialize dual players references
@@ -86,6 +279,18 @@ export function initPlayer() {
     document.getElementById('exportCancelBtn').addEventListener('click', closeExportModal);
     document.getElementById('exportConfirmBtn').addEventListener('click', performExport);
     document.getElementById('exportBrowseFolderBtn').addEventListener('click', openExportFolderBrowser);
+    document.getElementById('exportSetStartBtn').addEventListener('click', () => {
+        document.getElementById('exportRangeStart').value = formatExportTime(getCurrentPreciseGlobalTime());
+        updateExportEstimate();
+    });
+    document.getElementById('exportSetEndBtn').addEventListener('click', () => {
+        document.getElementById('exportRangeEnd').value = formatExportTime(getCurrentPreciseGlobalTime());
+        updateExportEstimate();
+    });
+    ['exportRangeStart', 'exportRangeEnd', 'exportSpeed', 'exportQuality'].forEach((id) => {
+        document.getElementById(id).addEventListener('input', updateExportEstimate);
+        document.getElementById(id).addEventListener('change', updateExportEstimate);
+    });
     
     // Close modal when clicking outside
     document.getElementById('exportModal').addEventListener('click', (e) => {
@@ -129,6 +334,7 @@ export function initPlayer() {
         // Disable button if speed is not supported
         if (speed < PlaybackRateRange.min || speed > PlaybackRateRange.max) {
             btn.disabled = true;
+            btn.setAttribute('aria-disabled', 'true');
             btn.title = `${speed}x not supported by this browser`;
             btn.style.opacity = '0.5';
         }
@@ -204,8 +410,9 @@ export function initPlayer() {
         });
 
         // Add click handler to toggle play/pause
-        player.addEventListener('click', () => {
+        player.addEventListener('click', (e) => {
             if (index === activePlayerIndex) {
+                e.stopPropagation();
                 togglePlayPause();
             }
         });
@@ -234,6 +441,7 @@ function syncUIWithPlayerState() {
         playPauseBtn.textContent = '▶ Play';
         overlayBtn.textContent = '▶';
     }
+    updatePlaybackControlAccessibility();
     
     console.log(`UI synced to state: ${globalPlayerState}`);
 }
@@ -245,8 +453,7 @@ function applyStateToPlayers() {
     if (globalPlayerState === 'playing') {
         if (activePlayer.paused) {
             activePlayer.play().catch(err => {
-                console.error('Error playing video:', err);
-                setGlobalPlayerState('paused');
+                handlePlayPromiseError(err);
             });
         }
     } else {
@@ -260,11 +467,12 @@ function applyStateToPlayers() {
 function setPlaybackBtnToPlay() {
     document.getElementById('playPauseBtn').textContent = '⏸ Pause';
     document.querySelector('#playPauseOverlayBtn .btn-icon').textContent = '⏸';
+    updatePlaybackControlAccessibility();
     console.log('Set play/pause button to Play state');
 }
 
 // Show player screen and start playback
-export function showPlayerScreen(files) {
+export function showPlayerScreen(files, options = {}) {
     if (!files || files.length === 0) {
         alert('No video files to play.');
         return;
@@ -279,14 +487,30 @@ export function showPlayerScreen(files) {
     // Hide main screen and show player screen
     document.getElementById('mainScreen').style.display = 'none';
     document.getElementById('playerScreen').style.display = 'block';
+    window.scrollTo(0, 0);
 
     // Initialize player UI
     initializePlayer();
     initializeTimeline();
     initializeCustomControls();
+    updatePlaybackControlAccessibility();
+    updateActivePlayerAccessibility();
 
-    // Load first video (don't pause on initial load - allow autoplay)
-    loadVideo(0, false);
+    // Load first video (normal playback entry allows autoplay)
+    loadVideo(0, options.autoplay === false);
+    requestAnimationFrame(() => {
+        document.getElementById('videoWrapper')?.focus({ preventScroll: true });
+        if (options.openExportModal) {
+            openExportModal();
+        }
+    });
+}
+
+export function showExportFlow(files) {
+    showPlayerScreen(files, {
+        autoplay: false,
+        openExportModal: true,
+    });
 }
 
 // Hide player screen and return to main
@@ -297,6 +521,7 @@ export function hidePlayerScreen() {
         player.removeAttribute('src');
         player.load(); // Reset the video element
     });
+    globalPlayerState = 'paused';
     setPlaybackBtnToPause();
 
     // Reset state
@@ -309,6 +534,7 @@ export function hidePlayerScreen() {
     // Hide player screen and show main screen
     document.getElementById('playerScreen').style.display = 'none';
     document.getElementById('mainScreen').style.display = 'block';
+    document.getElementById('playVideosBtn')?.focus({ preventScroll: true });
 }
 
 // Initialize player controls
@@ -418,10 +644,8 @@ function switchToNextVideo() {
         videoFile.filename
     );
 
-    // Update button states
-    document.getElementById('prevBtn').disabled = currentVideoIndex === 0;
-    document.getElementById('nextBtn').disabled =
-        currentVideoIndex === videoFiles.length - 1;
+    updateNavigationButtonStates();
+    updateActivePlayerAccessibility();
 
     // Start playback on new active player if we were playing before
     const newActivePlayer = videoPlayers[activePlayerIndex];
@@ -429,8 +653,7 @@ function switchToNextVideo() {
         if (newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
             newActivePlayer.currentTime = 0;
             newActivePlayer.play().catch((err) => {
-                console.error('Error playing video:', err);
-                setGlobalPlayerState('paused');
+                handlePlayPromiseError(err);
             });
         } else {
             // Wait for video to be ready before playing
@@ -441,8 +664,7 @@ function switchToNextVideo() {
                 clearTimeout(timeoutId);
                 newActivePlayer.currentTime = 0;
                 newActivePlayer.play().catch((err) => {
-                    console.error('Error playing video:', err);
-                    setGlobalPlayerState('paused');
+                    handlePlayPromiseError(err);
                 });
             };
             newActivePlayer.addEventListener('loadeddata', playWhenReady);
@@ -493,10 +715,8 @@ function loadVideo(index, shouldPause = true) {
         videoFile.filename
     );
 
-    // Update button states
-    document.getElementById('prevBtn').disabled = index === 0;
-    document.getElementById('nextBtn').disabled =
-        index === videoFiles.length - 1;
+    updateNavigationButtonStates();
+    updateActivePlayerAccessibility();
 
     // Highlight current file marker
     highlightCurrentMarker();
@@ -516,14 +736,14 @@ function loadVideo(index, shouldPause = true) {
         // Wait for video to be ready before playing
         if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
             activePlayer.play().catch(err => {
-                console.error('Error playing video on initial load:', err);
+                handlePlayPromiseError(err, 'Error playing video on initial load:');
             });
         } else {
             // Wait for video to load
             const playWhenReady = () => {
                 activePlayer.removeEventListener('loadeddata', playWhenReady);
                 activePlayer.play().catch(err => {
-                    console.error('Error playing video on initial load:', err);
+                    handlePlayPromiseError(err, 'Error playing video on initial load:');
                 });
             };
             activePlayer.addEventListener('loadeddata', playWhenReady);
@@ -534,6 +754,7 @@ function loadVideo(index, shouldPause = true) {
 function setPlaybackBtnToPause() {
     document.getElementById('playPauseBtn').textContent = '▶ Play';
     document.querySelector('#playPauseOverlayBtn .btn-icon').textContent = '▶';
+    updatePlaybackControlAccessibility();
     console.log('Set play/pause button to Pause state');
 }
 
@@ -589,7 +810,11 @@ function changePlaybackSpeed(speed) {
     // Update speed display
     document.getElementById('speedInput').value = clampedSpeed;
     document.getElementById('speedSlider').value = clampedSpeed;
+    document
+        .getElementById('speedSlider')
+        .setAttribute('aria-valuetext', `${clampedSpeed.toFixed(1)}x`);
     document.getElementById('speedValue').textContent = `${clampedSpeed.toFixed(1)}x`;
+    updateSpeedPresetState(clampedSpeed);
 }
 
 // Update video info display
@@ -603,6 +828,7 @@ function updateVideoInfo() {
     ).textContent = `${currentTime} / ${duration} | Video ${
         currentVideoIndex + 1
     } of ${videoFiles.length}`;
+    updateActivePlayerAccessibility();
 }
 
 // Format time in MM:SS format
@@ -611,6 +837,132 @@ function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+}
+
+function formatExportTime(seconds) {
+    if (!Number.isFinite(seconds) || seconds < 0) return '00:00.000';
+
+    const totalMilliseconds = Math.round(seconds * 1000);
+    const hours = Math.floor(totalMilliseconds / 3600000);
+    const mins = Math.floor((totalMilliseconds % 3600000) / 60000);
+    const secs = Math.floor((totalMilliseconds % 60000) / 1000);
+    const milliseconds = totalMilliseconds % 1000;
+    const secondsWithMs = `${String(secs).padStart(2, '0')}.${String(milliseconds).padStart(3, '0')}`;
+
+    if (hours > 0) {
+        return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}:${secondsWithMs}`;
+    }
+
+    return `${String(mins).padStart(2, '0')}:${secondsWithMs}`;
+}
+
+function parseExportTime(value) {
+    const trimmed = String(value || '').trim();
+    if (!trimmed) {
+        throw new Error('Time is required');
+    }
+
+    function parseSecondToken(token) {
+        const match = token.match(/^(\d+)(?:\.(\d{1,3}))?$/);
+        if (!match) {
+            throw new Error('Use seconds, MM:SS.mmm, or HH:MM:SS.mmm');
+        }
+
+        const wholeSeconds = Number(match[1]);
+        const milliseconds = Number((match[2] || '').padEnd(3, '0')) || 0;
+        return { wholeSeconds, milliseconds };
+    }
+
+    if (/^\d+(?:\.\d{1,3})?$/.test(trimmed)) {
+        const { wholeSeconds, milliseconds } = parseSecondToken(trimmed);
+        return wholeSeconds + milliseconds / 1000;
+    }
+
+    const rawParts = trimmed.split(':');
+    if (rawParts.length < 2 || rawParts.length > 3) {
+        throw new Error('Use seconds, MM:SS.mmm, or HH:MM:SS.mmm');
+    }
+
+    const leadingParts = rawParts.slice(0, -1).map((part) => {
+        if (!/^\d+$/.test(part)) {
+            throw new Error('Use seconds, MM:SS.mmm, or HH:MM:SS.mmm');
+        }
+        return Number(part);
+    });
+    const { wholeSeconds, milliseconds } = parseSecondToken(rawParts[rawParts.length - 1]);
+
+    if (rawParts.length === 2) {
+        const [minutes] = leadingParts;
+        if (wholeSeconds >= 60) {
+            throw new Error('Seconds must be below 60');
+        }
+        return minutes * 60 + wholeSeconds + milliseconds / 1000;
+    }
+
+    if (rawParts.length === 3) {
+        const [hours, minutes] = leadingParts;
+        if (minutes >= 60 || wholeSeconds >= 60) {
+            throw new Error('Minutes and seconds must be below 60');
+        }
+        return hours * 3600 + minutes * 60 + wholeSeconds + milliseconds / 1000;
+    }
+
+    throw new Error('Use seconds, MM:SS.mmm, or HH:MM:SS.mmm');
+}
+
+function estimateProcessingTime(selectedDuration, quality) {
+    const qualityFactors = {
+        max: 0.9,
+        high: 0.65,
+        standard: 0.45,
+        compact: 0.3,
+    };
+    const factor = qualityFactors[quality] || qualityFactors.max;
+    const low = Math.max(5, selectedDuration * factor * 0.6);
+    const high = Math.max(low + 5, selectedDuration * factor * 1.4);
+    return `~${formatExportTime(low)}-${formatExportTime(high)}`;
+}
+
+function getExportSettingsFromForm() {
+    const start = parseExportTime(document.getElementById('exportRangeStart').value);
+    const end = parseExportTime(document.getElementById('exportRangeEnd').value);
+    const speed = Number(document.getElementById('exportSpeed').value);
+    const quality = document.getElementById('exportQuality').value;
+
+    if (!Number.isFinite(speed) || speed < 0.1 || speed > 50) {
+        throw new Error('Speed must be between 0.1x and 50x');
+    }
+    if (start < 0 || end < 0) {
+        throw new Error('Start and end times cannot be negative');
+    }
+    if (end <= start) {
+        throw new Error('End time must be after start time');
+    }
+    if (end > totalDuration) {
+        throw new Error(`End time cannot exceed ${formatExportTime(totalDuration)}`);
+    }
+
+    return { start, end, speed, quality };
+}
+
+function updateExportEstimate() {
+    const selectedDurationEl = document.getElementById('exportSelectedDuration');
+    const outputDurationEl = document.getElementById('exportOutputDuration');
+    const processingEstimateEl = document.getElementById('exportProcessingEstimate');
+
+    if (!selectedDurationEl || !outputDurationEl || !processingEstimateEl) return;
+
+    try {
+        const { start, end, speed, quality } = getExportSettingsFromForm();
+        const selectedDuration = end - start;
+        selectedDurationEl.textContent = formatExportTime(selectedDuration);
+        outputDurationEl.textContent = formatExportTime(selectedDuration / speed);
+        processingEstimateEl.textContent = estimateProcessingTime(selectedDuration, quality);
+    } catch (error) {
+        selectedDurationEl.textContent = 'Invalid';
+        outputDurationEl.textContent = 'Invalid';
+        processingEstimateEl.textContent = error.message;
+    }
 }
 
 // Initialize timeline
@@ -657,13 +1009,16 @@ function initializeTimeline() {
             const duration = file.duration ? formatTime(file.duration) : 'Unknown';
             const fileTypeDisplay = file.fileType || 'Other';
             
-            return `<div class="file-marker file-marker-${escapeHtml(fileType)}"
-                     data-index="${index}"
-                     data-filename="${escapeHtml(file.filename)}"
-                     data-timestamp="${escapeHtml(timestamp)}"
-                     data-duration="${escapeHtml(duration)}"
-                     data-filetype="${escapeHtml(fileTypeDisplay)}"
-                     style="left: ${clampedPosition}%">
+             return `<div class="file-marker file-marker-${escapeHtml(fileType)}"
+                      data-index="${index}"
+                      data-filename="${escapeHtml(file.filename)}"
+                      data-timestamp="${escapeHtml(timestamp)}"
+                      data-duration="${escapeHtml(duration)}"
+                      data-filetype="${escapeHtml(fileTypeDisplay)}"
+                      role="button"
+                      tabindex="0"
+                      aria-label="Jump to video ${index + 1}: ${escapeHtml(file.filename)}, ${escapeHtml(timestamp)}"
+                      style="left: ${clampedPosition}%">
                      <div class="file-marker-tooltip">
                          <div class="tooltip-filename">${escapeHtml(file.filename)}</div>
                          <div class="tooltip-timestamp">⏰ ${escapeHtml(timestamp)}</div>
@@ -683,9 +1038,16 @@ function initializeTimeline() {
     // Add click handlers to file markers
     const playerScreen = document.getElementById('playerScreen');
     playerScreen.querySelectorAll('.file-marker').forEach((marker) => {
-        marker.addEventListener('click', () => {
+        const activateMarker = () => {
             const index = parseInt(marker.dataset.index);
             loadVideo(index);
+        };
+        marker.addEventListener('click', activateMarker);
+        marker.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                activateMarker();
+            }
         });
     });
 
@@ -693,7 +1055,7 @@ function initializeTimeline() {
     highlightCurrentMarker();
 
     // Add click handler to timeline track for seeking
-    document.getElementById('timelineTrack').addEventListener('click', (e) => {
+    document.getElementById('timelineTrack').onclick = (e) => {
         if (e.target.classList.contains('file-marker')) return; // Already handled
 
         const rect = e.currentTarget.getBoundingClientRect();
@@ -718,7 +1080,7 @@ function initializeTimeline() {
         }
 
         loadVideo(closestIndex);
-    });
+    };
 }
 
 // Generate time markers for midnight and noon
@@ -816,6 +1178,7 @@ function highlightCurrentMarker() {
     const playerScreen = document.getElementById('playerScreen');
     playerScreen.querySelectorAll('.file-marker').forEach((marker) => {
         marker.classList.remove('current-marker');
+        marker.removeAttribute('aria-current');
     });
 
     // Add highlight to current marker
@@ -824,11 +1187,20 @@ function highlightCurrentMarker() {
     );
     if (currentMarker) {
         currentMarker.classList.add('current-marker');
+        currentMarker.setAttribute('aria-current', 'true');
     }
 }
 
 // Initialize custom controls overlay
 function initializeCustomControls() {
+    if (areCustomControlsInitialized) {
+        updateProgressAccessibility();
+        syncMuteButtonState();
+        syncFullscreenButtonState();
+        return;
+    }
+
+    const videoWrapper = document.getElementById('videoWrapper');
     const progressContainer = document.getElementById('progressBarContainer');
     const progressHandle = document.getElementById('progressHandle');
     const playPauseOverlayBtn = document.getElementById('playPauseOverlayBtn');
@@ -846,16 +1218,7 @@ function initializeCustomControls() {
     // Mute button
     muteBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const activePlayer = videoPlayers[activePlayerIndex];
-        activePlayer.muted = !activePlayer.muted;
-        muteBtn.querySelector('.btn-icon').textContent = activePlayer.muted
-            ? '🔇'
-            : '🔊';
-
-        // Apply to both players
-        videoPlayers.forEach((player) => {
-            player.muted = activePlayer.muted;
-        });
+        toggleMute();
     });
 
     // Volume slider
@@ -867,6 +1230,7 @@ function initializeCustomControls() {
         });
         muteBtn.querySelector('.btn-icon').textContent =
             volume === 0 ? '🔇' : '🔊';
+        syncMuteButtonState();
     });
     
     // Screenshot button
@@ -878,20 +1242,20 @@ function initializeCustomControls() {
     // Fullscreen button
     fullscreenBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        const videoWrapper = document.querySelector('.video-wrapper');
-        if (!document.fullscreenElement) {
-            videoWrapper.requestFullscreen().catch((err) => {
-                console.error('Error entering fullscreen:', err);
-            });
-        } else {
-            document.exitFullscreen();
-        }
+        toggleFullscreen();
+    });
+
+    videoWrapper.addEventListener('click', (e) => {
+        if (isDraggingProgress || shouldIgnoreWrapperClick(e.target)) return;
+        togglePlayPause();
     });
 
     // Progress bar seeking
     let isDragging = false;
 
     const startDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         isDragging = true;
         isDraggingProgress = true;
         
@@ -932,6 +1296,22 @@ function initializeCustomControls() {
 
     progressHandle.addEventListener('mousedown', startDrag);
     progressContainer.addEventListener('mousedown', startDrag);
+    progressContainer.addEventListener('keydown', (e) => {
+        const key = e.key;
+        if (key === 'ArrowLeft' || key === 'ArrowRight') {
+            e.preventDefault();
+            seekBySeconds(key === 'ArrowRight' ? SEEK_STEP_SECONDS : -SEEK_STEP_SECONDS);
+        } else if (key === 'PageUp' || key === 'PageDown') {
+            e.preventDefault();
+            seekBySeconds(key === 'PageUp' ? LARGE_SEEK_STEP_SECONDS : -LARGE_SEEK_STEP_SECONDS);
+        } else if (key === 'Home') {
+            e.preventDefault();
+            seekToGlobalTime(0);
+        } else if (key === 'End') {
+            e.preventDefault();
+            seekToGlobalTime(totalDuration);
+        }
+    });
     document.addEventListener('mousemove', handleProgressDrag);
     document.addEventListener('mouseup', endDrag);
 
@@ -943,11 +1323,19 @@ function initializeCustomControls() {
     
     // Keyboard shortcuts
     document.addEventListener('keydown', handleKeyboardShortcuts);
+    document.addEventListener('fullscreenchange', syncFullscreenButtonState);
+    areCustomControlsInitialized = true;
+    updateProgressAccessibility();
+    syncMuteButtonState();
+    syncFullscreenButtonState();
 }
 
 // Update custom progress bar based on current playback
 function updateCustomProgressBar() {
-    if (totalDuration === 0) return;
+    if (totalDuration === 0) {
+        updateProgressAccessibility(0);
+        return;
+    }
 
     // Calculate current global time
     const activePlayer = videoPlayers[activePlayerIndex];
@@ -971,9 +1359,11 @@ function updateCustomProgressBar() {
 function updateProgressBarVisual(percent) {
     const progressPlayed = document.getElementById('progressPlayed');
     const progressHandle = document.getElementById('progressHandle');
+    const safePercent = Math.max(0, Math.min(100, percent || 0));
 
-    progressPlayed.style.width = `${percent}%`;
-    progressHandle.style.left = `${percent}%`;
+    progressPlayed.style.width = `${safePercent}%`;
+    progressHandle.style.left = `${safePercent}%`;
+    updateProgressAccessibility((safePercent / 100) * (totalDuration || 0));
 }
 
 // Seek to a specific percentage of the total duration
@@ -984,14 +1374,20 @@ function seekToGlobalPercent(percent) {
 
 // Seek to a specific time in the global timeline
 function seekToGlobalTime(targetTime) {
+    targetTime = clampGlobalTime(targetTime);
+    currentGlobalTime = targetTime;
+
     // Find which video this time corresponds to
     let targetVideoIndex = 0;
     let localTime = targetTime;
 
     for (let i = 0; i < videoFiles.length; i++) {
-        if (videoStartTimes[i] + videoDurations[i] > targetTime) {
+        if (videoStartTimes[i] + videoDurations[i] >= targetTime || i === videoFiles.length - 1) {
             targetVideoIndex = i;
-            localTime = targetTime - videoStartTimes[i];
+            localTime = Math.max(
+                0,
+                Math.min(videoDurations[i] || 0, targetTime - videoStartTimes[i])
+            );
             break;
         }
     }
@@ -1024,21 +1420,87 @@ function seekToGlobalTime(targetTime) {
     }
 }
 
+function getExportModalFocusableElements() {
+    const modal = document.getElementById('exportModal');
+    if (!modal) return [];
+
+    return Array.from(
+        modal.querySelectorAll(
+            'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+        )
+    ).filter((element) => element.offsetParent !== null);
+}
+
+function trapExportModalFocus(e) {
+    const focusableElements = getExportModalFocusableElements();
+    if (focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0];
+    const lastElement = focusableElements[focusableElements.length - 1];
+
+    if (e.shiftKey && document.activeElement === firstElement) {
+        e.preventDefault();
+        lastElement.focus();
+    } else if (!e.shiftKey && document.activeElement === lastElement) {
+        e.preventDefault();
+        firstElement.focus();
+    }
+}
+
 // Handle keyboard shortcuts
 function handleKeyboardShortcuts(e) {
-    // Only handle shortcuts when player screen is visible
-    const playerScreen = document.getElementById('playerScreen');
-    if (!playerScreen || playerScreen.style.display === 'none') {
+    if (!isPlayerScreenVisible()) return;
+
+    if (isExportModalOpen()) {
+        if (e.key === 'Tab') {
+            trapExportModalFocus(e);
+            return;
+        }
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            closeExportModal();
+            return;
+        }
+        if (isTextEntryTarget(e.target) || isNativeInteractiveTarget(e.target)) {
+            return;
+        }
+    }
+
+    if (e.key === 'Escape') {
+        if (document.fullscreenElement) {
+            e.preventDefault();
+            document.exitFullscreen();
+        }
         return;
     }
-    
-    // Ignore shortcuts when typing in input fields
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
-        return;
-    }
-    
-    // 'S' key for screenshot
-    if (e.key === 's' || e.key === 'S') {
+
+    if (isTextEntryTarget(e.target)) return;
+    if (isNativeInteractiveTarget(e.target)) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
+
+    const key = e.key.toLowerCase();
+
+    if (key === ' ' || key === 'k' || e.key === 'Enter') {
+        if (e.repeat) return;
+        e.preventDefault();
+        togglePlayPause();
+    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        const direction = e.key === 'ArrowRight' ? 1 : -1;
+        seekBySeconds(direction * (e.shiftKey ? LARGE_SEEK_STEP_SECONDS : SEEK_STEP_SECONDS));
+    } else if (e.key === 'Home') {
+        e.preventDefault();
+        seekToGlobalTime(0);
+    } else if (e.key === 'End') {
+        e.preventDefault();
+        seekToGlobalTime(totalDuration);
+    } else if (key === 'm') {
+        e.preventDefault();
+        toggleMute();
+    } else if (key === 'f') {
+        e.preventDefault();
+        toggleFullscreen();
+    } else if (key === 's') {
         e.preventDefault();
         takeScreenshot();
     }
@@ -1162,10 +1624,17 @@ function showScreenshotFeedback(success, message) {
 // Export functionality
 function openExportModal() {
     const modal = document.getElementById('exportModal');
+    lastFocusedElementBeforeExport = document.activeElement;
     
     // Update export info
     document.getElementById('exportVideoCount').textContent = videoFiles.length;
-    document.getElementById('exportTotalDuration').textContent = formatTime(totalDuration);
+    document.getElementById('exportTotalDuration').textContent = formatExportTime(totalDuration);
+    document.getElementById('exportRangeStart').value = '00:00.000';
+    document.getElementById('exportRangeEnd').value = formatExportTime(totalDuration);
+
+    const playbackSpeed = Number(document.getElementById('speedInput').value) || 1;
+    document.getElementById('exportSpeed').value = String(Math.max(0.1, Math.min(50, playbackSpeed)));
+    document.getElementById('exportQuality').value = 'max';
     
     // Load saved output folder
     const savedOutputFolder = localStorage.getItem('mp4-combiner-output-folder') || '';
@@ -1184,14 +1653,24 @@ function openExportModal() {
     
     // Clear any previous status
     document.getElementById('exportStatus').innerHTML = '';
+    updateExportEstimate();
     
     // Show modal
     modal.style.display = 'flex';
+    modal.removeAttribute('aria-hidden');
+    requestAnimationFrame(() => {
+        const firstFocusableElement = getExportModalFocusableElements()[0];
+        firstFocusableElement?.focus();
+    });
 }
 
 function closeExportModal() {
     const modal = document.getElementById('exportModal');
     modal.style.display = 'none';
+    modal.setAttribute('aria-hidden', 'true');
+    if (lastFocusedElementBeforeExport instanceof HTMLElement) {
+        lastFocusedElementBeforeExport.focus({ preventScroll: true });
+    }
 }
 
 function openExportFolderBrowser() {
@@ -1218,6 +1697,15 @@ async function performExport() {
         statusDiv.innerHTML = '<div class="error">Please enter an output filename</div>';
         return;
     }
+
+    let exportSettings;
+    try {
+        exportSettings = getExportSettingsFromForm();
+    } catch (error) {
+        statusDiv.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+        updateExportEstimate();
+        return;
+    }
     
     // Construct the full output path
     const separator = outputFolder.includes('\\') ? '\\' : '/';
@@ -1232,13 +1720,23 @@ async function performExport() {
     const exportBtn = document.getElementById('exportConfirmBtn');
     exportBtn.disabled = true;
     
-    statusDiv.innerHTML = `<div class="loading"><div class="spinner"></div>Exporting ${videoFiles.length} video(s)...</div>`;
+    const selectedDuration = exportSettings.end - exportSettings.start;
+    statusDiv.innerHTML =
+        `<div class="loading"><div class="spinner"></div>` +
+        `Exporting ${formatExportTime(selectedDuration)} from ${videoFiles.length} video(s)...</div>`;
     
     try {
-        const response = await fetch('/combine', {
+        const response = await fetch('/export', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ files: filePaths, outputPath })
+            body: JSON.stringify({
+                files: filePaths,
+                outputPath,
+                rangeStart: exportSettings.start,
+                rangeEnd: exportSettings.end,
+                speed: exportSettings.speed,
+                quality: exportSettings.quality,
+            })
         });
         
         const data = await response.json();

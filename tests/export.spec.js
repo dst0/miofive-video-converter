@@ -86,6 +86,80 @@ test.describe('Video Player Export Functionality', () => {
         expect(totalDuration).toMatch(/\d{2}:\d{2}/);
     });
 
+    test('should show precise range, speed, quality, and estimate controls', async ({ page }) => {
+        // Scan for videos
+        await page.fill('#folderPath', TEST_DATA_PATH);
+        await page.click('#scanBtn');
+        await page.waitForSelector('.file-list', { timeout: 10000 });
+
+        // Click Play Videos
+        await page.click('#playVideosBtn');
+        await page.waitForSelector('#playerScreen', { state: 'visible', timeout: 5000 });
+
+        // Click export button
+        await page.click('#exportVideosBtn');
+        await page.waitForSelector('#exportModal', { state: 'visible' });
+
+        await expect(page.locator('#exportRangeStart')).toHaveValue('00:00.000');
+        await expect(page.locator('#exportRangeEnd')).toHaveValue('00:20.000');
+        await expect(page.locator('#exportSpeed')).toHaveValue('1');
+        await expect(page.locator('#exportQuality')).toHaveValue('max');
+        await expect(page.locator('#exportSelectedDuration')).toHaveText('00:20.000');
+        await expect(page.locator('#exportOutputDuration')).toHaveText('00:20.000');
+        await expect(page.locator('#exportProcessingEstimate')).toContainText('~');
+    });
+
+    test('should send millisecond precise export range values', async ({ page }) => {
+        // Scan for videos
+        await page.fill('#folderPath', TEST_DATA_PATH);
+        await page.click('#scanBtn');
+        await page.waitForSelector('.file-list', { timeout: 10000 });
+
+        // Click Play Videos
+        await page.click('#playVideosBtn');
+        await page.waitForSelector('#playerScreen', { state: 'visible', timeout: 5000 });
+
+        // Click export button
+        await page.click('#exportVideosBtn');
+        await page.waitForSelector('#exportModal', { state: 'visible' });
+
+        await page.evaluate((outputDir) => {
+            document.getElementById('exportOutputFolder').value = outputDir;
+        }, TEST_OUTPUT_DIR);
+        await page.fill('#exportOutputFilename', 'millisecond_range.mp4');
+        await page.fill('#exportRangeStart', '00:00.500');
+        await page.fill('#exportRangeEnd', '00:02.250');
+
+        await page.route('**/export', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    success: true,
+                    output: path.join(TEST_OUTPUT_DIR, 'millisecond_range.mp4'),
+                    details: {
+                        rangeStart: 0.5,
+                        rangeEnd: 2.25,
+                        selectedDuration: 1.75,
+                    },
+                }),
+            });
+        });
+
+        const requestPromise = page.waitForRequest((request) =>
+            request.url().endsWith('/export') && request.method() === 'POST'
+        );
+
+        await page.click('#exportConfirmBtn');
+        const request = await requestPromise;
+        const body = request.postDataJSON();
+
+        expect(body.rangeStart).toBe(0.5);
+        expect(body.rangeEnd).toBe(2.25);
+        expect(body.speed).toBe(1);
+        expect(body.quality).toBe('max');
+    });
+
     test('should have output folder and filename inputs', async ({ page }) => {
         // Scan for videos
         await page.fill('#folderPath', TEST_DATA_PATH);
@@ -234,6 +308,33 @@ test.describe('Video Player Export Functionality', () => {
         await page.waitForSelector('#exportStatus .error');
         const errorText = await page.locator('#exportStatus .error').textContent();
         expect(errorText).toContain('filename');
+    });
+
+    test('should validate export range before sending request', async ({ page }) => {
+        // Scan for videos
+        await page.fill('#folderPath', TEST_DATA_PATH);
+        await page.click('#scanBtn');
+        await page.waitForSelector('.file-list', { timeout: 10000 });
+
+        // Click Play Videos
+        await page.click('#playVideosBtn');
+        await page.waitForSelector('#playerScreen', { state: 'visible', timeout: 5000 });
+
+        // Click export button
+        await page.click('#exportVideosBtn');
+        await page.waitForSelector('#exportModal', { state: 'visible' });
+
+        await page.evaluate((outputDir) => {
+            document.getElementById('exportOutputFolder').value = outputDir;
+        }, TEST_OUTPUT_DIR);
+        await page.fill('#exportOutputFilename', 'invalid_range.mp4');
+        await page.fill('#exportRangeStart', '00:10');
+        await page.fill('#exportRangeEnd', '00:05');
+        await page.click('#exportConfirmBtn');
+
+        await page.waitForSelector('#exportStatus .error');
+        const errorText = await page.locator('#exportStatus .error').textContent();
+        expect(errorText).toContain('End time must be after start time');
     });
 
     test('should successfully export videos', async ({ page }) => {

@@ -8,11 +8,15 @@ const {promisify} = require('util');
 
 const execPromise = promisify(exec);
 const app = express();
-const PORT = 3000;
+const DEFAULT_PORT = Number(process.env.PORT) || 3000;
 
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const RESOURCE_DIR = process.env.MIOFIVE_RESOURCE_DIR || path.join(__dirname, 'src-tauri', 'resources');
+const PUBLIC_DIR = fsSync.existsSync(path.join(RESOURCE_DIR, 'public'))
+    ? path.join(RESOURCE_DIR, 'public')
+    : path.join(__dirname, 'public');
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
 const TEST_DATA_DIR = path.join(__dirname, 'test-data');
+const BUNDLED_BIN_DIR = path.join(RESOURCE_DIR, 'bin');
 
 // MP4 duration extraction configuration
 const MP4_HEADER_BUFFER_SIZE = 1024 * 1024; // 1MB should be enough for headers
@@ -46,6 +50,65 @@ function runStream(command, { cwd, env } = {}) {
     });
 }
 
+function runProcess(command, args, { cwd, env } = {}) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(command, args, { stdio: 'inherit', cwd, env });
+        child.on('error', reject);
+        child.on('close', (code) => (
+            code === 0 ? resolve() : reject(new Error(`${command} failed with exit code ${code}`))
+        ));
+    });
+}
+
+function runCapture(command, args, { cwd, env } = {}) {
+    return new Promise((resolve, reject) => {
+        const child = spawn(command, args, { cwd, env });
+        let stdout = '';
+        let stderr = '';
+
+        child.stdout.on('data', (data) => {
+            stdout += data.toString();
+        });
+        child.stderr.on('data', (data) => {
+            stderr += data.toString();
+        });
+        child.on('error', reject);
+        child.on('close', (code) => {
+            if (code === 0) {
+                resolve({ stdout, stderr });
+                return;
+            }
+            reject(new Error(stderr || `${command} failed with exit code ${code}`));
+        });
+    });
+}
+
+function executableName(name) {
+    return process.platform === 'win32' ? `${name}.exe` : name;
+}
+
+function executableExists(filePath) {
+    try {
+        fsSync.accessSync(filePath, fsSync.constants.X_OK);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+function resolveExecutable(name) {
+    const envPath = process.env[`MIOFIVE_${name.toUpperCase()}_PATH`];
+    const candidates = [
+        envPath,
+        path.join(BUNDLED_BIN_DIR, executableName(name)),
+        process.platform === 'darwin' ? `/opt/homebrew/bin/${name}` : undefined,
+        process.platform === 'darwin' ? `/usr/local/bin/${name}` : undefined,
+        name,
+    ].filter(Boolean);
+
+    return candidates.find((candidate) => candidate === name || executableExists(candidate)) || name;
+}
+
 app.use(express.json());
 
 // Serve static assets (index.html, etc.)
@@ -54,10 +117,21 @@ app.use(express.static(PUBLIC_DIR));
 // Check if FFmpeg is available
 async function checkFFmpeg() {
     try {
-        await execPromise('ffmpeg -version');
-        return true;
-    } catch {
-        return false;
+        const ffmpegPath = resolveExecutable('ffmpeg');
+        const ffprobePath = resolveExecutable('ffprobe');
+        await runCapture(ffmpegPath, ['-version']);
+        await runCapture(ffprobePath, ['-version']);
+        return {
+            available: true,
+            ffmpegPath,
+            ffprobePath,
+            bundled: ffmpegPath !== 'ffmpeg' && ffmpegPath.startsWith(BUNDLED_BIN_DIR),
+        };
+    } catch (err) {
+        return {
+            available: false,
+            message: err.message,
+        };
     }
 }
 
@@ -234,6 +308,349 @@ async function scanDirectory(dirPath, startTime, endTime) {
     return results.sort((a, b) => a.timestamp - b.timestamp);
 }
 
+const EXPORT_QUALITY_PROFILES = {
+    max: { crf: '16', preset: 'slow', audioBitrate: '192k' },
+    high: { crf: '20', preset: 'medium', audioBitrate: '160k' },
+    standard: { crf: '23', preset: 'medium', audioBitrate: '128k' },
+    compact: { crf: '28', preset: 'fast', audioBitrate: '96k' },
+};
+
+function isPathInside(parentPath, childPath) {
+    const relativePath = path.relative(parentPath, childPath);
+    return relativePath === '' || (
+        relativePath &&
+        !relativePath.startsWith('..') &&
+        !path.isAbsolute(relativePath)
+    );
+}
+
+function toFiniteNumber(value, label) {
+    const number = Number(value);
+    if (!Number.isFinite(number)) {
+        throw new Error(`${label} must be a valid number`);
+    }
+    return number;
+}
+
+function formatFilterNumber(value) {
+    return Number(value)
+        .toFixed(6)
+        .replace(/0+$/, '')
+        .replace(/\.$/, '');
+}
+
+function roundSecondsToMilliseconds(value) {
+    return Math.round(Number(value) * 1000) / 1000;
+}
+
+function buildAtempoFilter(speed) {
+    const filters = [];
+    let remaining = speed;
+
+    while (remaining < 0.5) {
+        filters.push('atempo=0.5');
+        remaining /= 0.5;
+    }
+
+    while (remaining > 2) {
+        filters.push('atempo=2');
+        remaining /= 2;
+    }
+
+    filters.push(`atempo=${formatFilterNumber(remaining)}`);
+    return filters.join(',');
+}
+
+async function getVideoDuration(filePath) {
+    try {
+        const fastDuration = await getVideoDurationFast(filePath);
+        if (Number.isFinite(fastDuration) && fastDuration > 0) {
+            return fastDuration;
+        }
+    } catch {
+        // Fall through to ffprobe for files whose MP4 metadata is not in the header.
+    }
+
+    const { stdout } = await runCapture(resolveExecutable('ffprobe'), [
+        '-v', 'error',
+        '-show_entries', 'format=duration',
+        '-of', 'default=nokey=1:noprint_wrappers=1',
+        filePath,
+    ]);
+    const probedDuration = Number.parseFloat(stdout.trim());
+    if (!Number.isFinite(probedDuration) || probedDuration <= 0) {
+        throw new Error(`Unable to read duration for ${path.basename(filePath)}`);
+    }
+    return probedDuration;
+}
+
+async function hasAudioStream(filePath) {
+    try {
+        const { stdout } = await runCapture(resolveExecutable('ffprobe'), [
+            '-v', 'error',
+            '-select_streams', 'a:0',
+            '-show_entries', 'stream=index',
+            '-of', 'csv=p=0',
+            filePath,
+        ]);
+        return stdout.trim().length > 0;
+    } catch {
+        return false;
+    }
+}
+
+async function validateInputFiles(files) {
+    const normalizedTestData = path.resolve(TEST_DATA_DIR);
+    const normalizedFiles = [];
+
+    for (const file of files) {
+        if (typeof file !== 'string' || !file.trim()) {
+            throw new Error('Invalid input file path');
+        }
+
+        const normalizedPath = path.resolve(file);
+        if (!normalizedPath.toUpperCase().endsWith('.MP4')) {
+            throw new Error('Only MP4 files are allowed');
+        }
+
+        if (DEMO_MODE && !isPathInside(normalizedTestData, normalizedPath)) {
+            throw new Error('Access denied in demo mode. Only test-data videos are accessible.');
+        }
+
+        await fs.access(normalizedPath);
+        const stat = await fs.stat(normalizedPath);
+        if (!stat.isFile()) {
+            throw new Error(`Path is not a file: ${normalizedPath}`);
+        }
+
+        normalizedFiles.push(normalizedPath);
+    }
+
+    return normalizedFiles;
+}
+
+async function getAvailableOutputPath(outputPath) {
+    const normalizedOutputPath = path.resolve(outputPath);
+    const parsedPath = path.parse(normalizedOutputPath);
+
+    if (!parsedPath.dir) {
+        throw new Error('Output folder is required');
+    }
+
+    await fs.access(parsedPath.dir);
+    const outputDirStat = await fs.stat(parsedPath.dir);
+    if (!outputDirStat.isDirectory()) {
+        throw new Error('Output folder is not a directory');
+    }
+
+    let finalOutputPath = normalizedOutputPath;
+    let counter = 1;
+    const MAX_COUNTER = 9999;
+
+    while (counter <= MAX_COUNTER) {
+        try {
+            await fs.access(finalOutputPath);
+            finalOutputPath = path.join(parsedPath.dir, `${parsedPath.name}_${counter}${parsedPath.ext}`);
+            counter++;
+        } catch {
+            return finalOutputPath;
+        }
+    }
+
+    throw new Error('Too many files with the same name. Please choose a different filename.');
+}
+
+async function buildExportSegments(files, rangeStart, rangeEnd) {
+    const durations = await Promise.all(files.map((filePath) => getVideoDuration(filePath)));
+    const totalDuration = durations.reduce((sum, duration) => sum + duration, 0);
+    const startSeconds = roundSecondsToMilliseconds(Math.max(0, rangeStart ?? 0));
+    const endSeconds = roundSecondsToMilliseconds(Math.min(rangeEnd ?? totalDuration, totalDuration));
+
+    if (startSeconds >= endSeconds) {
+        throw new Error('Export end time must be after start time');
+    }
+
+    const segments = [];
+    let globalOffset = 0;
+
+    files.forEach((file, index) => {
+        const duration = durations[index];
+        const fileStart = globalOffset;
+        const fileEnd = globalOffset + duration;
+        const overlapStart = Math.max(startSeconds, fileStart);
+        const overlapEnd = Math.min(endSeconds, fileEnd);
+
+        const segmentDuration = roundSecondsToMilliseconds(overlapEnd - overlapStart);
+
+        if (segmentDuration > 0) {
+            segments.push({
+                file,
+                start: roundSecondsToMilliseconds(overlapStart - fileStart),
+                duration: segmentDuration,
+            });
+        }
+
+        globalOffset = fileEnd;
+    });
+
+    if (segments.length === 0) {
+        throw new Error('Selected range does not include any video frames');
+    }
+
+    return { segments, totalDuration, startSeconds, endSeconds };
+}
+
+function normalizeExportOptions({ rangeStart, rangeEnd, speed, quality }) {
+    const normalizedSpeed = speed === undefined ? 1 : toFiniteNumber(speed, 'Export speed');
+    if (normalizedSpeed < 0.1 || normalizedSpeed > 50) {
+        throw new Error('Export speed must be between 0.1x and 50x');
+    }
+
+    const normalizedStart = rangeStart === undefined || rangeStart === null || rangeStart === ''
+        ? 0
+        : roundSecondsToMilliseconds(toFiniteNumber(rangeStart, 'Export start time'));
+    const normalizedEnd = rangeEnd === undefined || rangeEnd === null || rangeEnd === ''
+        ? undefined
+        : roundSecondsToMilliseconds(toFiniteNumber(rangeEnd, 'Export end time'));
+
+    if (normalizedStart < 0) {
+        throw new Error('Export start time cannot be negative');
+    }
+    if (normalizedEnd !== undefined && normalizedEnd <= normalizedStart) {
+        throw new Error('Export end time must be after start time');
+    }
+
+    const normalizedQuality = EXPORT_QUALITY_PROFILES[quality] ? quality : 'max';
+
+    return {
+        rangeStart: normalizedStart,
+        rangeEnd: normalizedEnd,
+        speed: normalizedSpeed,
+        quality: normalizedQuality,
+        profile: EXPORT_QUALITY_PROFILES[normalizedQuality],
+    };
+}
+
+function isClientInputError(error) {
+    const message = error?.message || '';
+    return [
+        'Invalid input',
+        'Only MP4',
+        'Access denied',
+        'Path is not a file',
+        'Output folder',
+        'Too many files',
+        'Export ',
+        'Selected range',
+        'Unable to read duration',
+    ].some((pattern) => message.includes(pattern));
+}
+
+async function exportVideoRange({ files, finalOutputPath, rangeStart, rangeEnd, speed, quality }) {
+    const options = normalizeExportOptions({ rangeStart, rangeEnd, speed, quality });
+    const { segments, totalDuration, startSeconds, endSeconds } = await buildExportSegments(
+        files,
+        options.rangeStart,
+        options.rangeEnd
+    );
+
+    const audioFlags = await Promise.all(segments.map((segment) => hasAudioStream(segment.file)));
+    const includeAudio = audioFlags.some(Boolean);
+    const args = ['-hide_banner', '-loglevel', 'info', '-stats', '-y'];
+    let nextInputIndex = 0;
+
+    segments.forEach((segment, index) => {
+        segment.inputIndex = nextInputIndex;
+        segment.hasAudio = audioFlags[index];
+        args.push('-i', segment.file);
+        nextInputIndex++;
+
+        if (includeAudio && !segment.hasAudio) {
+            segment.silentInputIndex = nextInputIndex;
+            args.push(
+                '-f', 'lavfi',
+                '-t', formatFilterNumber(segment.duration),
+                '-i', 'anullsrc=channel_layout=stereo:sample_rate=48000'
+            );
+            nextInputIndex++;
+        }
+    });
+
+    const filterParts = [];
+    const atempoFilter = buildAtempoFilter(options.speed);
+    const speedExpr = formatFilterNumber(options.speed);
+
+    segments.forEach((segment, index) => {
+        const startExpr = formatFilterNumber(segment.start);
+        const durationExpr = formatFilterNumber(segment.duration);
+
+        filterParts.push(
+            `[${segment.inputIndex}:v:0]trim=start=${startExpr}:duration=${durationExpr},` +
+            `setpts=(PTS-STARTPTS)/${speedExpr}[v${index}]`
+        );
+
+        if (includeAudio) {
+            const audioSource = segment.hasAudio
+                ? `[${segment.inputIndex}:a:0]atrim=start=${startExpr}:duration=${durationExpr}`
+                : `[${segment.silentInputIndex}:a:0]atrim=duration=${durationExpr}`;
+            filterParts.push(`${audioSource},asetpts=PTS-STARTPTS,${atempoFilter}[a${index}]`);
+        }
+    });
+
+    if (segments.length > 1) {
+        if (includeAudio) {
+            const concatInputs = segments.map((_, index) => `[v${index}][a${index}]`).join('');
+            filterParts.push(`${concatInputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`);
+        } else {
+            const concatInputs = segments.map((_, index) => `[v${index}]`).join('');
+            filterParts.push(`${concatInputs}concat=n=${segments.length}:v=1:a=0[outv]`);
+        }
+    }
+
+    args.push('-filter_complex', filterParts.join(';'));
+
+    if (segments.length > 1) {
+        args.push('-map', '[outv]');
+        if (includeAudio) {
+            args.push('-map', '[outa]');
+        }
+    } else {
+        args.push('-map', '[v0]');
+        if (includeAudio) {
+            args.push('-map', '[a0]');
+        }
+    }
+
+    args.push(
+        '-c:v', 'libx264',
+        '-preset', options.profile.preset,
+        '-crf', options.profile.crf,
+        '-pix_fmt', 'yuv420p'
+    );
+
+    if (includeAudio) {
+        args.push('-c:a', 'aac', '-b:a', options.profile.audioBitrate);
+    }
+
+    args.push('-movflags', '+faststart', finalOutputPath);
+
+    console.log(
+        `Exporting ${formatFilterNumber(endSeconds - startSeconds)}s range ` +
+        `at ${formatFilterNumber(options.speed)}x using ${options.quality} quality...`
+    );
+    await runProcess(resolveExecutable('ffmpeg'), args);
+
+    return {
+        rangeStart: startSeconds,
+        rangeEnd: endSeconds,
+        selectedDuration: endSeconds - startSeconds,
+        outputDuration: (endSeconds - startSeconds) / options.speed,
+        speed: options.speed,
+        quality: options.quality,
+        sourceDuration: totalDuration,
+    };
+}
+
 // Root: serve the HTML file explicitly (nice fallback)
 app.get('/', (req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
@@ -241,18 +658,11 @@ app.get('/', (req, res) => {
 
 // Check FFmpeg availability
 app.get('/check-ffmpeg', async (req, res) => {
-    const available = await checkFFmpeg();
-    res.json({available});
+    res.json(await checkFFmpeg());
 });
 
 // Check if demo mode is enabled
 app.get('/demo-mode', (req, res) => {
-    // Rate limiting check (for consistency, though this endpoint is very lightweight)
-    const clientId = req.ip || req.connection.remoteAddress;
-    if (!checkRateLimit(clientId)) {
-        return res.status(429).json({error: 'Too many requests. Please try again later.'});
-    }
-    
     res.json({
         enabled: DEMO_MODE,
         demoPath: DEMO_MODE ? TEST_DATA_DIR : null
@@ -506,80 +916,46 @@ app.post('/scan', async (req, res) => {
 });
 
 
-// Combine endpoint
-app.post('/combine', async (req, res) => {
-    const {files, outputPath} = req.body;
+async function handleExportRequest(req, res) {
+    const {files, outputPath, rangeStart, rangeEnd, speed, quality} = req.body;
     if (!files || files.length === 0) {
-        return res.status(400).json({error: 'No files to combine'});
+        return res.status(400).json({error: 'No files to export'});
     }
     if (!outputPath) {
         return res.status(400).json({error: 'Output path is required'});
     }
 
-    const hasFFmpeg = await checkFFmpeg();
-    if (!hasFFmpeg) {
-        return res.status(400).json({error: 'FFmpeg is not installed. Run: npm run install-ffmpeg'});
+    const ffmpegStatus = await checkFFmpeg();
+    if (!ffmpegStatus.available) {
+        return res.status(400).json({error: 'FFmpeg is not available in the app bundle or system PATH'});
     }
 
     try {
-        // Check if file exists and add counter if needed
-        let finalOutputPath = outputPath;
-        const parsedPath = path.parse(outputPath);
-        let counter = 1;
-        const MAX_COUNTER = 9999; // Prevent infinite loops
-        
-        // Check if the file already exists
-        try {
-            await fs.access(finalOutputPath);
-            // File exists, add counter
-            while (counter <= MAX_COUNTER) {
-                finalOutputPath = path.join(parsedPath.dir, `${parsedPath.name}_${counter}${parsedPath.ext}`);
-                try {
-                    await fs.access(finalOutputPath);
-                    counter++;
-                } catch {
-                    // File doesn't exist, we can use this name
-                    break;
-                }
-            }
-            
-            if (counter > MAX_COUNTER) {
-                throw new Error('Too many files with the same name. Please choose a different filename.');
-            }
-        } catch (err) {
-            if (err.message && err.message.includes('Too many files')) {
-                throw err;
-            }
-            // File doesn't exist, use original path
-        }
+        const normalizedFiles = await validateInputFiles(files);
+        const finalOutputPath = await getAvailableOutputPath(outputPath);
+        const details = await exportVideoRange({
+            files: normalizedFiles,
+            finalOutputPath,
+            rangeStart,
+            rangeEnd,
+            speed,
+            quality,
+        });
 
-        const listPath = path.join(__dirname, 'filelist.txt');
-        console.log('Creating file with input file list: ' + listPath);
-        const fileListContent = files.map(f => `file '${String(f).replace(/'/g, "'\\''")}'`).join('\n');
-        await fs.writeFile(listPath, fileListContent);
-        console.log('File with input file list is successfully created\n');
-
-        console.log('Combining videos using ffmpeg tool...');
-        const command = [
-            'ffmpeg',
-            '-hide_banner', '-loglevel', 'info', '-stats', '-y',
-            '-f', 'concat', '-safe', '0',
-            '-i', `"${listPath}"`,
-            '-c', 'copy',
-            '-bsf:a', 'aac_adtstoasc',
-            '-movflags', '+faststart',
-            `"${finalOutputPath}"`
-        ].join(' ');
-        await runStream(command);
-        await fs.unlink(listPath);
-
-        console.log('Videos combined successfully to:', finalOutputPath);
-        res.json({success: true, message: 'Videos combined successfully', output: finalOutputPath});
+        console.log('Videos exported successfully to:', finalOutputPath);
+        res.json({
+            success: true,
+            message: 'Video exported successfully',
+            output: finalOutputPath,
+            details,
+        });
     } catch (err) {
-        console.error('Failed to combine videos:', err.message);
-        res.status(500).json({error: `Failed to combine videos: ${err.message}`});
+        console.error('Failed to export videos:', err.message);
+        res.status(isClientInputError(err) ? 400 : 500).json({error: `Failed to export videos: ${err.message}`});
     }
-});
+}
+
+app.post('/export', handleExportRequest);
 
 // Serve video files with range support for streaming
 app.get('/video', async (req, res) => {
@@ -669,23 +1045,50 @@ app.get('/video', async (req, res) => {
 });
 
 // Start server
-async function startServer() {
+async function startServer({ port = DEFAULT_PORT, host, silent = false } = {}) {
     const hasFFmpeg = await checkFFmpeg();
-    app.listen(PORT, () => {
-        console.log(`\n✅ Server running at http://localhost:${PORT}\n`);
-        if (DEMO_MODE) {
-            console.log('🎭 Demo Mode is ENABLED');
-            console.log(`   Only test-data directory is accessible: ${TEST_DATA_DIR}\n`);
-        }
-        if (hasFFmpeg) {
-            console.log('✅ FFmpeg is installed and ready');
-        } else {
-            console.log('⚠️  FFmpeg is NOT installed');
-            console.log('   Video combining will not work');
-            console.log('   Run: npm run install-ffmpeg');
-        }
-        console.log('\nPress Ctrl+C to stop the server\n');
+    const listenArgs = host ? [port, host] : [port];
+
+    return new Promise((resolve, reject) => {
+        const server = app.listen(...listenArgs, () => {
+            const address = server.address();
+            const resolvedPort = typeof address === 'object' && address ? address.port : port;
+            const resolvedHost = host || 'localhost';
+
+            if (!silent) {
+                console.log(`\n✅ Server running at http://${resolvedHost}:${resolvedPort}\n`);
+                if (DEMO_MODE) {
+                    console.log('🎭 Demo Mode is ENABLED');
+                    console.log(`   Only test-data directory is accessible: ${TEST_DATA_DIR}\n`);
+                }
+                if (hasFFmpeg.available) {
+                    console.log(`✅ FFmpeg is ready: ${hasFFmpeg.ffmpegPath}`);
+                } else {
+                    console.log('⚠️  FFmpeg is NOT available');
+                    console.log('   Video export will not work');
+                    if (hasFFmpeg.message) {
+                        console.log(`   ${hasFFmpeg.message}`);
+                    }
+                }
+                console.log('\nPress Ctrl+C to stop the server\n');
+            }
+
+            resolve({ server, port: resolvedPort, host: resolvedHost, hasFFmpeg });
+        });
+
+        server.on('error', reject);
     });
 }
 
-startServer();
+if (require.main === module) {
+    startServer().catch((err) => {
+        console.error(err);
+        process.exit(1);
+    });
+}
+
+module.exports = {
+    app,
+    startServer,
+    checkFFmpeg,
+};

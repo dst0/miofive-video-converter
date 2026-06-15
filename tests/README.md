@@ -87,7 +87,7 @@ The test suite covers:
    - `/check-ffmpeg` - FFmpeg availability
    - `/list-directories` - Directory listing
    - `/scan` - Video scanning
-   - `/combine` - Video combining
+   - `/export` - Video export
 
 ## CI/CD Integration
 

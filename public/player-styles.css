@@ -1,6 +1,12 @@
 /* Video Player Specific Styles */
 
 .player-container {
+    --player-accent: #667eea;
+    --player-accent-hover: #5568d3;
+    --player-panel-bg: #f8f9ff;
+    --player-panel-border: #e0e6ff;
+    --player-control-size: 44px;
+    --player-control-radius: 8px;
     max-width: 1200px;
     margin: 0 auto;
     background: white;
@@ -16,9 +22,15 @@
     margin-bottom: 30px;
 }
 
+.player-header h1 {
+    margin: 0;
+    line-height: 1.08;
+}
+
 .player-header-buttons {
     display: flex;
     gap: 10px;
+    align-items: center;
 }
 
 .export-btn {
@@ -31,6 +43,17 @@
     font-weight: 600;
     cursor: pointer;
     transition: background 0.3s;
+}
+
+.export-btn,
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: var(--player-control-size);
+    min-width: 150px;
+    line-height: 1.1;
+    white-space: nowrap;
 }
 
 .export-btn:hover {
@@ -62,8 +85,21 @@
     overflow: hidden;
     /* Maintain aspect ratio for video container */
     aspect-ratio: 16 / 9;
-    min-height: 300px;
+    min-height: clamp(180px, 42vw, 300px);
     max-height: 70vh;
+}
+
+.video-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    min-height: inherit;
+    background: #000;
+}
+
+.video-wrapper:focus-visible {
+    outline: 3px solid #111827;
+    outline-offset: 4px;
 }
 
 /* Dual video player setup */
@@ -110,7 +146,8 @@
     transition: opacity 0.3s;
 }
 
-.video-wrapper:hover .custom-controls-overlay {
+.video-wrapper:hover .custom-controls-overlay,
+.video-wrapper:focus-within .custom-controls-overlay {
     opacity: 1;
 }
 
@@ -127,6 +164,12 @@
     border-radius: 4px;
     cursor: pointer;
     margin-bottom: 8px;
+}
+
+.progress-bar-container:focus-visible {
+    outline: 3px solid #ffffff;
+    outline-offset: 5px;
+    box-shadow: 0 0 0 8px rgba(17, 24, 39, 0.65);
 }
 
 .progress-bar-buffered {
@@ -172,56 +215,73 @@
 }
 
 .time-display {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
     color: white;
     font-size: 12px;
     font-weight: 600;
 }
 
 .time-separator {
-    margin: 0 5px;
+    justify-self: center;
 }
 
 /* Control buttons row */
 .control-buttons-row {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 12px;
+    min-width: 0;
 }
 
 .overlay-btn {
     background: rgba(255, 255, 255, 0.2);
     border: none;
-    border-radius: 6px;
-    padding: 8px 12px;
+    border-radius: var(--player-control-radius);
     color: white;
     cursor: pointer;
     transition: background 0.3s;
     font-size: 18px;
+    width: var(--player-control-size);
+    height: var(--player-control-size);
+    min-width: var(--player-control-size);
+    min-height: var(--player-control-size);
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 
 .overlay-btn:hover {
     background: rgba(255, 255, 255, 0.3);
 }
 
+.overlay-btn:focus-visible {
+    outline-color: #ffffff;
+    box-shadow: 0 0 0 5px rgba(17, 24, 39, 0.75);
+}
+
 .overlay-btn .btn-icon {
     display: block;
+    line-height: 1;
 }
 
 .play-pause-btn {
-    font-size: 24px;
+    font-size: 22px;
 }
 
 /* Volume control */
 .volume-control {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
+    min-width: 190px;
 }
 
 .volume-slider {
-    width: 80px;
+    width: 120px;
     height: 4px;
     background: rgba(255, 255, 255, 0.3);
     border-radius: 2px;
@@ -250,9 +310,15 @@
 /* Speed display */
 .speed-display {
     color: white;
-    font-size: 14px;
+    font-size: 16px;
     font-weight: 600;
     margin-left: auto;
+    min-height: var(--player-control-size);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    text-align: center;
 }
 
 /* Video info overlay */
@@ -261,6 +327,8 @@
     position: absolute;
     top: 10px;
     left: 10px;
+    width: fit-content;
+    max-width: calc(100% - 20px);
     background: rgba(0, 0, 0, 0.7);
     color: white;
     padding: 8px 15px;
@@ -275,6 +343,7 @@
 
 #currentVideoName {
     font-weight: 600;
+    overflow-wrap: anywhere;
 }
 
 #videoProgress {
@@ -285,9 +354,9 @@
 .timeline-section {
     margin-bottom: 25px;
     padding: 20px;
-    background: #f8f9ff;
+    background: var(--player-panel-bg);
     border-radius: 8px;
-    border: 1px solid #e0e6ff;
+    border: 1px solid var(--player-panel-border);
 }
 
 .playback-position {
@@ -315,36 +384,43 @@
 }
 
 .controls-section {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
     align-items: center;
     gap: 20px;
     padding: 20px;
-    background: #f8f9ff;
+    background: var(--player-panel-bg);
     border-radius: 8px;
-    border: 1px solid #e0e6ff;
-    flex-wrap: wrap;
+    border: 1px solid var(--player-panel-border);
 }
 
 .playback-controls {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(96px, 1fr));
     gap: 10px;
 }
 
 .control-btn {
-    background: #667eea;
+    background: var(--player-accent);
     color: white;
     border: none;
-    border-radius: 6px;
-    padding: 12px 20px;
+    border-radius: var(--player-control-radius);
+    padding: 0 14px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
     transition: background 0.3s;
+    min-width: 96px;
+    min-height: var(--player-control-size);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1.1;
+    white-space: nowrap;
 }
 
 .control-btn:hover {
-    background: #5568d3;
+    background: var(--player-accent-hover);
 }
 
 .control-btn:disabled {
@@ -352,11 +428,17 @@
     cursor: not-allowed;
 }
 
+.control-btn[aria-pressed="true"],
+.overlay-btn[aria-pressed="true"] {
+    background: #374151;
+}
+
 .speed-control {
-    display: flex;
+    display: grid;
+    grid-template-columns: max-content 72px minmax(220px, 1fr);
     align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
+    gap: 10px 12px;
+    min-width: 0;
 }
 
 .speed-control label {
@@ -372,10 +454,11 @@
     border-radius: 6px;
     font-size: 14px;
     background: white;
+    min-height: 40px;
 }
 
 .speed-slider {
-    width: 150px;
+    width: 100%;
     height: 6px;
     background: #ddd;
     border-radius: 3px;
@@ -402,19 +485,26 @@
 }
 
 .speed-presets {
-    display: flex;
-    gap: 5px;
-    flex-wrap: wrap;
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(9, minmax(0, 1fr));
+    gap: 6px;
+    min-width: 0;
 }
 
 .preset-speed-btn {
-    padding: 6px 12px;
+    min-height: 36px;
+    padding: 0 8px;
     background: #f0f0f0;
     border: 1px solid #ddd;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 12px;
     cursor: pointer;
     transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
 }
 
 .preset-speed-btn:hover {
@@ -425,6 +515,12 @@
 
 .preset-speed-btn:active {
     transform: scale(0.95);
+}
+
+.preset-speed-btn[aria-pressed="true"] {
+    background: #374151;
+    border-color: #374151;
+    color: #fff;
 }
 
 /* Timeline specific styles for player */
@@ -441,6 +537,7 @@
 
 /* File marker tooltips */
 .file-marker-tooltip {
+    display: none;
     position: absolute;
     bottom: 120%;
     left: 50%;
@@ -468,8 +565,18 @@
     border-top-color: rgba(0, 0, 0, 0.9);
 }
 
-.file-marker:hover .file-marker-tooltip {
+.file-marker:hover .file-marker-tooltip,
+.file-marker:focus-visible .file-marker-tooltip {
+    display: block;
     opacity: 1;
+}
+
+@media (max-width: 640px) {
+    .file-marker-tooltip {
+        max-width: min(260px, calc(100vw - 48px));
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
 }
 
 .tooltip-filename {
@@ -493,32 +600,93 @@
 
 /* Responsive Design for Player */
 @media (max-width: 768px) {
+    .player-container {
+        padding: 20px;
+    }
+
     .player-header {
         flex-direction: column;
-        gap: 15px;
+        gap: 12px;
         align-items: flex-start;
+        margin-bottom: 20px;
+    }
+
+    .player-header h1 {
+        font-size: 32px;
+    }
+
+    .player-header-buttons {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+    }
+
+    .export-btn,
+    .back-btn {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        padding: 0 12px;
     }
 
     .controls-section {
-        flex-direction: column;
+        grid-template-columns: 1fr;
         align-items: stretch;
+        gap: 16px;
+        padding: 16px;
     }
 
     .playback-controls {
-        justify-content: center;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+    }
+
+    .control-btn {
+        width: 100%;
+        min-width: 0;
+        min-height: 44px;
+        padding: 0 8px;
+        font-size: 13px;
     }
 
     .speed-control {
-        justify-content: center;
-        flex-direction: column;
+        width: 100%;
+        grid-template-columns: 72px minmax(0, 1fr);
+        align-items: center;
+        gap: 10px;
     }
 
+    .speed-control label,
+    .speed-presets {
+        grid-column: 1 / -1;
+    }
+
+    .speed-control label {
+        width: 100%;
+    }
+
+    .speed-input,
     .speed-slider {
         width: 100%;
     }
 
+    .speed-presets {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        width: 100%;
+    }
+
+    .preset-speed-btn {
+        width: 100%;
+        min-height: 40px;
+        padding: 0 6px;
+    }
+
     .video-info {
-        top: 50px;
+        top: 10px;
         font-size: 11px;
         padding: 6px 10px;
     }
@@ -536,7 +704,216 @@
     }
 }
 
+@media (max-width: 640px) {
+    body {
+        padding: 10px;
+    }
+
+    .player-container {
+        width: 100%;
+        padding: 14px;
+        border-radius: 10px;
+    }
+
+    .player-header {
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .player-header-buttons {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 10px;
+    }
+
+    .export-btn,
+    .back-btn {
+        width: 100%;
+        min-height: 44px;
+        padding: 0 10px;
+        text-align: center;
+        line-height: 1.2;
+    }
+
+    .video-wrapper {
+        display: flex;
+        flex-direction: column;
+        aspect-ratio: auto;
+        min-height: 0;
+        max-height: none;
+        margin-bottom: 16px;
+    }
+
+    .video-stage {
+        flex: 0 0 auto;
+        height: auto;
+        min-height: 0;
+        aspect-ratio: 16 / 9;
+    }
+
+    .video-info {
+        top: 8px;
+        left: 8px;
+        max-width: calc(100% - 16px);
+    }
+
+    .custom-controls-overlay {
+        position: static;
+        padding: 12px;
+        background: #0b0f19;
+        border-top: 1px solid rgba(255, 255, 255, 0.14);
+    }
+
+    .playback-progress-bar {
+        margin-bottom: 10px;
+    }
+
+    .progress-bar-container {
+        height: 10px;
+        margin-bottom: 8px;
+    }
+
+    .control-buttons-row {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        align-items: center;
+        width: 100%;
+        gap: 8px;
+    }
+
+    .overlay-btn,
+    .speed-display {
+        width: 100%;
+        min-width: 0;
+        height: 44px;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+        line-height: 1;
+        border-radius: 8px;
+    }
+
+    .play-pause-btn {
+        font-size: 20px;
+    }
+
+    .volume-control {
+        display: contents;
+    }
+
+    .volume-slider {
+        display: none;
+    }
+
+    .speed-display {
+        margin-left: 0;
+        background: rgba(255, 255, 255, 0.12);
+        font-size: 14px;
+    }
+
+    .timeline-section,
+    .controls-section {
+        padding: 14px;
+        margin-bottom: 16px;
+    }
+
+    .timeline-legend {
+        gap: 8px 12px;
+        padding: 8px;
+    }
+
+    .timeline-labels {
+        margin-bottom: 14px;
+        line-height: 1.45;
+    }
+
+    .controls-section {
+        gap: 14px;
+    }
+
+    .playback-controls {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        width: 100%;
+        gap: 8px;
+    }
+
+    .control-btn {
+        width: 100%;
+        min-height: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 8px;
+        font-size: 13px;
+        line-height: 1.2;
+        white-space: nowrap;
+    }
+
+    .speed-control {
+        width: 100%;
+        display: grid;
+        grid-template-columns: 72px minmax(0, 1fr);
+        gap: 8px 10px;
+        align-items: center;
+    }
+
+    .speed-control label,
+    .speed-presets {
+        grid-column: 1 / -1;
+    }
+
+    .speed-input {
+        width: 72px;
+        min-height: 40px;
+    }
+
+    .speed-slider {
+        width: 100%;
+    }
+
+    .speed-presets {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        width: 100%;
+        gap: 6px;
+    }
+
+    .preset-speed-btn {
+        width: 100%;
+        min-height: 40px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 4px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .custom-controls-overlay,
+    .progress-bar-played,
+    .progress-bar-handle,
+    .overlay-btn,
+    .control-btn,
+    .preset-speed-btn,
+    .file-marker-tooltip {
+        transition: none;
+    }
+}
+
 /* Export modal specific styles */
+#exportModal .modal-content {
+    max-width: 680px;
+    max-height: 90vh;
+}
+
+#exportModal .modal-body {
+    min-height: 0;
+}
+
 .export-info {
     background: #f8f9fa;
     padding: 15px;
@@ -558,4 +935,52 @@
     color: #667eea;
     min-width: 120px;
     display: inline-block;
+}
+
+.export-options-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.export-options-grid .input-group {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    margin-bottom: 0;
+}
+
+.export-options-grid .input-group label {
+    min-width: 0;
+}
+
+.export-options-grid input,
+.export-options-grid select {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.range-input-row {
+    display: grid;
+    grid-template-columns: minmax(8ch, 1fr) auto;
+    gap: 8px;
+    align-items: center;
+}
+
+.small-btn {
+    min-height: 38px;
+    padding: 8px 10px;
+    white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+    .export-options-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .range-input-row {
+        grid-template-columns: 1fr;
+    }
 }

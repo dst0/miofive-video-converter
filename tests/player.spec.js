@@ -2,6 +2,27 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 
+async function openPlayer(page, selectedCount) {
+  await page.goto('/');
+
+  const testDir = path.join(__dirname, '../test-data');
+  await page.locator('#folderPath').fill(testDir);
+  await page.locator('#scanBtn').click();
+  await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+
+  if (selectedCount) {
+    const checkboxes = page.locator('.file-checkbox');
+    const count = await checkboxes.count();
+    for (let i = selectedCount; i < count; i++) {
+      await checkboxes.nth(i).uncheck();
+    }
+  }
+
+  await page.locator('#playVideosBtn').click();
+  await expect(page.locator('#playerScreen')).toBeVisible();
+  await expect(page.locator('#currentVideoName')).not.toBeEmpty();
+}
+
 test.describe('Video Player - UI Tests (SPA)', () => {
   test('should show Play Videos button after scanning', async ({ page }) => {
     await page.goto('/');
@@ -47,6 +68,21 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     // Check player UI elements (scope to player screen)
     await expect(page.locator('#playerScreen h1')).toContainText('Video Player');
     await expect(page.locator('#backBtn')).toBeVisible();
+  });
+
+  test('should reset scroll position when opening player screen', async ({ page }) => {
+    await page.goto('/');
+
+    const testDir = path.join(__dirname, '../test-data');
+    await page.locator('#folderPath').fill(testDir);
+    await page.locator('#scanBtn').click();
+    await expect(page.locator('#playVideosBtn')).toBeVisible({ timeout: 10000 });
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    await page.locator('#playVideosBtn').click();
+    await expect(page.locator('#playerScreen')).toBeVisible();
+
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
   });
 
   test('should have all player UI elements in SPA mode', async ({ page }) => {
@@ -173,6 +209,179 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     await expect(page.locator('#speedInput')).toHaveValue('1.0');
     await expect(page.locator('#speedSlider')).toBeVisible();
     await expect(page.locator('#speedSlider')).toHaveValue('1');
+  });
+
+  test('should keep mobile player controls out of the video stage', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openPlayer(page, 3);
+
+    const layout = await page.evaluate(() => {
+      const rect = (selector) => {
+        const el = document.querySelector(selector);
+        const r = el.getBoundingClientRect();
+        return {
+          top: r.top,
+          bottom: r.bottom,
+          width: r.width,
+          height: r.height,
+        };
+      };
+      const buttonRects = (selector) => [...document.querySelectorAll(selector)].map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          top: r.top,
+          width: r.width,
+          height: r.height,
+        };
+      });
+      const delta = (values) => Math.max(...values) - Math.min(...values);
+      const video = rect('#videoPlayer1');
+      const overlay = rect('.custom-controls-overlay');
+      const wrapper = rect('#videoWrapper');
+      const overlayButtons = buttonRects('.control-buttons-row .overlay-btn');
+      const playbackButtons = buttonRects('.playback-controls .control-btn');
+      const presetButtons = buttonRects('.speed-presets .preset-speed-btn');
+      const headerButtons = buttonRects('.player-header-buttons button');
+
+      return {
+        viewportWidth: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overlayStartsAfterVideo: overlay.top >= video.bottom - 1,
+        overlayShare: overlay.height / wrapper.height,
+        overlayButtonsAreOneRow: delta(overlayButtons.map((button) => button.top)) <= 1,
+        overlayButtonHeightDelta: delta(overlayButtons.map((button) => button.height)),
+        playbackButtonHeightDelta: delta(playbackButtons.map((button) => button.height)),
+        playbackButtonWidthDelta: delta(playbackButtons.map((button) => button.width)),
+        presetButtonHeightDelta: delta(presetButtons.map((button) => button.height)),
+        presetButtonWidthDelta: delta(presetButtons.map((button) => button.width)),
+        headerButtonHeightDelta: delta(headerButtons.map((button) => button.height)),
+      };
+    });
+
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewportWidth);
+    expect(layout.overlayStartsAfterVideo).toBe(true);
+    expect(layout.overlayShare).toBeLessThanOrEqual(0.4);
+    expect(layout.overlayButtonsAreOneRow).toBe(true);
+    expect(layout.overlayButtonHeightDelta).toBeLessThanOrEqual(1);
+    expect(layout.playbackButtonHeightDelta).toBeLessThanOrEqual(1);
+    expect(layout.playbackButtonWidthDelta).toBeLessThanOrEqual(1);
+    expect(layout.presetButtonHeightDelta).toBeLessThanOrEqual(1);
+    expect(layout.presetButtonWidthDelta).toBeLessThanOrEqual(1);
+    expect(layout.headerButtonHeightDelta).toBeLessThanOrEqual(1);
+  });
+
+  test('should keep desktop player controls visually consistent', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openPlayer(page, 3);
+
+    const layout = await page.evaluate(() => {
+      const buttonRects = (selector) => [...document.querySelectorAll(selector)].map((el) => {
+        const r = el.getBoundingClientRect();
+        return {
+          top: r.top,
+          width: r.width,
+          height: r.height,
+        };
+      });
+      const delta = (values) => Math.max(...values) - Math.min(...values);
+      const overlayButtons = buttonRects('.control-buttons-row .overlay-btn');
+      const playbackButtons = buttonRects('.playback-controls .control-btn');
+      const presetButtons = buttonRects('.speed-presets .preset-speed-btn');
+      const headerButtons = buttonRects('.player-header-buttons button');
+
+      return {
+        viewportWidth: window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        overlayButtonHeightDelta: delta(overlayButtons.map((button) => button.height)),
+        overlayButtonWidthDelta: delta(overlayButtons.map((button) => button.width)),
+        overlayButtonsAreOneRow: delta(overlayButtons.map((button) => button.top)) <= 1,
+        playbackButtonHeightDelta: delta(playbackButtons.map((button) => button.height)),
+        playbackButtonWidthDelta: delta(playbackButtons.map((button) => button.width)),
+        presetButtonHeightDelta: delta(presetButtons.map((button) => button.height)),
+        presetButtonWidthDelta: delta(presetButtons.map((button) => button.width)),
+        headerButtonHeightDelta: delta(headerButtons.map((button) => button.height)),
+      };
+    });
+
+    expect(layout.scrollWidth).toBeLessThanOrEqual(layout.viewportWidth);
+    expect(layout.overlayButtonsAreOneRow).toBe(true);
+    expect(layout.overlayButtonHeightDelta).toBeLessThanOrEqual(1);
+    expect(layout.overlayButtonWidthDelta).toBeLessThanOrEqual(1);
+    expect(layout.playbackButtonHeightDelta).toBeLessThanOrEqual(1);
+    expect(layout.playbackButtonWidthDelta).toBeLessThanOrEqual(1);
+    expect(layout.presetButtonHeightDelta).toBeLessThanOrEqual(1);
+    expect(layout.presetButtonWidthDelta).toBeLessThanOrEqual(1);
+    expect(layout.headerButtonHeightDelta).toBeLessThanOrEqual(1);
+  });
+
+  test('should expose accessible player controls and modal focus behavior', async ({ page }) => {
+    await openPlayer(page, 1);
+
+    const videoWrapper = page.locator('#videoWrapper');
+    await expect(videoWrapper).toBeFocused();
+    await expect(videoWrapper).toHaveAttribute('role', 'region');
+    await expect(videoWrapper).toHaveAttribute('aria-describedby', 'videoKeyboardHelp');
+
+    await expect(page.getByRole('button', { name: /pause video|play video/i })).toHaveCount(2);
+    await expect(page.getByRole('slider', { name: /seek through selected videos/i })).toBeVisible();
+    await expect(page.locator('#progressBarContainer')).toHaveAttribute('aria-valuetext', /of/);
+    await expect(page.locator('#muteBtn')).toHaveAttribute('aria-pressed', 'false');
+
+    await page.locator('#exportVideosBtn').click();
+    await expect(page.getByRole('dialog', { name: 'Export Videos' })).toBeVisible();
+    await expect(page.locator('#closeExportModalBtn')).toBeFocused();
+
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('#exportCancelBtn')).toBeFocused();
+
+    await page.keyboard.press('Escape');
+    await expect(page.getByRole('dialog', { name: 'Export Videos' })).not.toBeVisible();
+    await expect(page.locator('#exportVideosBtn')).toBeFocused();
+  });
+
+  test('should support keyboard shortcuts for video playback', async ({ page }) => {
+    await openPlayer(page, 1);
+
+    const videoWrapper = page.locator('#videoWrapper');
+    const playPauseBtn = page.locator('#playPauseBtn');
+    const progress = page.locator('#progressBarContainer');
+    const muteBtn = page.locator('#muteBtn');
+
+    await videoWrapper.focus();
+    const beforeSpace = await playPauseBtn.getAttribute('aria-pressed');
+    await page.keyboard.press('Space');
+    await expect.poll(() => playPauseBtn.getAttribute('aria-pressed')).toBe(
+      beforeSpace === 'true' ? 'false' : 'true'
+    );
+
+    const beforeK = await playPauseBtn.getAttribute('aria-pressed');
+    await page.keyboard.press('k');
+    await expect.poll(() => playPauseBtn.getAttribute('aria-pressed')).toBe(
+      beforeK === 'true' ? 'false' : 'true'
+    );
+
+    const maxDuration = Number(await progress.getAttribute('aria-valuemax'));
+    expect(maxDuration).toBeGreaterThan(0);
+    const beforeSeek = Number(await progress.getAttribute('aria-valuenow'));
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(async () => Number(await progress.getAttribute('aria-valuenow'))).toBeGreaterThan(beforeSeek);
+
+    await page.keyboard.press('m');
+    await expect(muteBtn).toHaveAttribute('aria-pressed', 'true');
+    await page.keyboard.press('m');
+    await expect(muteBtn).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('should toggle playback when clicking the video area', async ({ page }) => {
+    await openPlayer(page, 1);
+
+    const playPauseBtn = page.locator('#playPauseBtn');
+    const beforeClick = await playPauseBtn.getAttribute('aria-pressed');
+
+    await page.locator('#videoWrapper').click({ position: { x: 320, y: 180 } });
+    await expect.poll(() => playPauseBtn.getAttribute('aria-pressed')).toBe(
+      beforeClick === 'true' ? 'false' : 'true'
+    );
   });
 
   test('should navigate between multiple videos', async ({ page }) => {
@@ -330,6 +539,18 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     }
   });
 
+  test('should activate timeline file markers with the keyboard', async ({ page }) => {
+    await openPlayer(page, 3);
+
+    const secondMarker = page.locator('#playerScreen .file-marker').nth(1);
+    await expect(secondMarker).toHaveAttribute('role', 'button');
+    await secondMarker.focus();
+    await page.keyboard.press('Enter');
+
+    await expect(page.locator('#videoProgress')).toContainText('Video 2 of');
+    await expect(secondMarker).toHaveAttribute('aria-current', 'true');
+  });
+
   test('should return to main screen when clicking back button', async ({ page }) => {
     await page.goto('/');
     
@@ -355,6 +576,6 @@ test.describe('Video Player - UI Tests (SPA)', () => {
     // Should show main screen and hide player screen
     await expect(page.locator('#mainScreen')).toBeVisible();
     await expect(page.locator('#playerScreen')).not.toBeVisible();
-    await expect(page.locator('#mainScreen h1')).toContainText('MP4 Video Combiner');
+    await expect(page.locator('#mainScreen h1')).toContainText('Miofive Video Converter');
   });
 });

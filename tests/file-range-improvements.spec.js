@@ -40,7 +40,7 @@ test.describe('File Range and Player Sync Improvements', () => {
             ];
             
             // Import and call showPlayerScreen
-            import('/player.js').then(module => {
+            import('/player.js?v=export-ms-1').then(module => {
                 module.showPlayerScreen(mockFiles);
             });
         });

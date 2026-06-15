@@ -158,7 +158,7 @@ test.describe('Scan Functionality Tests', () => {
     await expect(page.locator('.range-end')).toBeVisible();
   });
 
-  test('should show combine section after scanning', async ({ page }) => {
+  test('should show single export entry point after scanning', async ({ page }) => {
     
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);
@@ -166,14 +166,20 @@ test.describe('Scan Functionality Tests', () => {
     // Click scan button
     await page.locator('#scanBtn').click();
     
-    // Wait for combine section
-    await page.waitForSelector('.combine-section', { timeout: 10000 });
+    // Wait for export section
+    await page.waitForSelector('.export-section', { timeout: 10000 });
     
-    // Check combine elements (outputFolder and outputFilename, not outputPath)
-    await expect(page.locator('#outputFolder')).toBeVisible();
-    await expect(page.locator('#outputFilename')).toBeVisible();
-    await expect(page.locator('#combineBtn')).toBeVisible();
-    await expect(page.locator('#combineBtn')).toHaveText('Combine');
+    // Export settings are handled by the shared player export modal
+    await expect(page.locator('#outputFolder')).toHaveCount(0);
+    await expect(page.locator('#outputFilename')).toHaveCount(0);
+    await expect(page.locator('#combineBtn')).toHaveCount(0);
+    await expect(page.locator('#playVideosBtn')).toBeVisible();
+    await expect(page.locator('#exportSelectedBtn')).toBeVisible();
+    await expect(page.locator('#exportSelectedBtn')).toHaveText('💾 Export Videos');
+
+    await page.locator('#exportSelectedBtn').click();
+    await expect(page.locator('#playerScreen')).toBeVisible();
+    await expect(page.getByRole('dialog', { name: 'Export Videos' })).toBeVisible();
   });
 
   test('should toggle select all checkbox', async ({ page }) => {

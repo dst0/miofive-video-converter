@@ -9,3 +9,10 @@ screenshots/
 test-data/Normal.old/
 test-screenshots/
 test-output/
+dist/
+release/
+src-tauri/target/
+src-tauri/binaries/miofive-server-*
+src-tauri/gen/
+src-tauri/resources/
+vendor/ffmpeg/

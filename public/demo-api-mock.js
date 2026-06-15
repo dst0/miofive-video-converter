@@ -192,11 +192,10 @@ export class DemoAPI {
     }
 
     /**
-     * Mock /combine endpoint - always fails in demo mode
+     * Mock /export endpoint - always fails in demo mode
      */
-    static async combine(data) {
-        // Combining is disabled in demo mode
-        throw new Error('Video combining is disabled in demo mode. Download the full application to use this feature.');
+    static async export(data) {
+        throw new Error('Video export is disabled in demo mode. Download the full application to use this feature.');
     }
 
     /**
@@ -260,16 +259,15 @@ export function setupDemoMode() {
                     });
                 }
 
-                if (url === '/combine' && options?.method === 'POST') {
+                if (url === '/export' && options?.method === 'POST') {
                     try {
-                        await DemoAPI.combine(options.body ? JSON.parse(options.body) : {});
+                        await DemoAPI.export(options.body ? JSON.parse(options.body) : {});
                     } catch (error) {
                         return new Response(JSON.stringify({ error: error.message }), {
                             status: 400,
                             headers: { 'Content-Type': 'application/json' }
                         });
                     }
-                    // If combine succeeds, return a 200 OK response
                     return new Response(JSON.stringify({ success: true }), {
                         status: 200,
                         headers: { 'Content-Type': 'application/json' }

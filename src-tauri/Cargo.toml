@@ -1,0 +1,19 @@
+[package]
+name = "miofive-video-converter"
+version = "1.0.0"
+description = "Scan and export precise Miofive DashCam MP4 video ranges by timestamp"
+authors = ["dst"]
+license = "MIT"
+edition = "2021"
+
+[lib]
+name = "miofive_video_converter_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde_json = "1"
+tauri = { version = "2", features = [] }
+tauri-plugin-shell = "2"

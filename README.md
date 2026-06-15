@@ -1,6 +1,6 @@
 # Miofive Video Converter
 
-A web-based tool to scan, organize, and combine video files from Miofive S1 Ultra dashcam recordings stored on microSD cards.
+A web-based tool to scan, organize, review, and export precise ranges from Miofive S1 Ultra dashcam recordings stored on microSD cards.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ The Miofive S1 Ultra dashcam records video footage continuously in short segment
 3. **Complex filenames**: Files use a timestamp-based naming scheme that's difficult to parse manually
 4. **Manual merging**: Combining these files in chronological order to create a continuous video is tedious and error-prone
 
-This tool solves these problems by automatically scanning the microSD card, identifying all video files, sorting them chronologically, and merging them into a single continuous video file.
+This tool solves these problems by automatically scanning the microSD card, identifying all video files, sorting them chronologically, and exporting a continuous video file from the selected playback range.
 
 ## Miofive S1 Ultra File System
 
@@ -82,7 +82,7 @@ This tool provides a simple web interface that:
 2. **Parses** the complex filename format to extract timestamps
 3. **Filters** videos by date/time range and camera channel
 4. **Sorts** files chronologically for seamless playback
-5. **Combines** selected videos into a single output file using FFmpeg
+5. **Exports** selected videos through one precise FFmpeg flow with millisecond start/end range selection
 
 The result is a continuous video file that's much easier to review, share, or archive.
 
@@ -90,8 +90,8 @@ The result is a continuous video file that's much easier to review, share, or ar
 
 ### Prerequisites
 
-- **Node.js** (v14 or higher) - [Download here](https://nodejs.org/)
-- **FFmpeg** (automatically installed by the tool)
+- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
+- **FFmpeg and FFprobe** available through `PATH`, Homebrew paths, or `MIOFIVE_FFMPEG_PATH` / `MIOFIVE_FFPROBE_PATH`
 
 ### Setup Steps
 
@@ -106,13 +106,12 @@ The result is a continuous video file that's much easier to review, share, or ar
    npm install
    ```
    
-   This will automatically:
-   - Install required Node.js packages
-   - Download and install FFmpeg (if not already present)
+   This will install required Node.js packages. The post-install check can install FFmpeg through your system package manager if it is not already present; it does not download npm FFmpeg binary packages.
 
 3. **Verify FFmpeg installation**:
    ```bash
    ffmpeg -version
+   ffprobe -version
    ```
 
 ## Usage
@@ -136,6 +135,35 @@ Visit the [live demo deployment](#) to see the application in action (demo mode 
 ### Running the Application
 
 This server is designed to run on a system where the microSD card from your Miofive S1 Ultra dashcam is inserted (via USB card reader or built-in SD card slot).
+
+#### macOS Desktop App
+
+Run the Tauri desktop app during development:
+
+```bash
+npm run desktop
+```
+
+Build the native macOS app:
+
+```bash
+npm run build:mac
+```
+
+Install the built app for the current macOS user:
+
+```bash
+npm run install:mac
+open "$HOME/Applications/Miofive Video Converter.app"
+```
+
+The generated `.app` is written to `src-tauri/target/release/bundle/macos/`, and the `.dmg` installer is written to `src-tauri/target/release/bundle/dmg/`. For a manual install, open the `.dmg` and drag `Miofive Video Converter` to Applications.
+
+The installed Apple Silicon macOS app bundles the Node.js backend plus static FFmpeg/FFprobe binaries, so users do not need to install Node.js, npm, Rust, Homebrew, FFmpeg, or FFprobe separately.
+
+By default the release build builds FFmpeg 8.1.1 and x264 from pinned upstream source archives for Apple Silicon macOS, verifies their SHA-256 checksums, inspects `ffmpeg -L` / `ffprobe -L`, and rejects binaries whose output reports nonfree components. The first source build can take several minutes and requires Xcode Command Line Tools plus standard macOS command-line tools (`curl`, `make`, `tar`, and `shasum`). You can run that step directly with `npm run build:ffmpeg`. To bundle a different redistributable LGPL/GPL build, set both `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` before running `npm run build:mac`. To build without bundled FFmpeg for development only, set `MIOFIVE_SKIP_FFMPEG_BUNDLE=true`.
+
+#### Web Server
 
 1. **Insert the microSD card** into your computer using a card reader
 
@@ -164,13 +192,13 @@ This server is designed to run on a system where the microSD card from your Miof
    
    e. **Review**: Check the list of found files and their timestamps
    
-   f. **Set output path**: Choose where to save the combined video
-   
-   g. **Combine**: Click "Combine Videos" to merge files into one video
+   f. **Play or export**: Use the selected files in the player, then choose the exact export start/end time down to milliseconds
 
-5. **Wait for processing**: FFmpeg will combine the videos (this may take several minutes depending on total file size)
+   g. **Set output**: Choose where to save the exported video, output speed, and quality
 
-6. **Access your video**: The combined video will be saved to your specified output location
+5. **Wait for processing**: FFmpeg will export the selected range (this may take several minutes depending on total file size and quality)
+
+6. **Access your video**: The exported video will be saved to your specified output location
 
 ### Tips for Best Results
 
@@ -188,21 +216,27 @@ This server is designed to run on a system where the microSD card from your Miof
 - ✅ Dual camera channel selection (A/B)
 - ✅ Interactive folder browser
 - ✅ Chronological sorting
-- ✅ FFmpeg-based lossless video merging
+- ✅ Single FFmpeg-based export flow for full-video and selected-range exports
+- ✅ Millisecond-precise export start/end selection
 - ✅ Real-time progress display
+- ✅ Installable Tauri macOS desktop app
+- ✅ Bundled Node.js sidecar for clean Mac installs
+- ✅ Bundled GPL FFmpeg/FFprobe for Apple Silicon macOS releases
+- ✅ PWA metadata for future mobile/home-screen installation
 - ✅ Cross-platform support (Windows, macOS, Linux)
 
 ## Requirements
 
-- **System**: Windows, macOS, or Linux
-- **Node.js**: v14 or higher
-- **FFmpeg**: Auto-installed during setup
-- **Storage**: Free disk space equal to the size of videos you want to combine
+- **Installed macOS app**: Apple Silicon macOS; no Node.js, npm, Rust, Homebrew, FFmpeg, or FFprobe installation required
+- **Source/development mode**: Node.js v18 or higher, Rust toolchain, and Xcode Command Line Tools
+- **Storage**: Free disk space equal to the size of videos you want to export
 - **Card Reader**: USB card reader or built-in SD card slot to access the microSD card
 
 ## License
 
-MIT License - See LICENSE file for details
+This project is MIT licensed. See [LICENSE](LICENSE).
+
+Runtime and build dependencies are open-source packages. The release app bundles GPL-3.0-or-later FFmpeg/FFprobe binaries. The app does not depend on npm FFmpeg/FFprobe binary packages because tested Apple Silicon static npm binaries reported `--enable-nonfree` and "not legally redistributable". See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) before distributing builds.
 
 ## Author
 
