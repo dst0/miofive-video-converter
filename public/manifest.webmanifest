@@ -1,0 +1,19 @@
+{
+  "name": "Miofive Video Converter",
+  "short_name": "Miofive",
+  "description": "Scan and export precise Miofive DashCam MP4 video ranges by timestamp.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#2563eb",
+  "categories": ["photo", "video", "utilities"],
+  "icons": [
+    {
+      "src": "/app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -37,9 +37,9 @@ async function openFolderBrowser() {
     const modal = document.getElementById('folderBrowserModal');
     
     // Determine starting path based on whether we're browsing for output or input
-    if (window.browsingForOutput) {
-        const outputFolderInput = document.getElementById('outputFolder');
-        currentBrowsePath = outputFolderInput?.value || null;
+    if (window.browsingForExport) {
+        const exportOutputFolderInput = document.getElementById('exportOutputFolder');
+        currentBrowsePath = exportOutputFolderInput?.value || null;
     } else {
         const folderPathInput = document.getElementById('folderPath');
         currentBrowsePath = folderPathInput?.value || null;
@@ -66,23 +66,6 @@ function selectCurrentFolder() {
                 localStorage.setItem('mp4-combiner-output-folder', currentBrowsePath);
             }
             window.browsingForExport = false;
-        } else if (window.browsingForOutput) {
-            const outputFolderInput = document.getElementById('outputFolder');
-            if (outputFolderInput) {
-                outputFolderInput.value = currentBrowsePath;
-                localStorage.setItem('mp4-combiner-output-folder', currentBrowsePath);
-                
-                // Trigger save function if it exists
-                if (typeof saveOutputSettings === 'function') {
-                    saveOutputSettings();
-                }
-                
-                // Auto-fill filename when output folder is selected
-                if (typeof autoFillFilename === 'function') {
-                    autoFillFilename();
-                }
-            }
-            window.browsingForOutput = false;
         } else {
             const folderPathInput = document.getElementById('folderPath');
             folderPathInput.value = currentBrowsePath;

@@ -1,10 +1,16 @@
 {
-  "name": "Miofive Video Converter",
+  "name": "miofive-video-converter",
   "version": "1.0.0",
-  "description": "Scan and combine Miofive DashCam MP4 videos by timestamp",
+  "description": "Scan and export precise Miofive DashCam MP4 video ranges by timestamp",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "copy:ffmpeg": "node scripts/copy-ffmpeg-binaries.js",
+    "build:sidecar": "npm run copy:ffmpeg && node scripts/build-sidecar.js",
+    "desktop": "tauri dev",
+    "pack:mac": "tauri build --bundles app",
+    "dist:mac": "tauri build --bundles dmg,app",
+    "check:licenses": "node scripts/check-open-source-licenses.js",
     "postinstall": "node install-ffmpeg.js",
     "test": "playwright test",
     "test:headed": "playwright test --headed",
@@ -13,15 +19,23 @@
   "keywords": [
     "video",
     "mp4",
-    "combiner",
+    "export",
     "ffmpeg"
   ],
   "author": "dst",
   "license": "MIT",
+  "pkg": {
+    "assets": [
+      "public/**/*",
+      "test-data/**/*"
+    ]
+  },
   "dependencies": {
     "express": "^4.18.2"
   },
   "devDependencies": {
-    "@playwright/test": "^1.56.1"
+    "@playwright/test": "^1.56.1",
+    "@tauri-apps/cli": "^2.9.1",
+    "@yao-pkg/pkg": "6.12.0"
   }
 }

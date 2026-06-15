@@ -10,15 +10,15 @@ test.describe('Application Basic Tests', () => {
 
   test('should load homepage with correct structure', async ({ page }) => {
     // Check page title
-    await expect(page).toHaveTitle(/MP4 Video Combiner/);
+    await expect(page).toHaveTitle(/Miofive Video Converter/);
     
     // Check main heading is visible (scope to main screen to avoid SPA duplicate)
     const heading = page.locator('#mainScreen h1');
-    await expect(heading).toHaveText('MP4 Video Combiner');
+    await expect(heading).toHaveText('Miofive Video Converter');
     
     // Check subtitle
     const subtitle = page.locator('#mainScreen .subtitle');
-    await expect(subtitle).toContainText('Scan folders for timestamped videos');
+    await expect(subtitle).toContainText('Scan timestamped videos');
     
     // Check all main UI elements are visible
     await expect(page.locator('#channelA')).toBeVisible();

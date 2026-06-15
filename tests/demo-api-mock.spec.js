@@ -143,20 +143,20 @@ test.describe('Demo API Mock Module Tests', () => {
         expect(result.files[result.files.length - 1].filename).toContain('000007A');
     });
 
-    test('DemoAPI.combine() should always throw error', async ({ page }) => {
+    test('DemoAPI.export() should always throw error', async ({ page }) => {
         await page.goto('/');
         
         const error = await page.evaluate(async () => {
             const module = await import('/demo-api-mock.js');
             try {
-                await module.DemoAPI.combine({ files: [] });
+                await module.DemoAPI.export({ files: [] });
                 return null;
             } catch (err) {
                 return err.message;
             }
         });
         
-        expect(error).toContain('Video combining is disabled in demo mode');
+        expect(error).toContain('Video export is disabled in demo mode');
     });
 
     test('fetch interception should handle /demo-mode endpoint', async ({ page }) => {
@@ -193,15 +193,15 @@ test.describe('Demo API Mock Module Tests', () => {
         expect(result.files).toHaveLength(10);
     });
 
-    test('fetch interception should handle /combine endpoint error', async ({ page }) => {
+    test('fetch interception should handle /export endpoint error', async ({ page }) => {
         await page.goto('/');
         
         const result = await page.evaluate(async () => {
             const module = await import('/demo-api-mock.js');
             
-            // Call DemoAPI.combine() directly
+            // Call DemoAPI.export() directly
             try {
-                await module.DemoAPI.combine({ files: [] });
+                await module.DemoAPI.export({ files: [] });
                 return { status: 200, data: { success: true } };
             } catch (error) {
                 return { status: 400, data: { error: error.message } };
@@ -209,7 +209,7 @@ test.describe('Demo API Mock Module Tests', () => {
         });
         
         expect(result.status).toBe(400);
-        expect(result.data.error).toContain('Video combining is disabled in demo mode');
+        expect(result.data.error).toContain('Video export is disabled in demo mode');
     });
 
     test('fetch interception should handle /video? endpoint with query parameter', async ({ page }) => {
@@ -250,7 +250,7 @@ test.describe('Demo API Mock Module Tests', () => {
         
         // Test that non-API URLs don't match the pattern
         const result = await page.evaluate(async () => {
-            const apiUrls = ['/demo-mode', '/scan', '/combine', '/video?path=test'];
+            const apiUrls = ['/demo-mode', '/scan', '/export', '/video?path=test'];
             const nonApiUrls = ['https://example.com', 'http://example.com/api', 'style.css'];
             
             return {

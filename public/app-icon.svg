@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Miofive Video Converter">
+  <rect width="512" height="512" rx="112" fill="#111827"/>
+  <path d="M128 176c0-26.5 21.5-48 48-48h112c26.5 0 48 21.5 48 48v160c0 26.5-21.5 48-48 48H176c-26.5 0-48-21.5-48-48V176Z" fill="#2563eb"/>
+  <path d="M336 220l80-48v168l-80-48v-72Z" fill="#60a5fa"/>
+  <path d="M186 208h92M186 256h72M186 304h104" stroke="#f9fafb" stroke-width="28" stroke-linecap="round"/>
+</svg>

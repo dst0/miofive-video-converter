@@ -37,7 +37,7 @@ The test videos are located in the `Normal/` subdirectory and follow the Miofive
 1. **Scan**: Point the application to the `test-data` folder
 2. **Select**: Choose channel A (all test videos are channel A)
 3. **Play**: Use the "Play Videos" button to test seamless playback
-4. **Combine**: Use the "Combine" button to merge videos into a single file
+4. **Export**: Use "Export Videos" to open the shared export dialog and save the selected playback range
 
 ## Generating Test Videos
 
