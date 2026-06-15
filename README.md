@@ -144,17 +144,24 @@ Run the Tauri desktop app during development:
 npm run desktop
 ```
 
-Build an installable macOS app:
+Build the native macOS app:
 
 ```bash
-npm run dist:mac
+npm run build:mac
 ```
 
-The generated `.app` and `.dmg` files are written to `src-tauri/target/release/bundle/`. Install the app by opening the `.dmg` and dragging `Miofive Video Converter` to Applications.
+Install the built app for the current macOS user:
+
+```bash
+npm run install:mac
+open "$HOME/Applications/Miofive Video Converter.app"
+```
+
+The generated `.app` is written to `src-tauri/target/release/bundle/macos/`, and the `.dmg` installer is written to `src-tauri/target/release/bundle/dmg/`. For a manual install, open the `.dmg` and drag `Miofive Video Converter` to Applications.
 
 The installed Apple Silicon macOS app bundles the Node.js backend plus static FFmpeg/FFprobe binaries, so users do not need to install Node.js, npm, Rust, Homebrew, FFmpeg, or FFprobe separately.
 
-By default the release build downloads the pinned Martin Riedl macOS arm64 FFmpeg 8.1.1 release zips, verifies their SHA-256 checksums, inspects `ffmpeg -L` / `ffprobe -L`, and rejects binaries whose output reports nonfree components. To bundle a different redistributable LGPL/GPL build, set both `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` before running `npm run dist:mac`. To build without bundled FFmpeg for development only, set `MIOFIVE_SKIP_FFMPEG_BUNDLE=true`.
+By default the release build builds FFmpeg 8.1.1 and x264 from pinned upstream source archives for Apple Silicon macOS, verifies their SHA-256 checksums, inspects `ffmpeg -L` / `ffprobe -L`, and rejects binaries whose output reports nonfree components. The first source build can take several minutes. To bundle a different redistributable LGPL/GPL build, set both `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` before running `npm run build:mac`. To build without bundled FFmpeg for development only, set `MIOFIVE_SKIP_FFMPEG_BUNDLE=true`.
 
 #### Web Server
 

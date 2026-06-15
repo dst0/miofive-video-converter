@@ -8,6 +8,8 @@
     "copy:ffmpeg": "node scripts/copy-ffmpeg-binaries.js",
     "build:sidecar": "npm run copy:ffmpeg && node scripts/build-sidecar.js",
     "desktop": "tauri dev",
+    "build:mac": "npm run dist:mac",
+    "install:mac": "mkdir -p \"$HOME/Applications\" && rm -rf \"$HOME/Applications/Miofive Video Converter.app\" && cp -R \"src-tauri/target/release/bundle/macos/Miofive Video Converter.app\" \"$HOME/Applications/\"",
     "pack:mac": "tauri build --bundles app",
     "dist:mac": "tauri build --bundles dmg,app",
     "check:licenses": "node scripts/check-open-source-licenses.js",
