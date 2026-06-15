@@ -35,27 +35,6 @@
             </div>
         </div>
         
-        <div id="folderBrowserModal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Select Folder</h3>
-                    <button type="button" class="close-btn" id="closeBrowserBtn">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="current-path">
-                        <span id="currentPathDisplay">Loading...</span>
-                    </div>
-                    <div class="folder-tree" id="folderTree">
-                        <div class="loading-folders">Loading folders...</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" id="selectFolderBtn" class="secondary">Select Current Folder</button>
-                    <button type="button" id="cancelBrowserBtn">Cancel</button>
-                </div>
-            </div>
-        </div>
-
         <div class="pre-scan-filters">
             <div class="filter-header">
                 <label class="filter-toggle-label">
@@ -267,6 +246,27 @@
                 <button type="button" id="exportConfirmBtn" class="primary">Export</button>
                 <button type="button" id="exportCancelBtn" class="secondary">Cancel</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<div id="folderBrowserModal" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Select Folder</h3>
+            <button type="button" class="close-btn" id="closeBrowserBtn">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="current-path">
+                <span id="currentPathDisplay">Loading...</span>
+            </div>
+            <div class="folder-tree" id="folderTree">
+                <div class="loading-folders">Loading folders...</div>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button type="button" id="selectFolderBtn" class="secondary">Select Current Folder</button>
+            <button type="button" id="cancelBrowserBtn">Cancel</button>
         </div>
     </div>
 </div>
