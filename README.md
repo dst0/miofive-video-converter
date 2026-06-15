@@ -161,7 +161,7 @@ The generated `.app` is written to `src-tauri/target/release/bundle/macos/`, and
 
 The installed Apple Silicon macOS app bundles the Node.js backend plus static FFmpeg/FFprobe binaries, so users do not need to install Node.js, npm, Rust, Homebrew, FFmpeg, or FFprobe separately.
 
-By default the release build builds FFmpeg 8.1.1 and x264 from pinned upstream source archives for Apple Silicon macOS, verifies their SHA-256 checksums, inspects `ffmpeg -L` / `ffprobe -L`, and rejects binaries whose output reports nonfree components. The first source build can take several minutes. To bundle a different redistributable LGPL/GPL build, set both `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` before running `npm run build:mac`. To build without bundled FFmpeg for development only, set `MIOFIVE_SKIP_FFMPEG_BUNDLE=true`.
+By default the release build builds FFmpeg 8.1.1 and x264 from pinned upstream source archives for Apple Silicon macOS, verifies their SHA-256 checksums, inspects `ffmpeg -L` / `ffprobe -L`, and rejects binaries whose output reports nonfree components. The first source build can take several minutes and requires Xcode Command Line Tools plus standard macOS command-line tools (`curl`, `make`, `tar`, and `shasum`). You can run that step directly with `npm run build:ffmpeg`. To bundle a different redistributable LGPL/GPL build, set both `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` before running `npm run build:mac`. To build without bundled FFmpeg for development only, set `MIOFIVE_SKIP_FFMPEG_BUNDLE=true`.
 
 #### Web Server
 

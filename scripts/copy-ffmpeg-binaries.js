@@ -29,7 +29,7 @@ function assertRedistributableBinary(sourcePath, outputName) {
         throw new Error(`Unable to inspect ${outputName} license with "${sourcePath} -L"`);
     }
 
-    if (/nonfree|not legally redistributable/i.test(output)) {
+    if (/--enable-nonfree/.test(output) || /not legally redistributable|nonfree parts|non-free/i.test(output)) {
         throw new Error(
             `${outputName} reports nonfree components and is not legally redistributable. ` +
             'Use a redistributable LGPL/GPL FFmpeg build instead.'

@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
+    "build:ffmpeg": "scripts/build-ffmpeg-macos-arm64.sh",
     "copy:ffmpeg": "node scripts/copy-ffmpeg-binaries.js",
     "build:sidecar": "npm run copy:ffmpeg && node scripts/build-sidecar.js",
     "desktop": "tauri dev",

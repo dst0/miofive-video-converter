@@ -100,7 +100,8 @@ assert_redistributable() {
   local name="$2"
   local license_output
   license_output="$("${binary}" -L 2>&1)"
-  if grep -Eiq 'nonfree|not legally redistributable' <<<"${license_output}"; then
+  if grep -Eq -- '--enable-nonfree' <<<"${license_output}" ||
+      grep -Eiq 'not legally redistributable|nonfree parts|non-free' <<<"${license_output}"; then
     echo "${name} reports nonfree components and is not redistributable:" >&2
     echo "${license_output}" >&2
     exit 1

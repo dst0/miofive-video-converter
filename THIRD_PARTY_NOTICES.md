@@ -23,12 +23,14 @@ The Apple Silicon macOS desktop release bundles static FFmpeg and FFprobe binari
 3. common Homebrew paths on macOS
 4. `PATH`
 
-The default release bundle uses Martin Riedl's macOS arm64 FFmpeg 8.1.1 release zips:
+The default release bundle does not download third-party prebuilt FFmpeg binaries. It builds FFmpeg and x264 from pinned upstream source archives:
 
-- `https://ffmpeg.martin-riedl.de/download/macos/arm64/1778761665_8.1.1/ffmpeg.zip`
-- `https://ffmpeg.martin-riedl.de/download/macos/arm64/1778761665_8.1.1/ffprobe.zip`
+- FFmpeg 8.1.1: `https://ffmpeg.org/releases/ffmpeg-8.1.1.tar.xz`
+- x264 commit `0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee`: `https://code.videolan.org/videolan/x264/-/archive/0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee/x264-0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee.tar.gz`
 
-The bundle script downloads the matching `.sha256` files, verifies each archive, runs each extracted binary with `-L`, and rejects output containing `nonfree` or `not legally redistributable`. The verified `-L` output reports GNU GPL version 3 or later for both FFmpeg and FFprobe.
+The source build script verifies each source archive SHA-256, builds static Apple Silicon macOS binaries with `--enable-gpl --enable-version3 --enable-libx264 --disable-nonfree`, runs each built binary with `-L`, and rejects output that reports `--enable-nonfree` or FFmpeg's "not legally redistributable" wording. The verified `-L` output reports GNU GPL version 3 or later for both FFmpeg and FFprobe.
+
+The packaged app includes `src-tauri/resources/licenses/FFMPEG-GPL-NOTICE.txt`, generated during release packaging. That notice records the exact source URLs, source checksums, and configure flags used for the bundled binaries.
 
 Set both `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` to bundle a different redistributable LGPL/GPL build. Set `MIOFIVE_SKIP_FFMPEG_BUNDLE=true` only for development builds that intentionally rely on environment, Homebrew paths, or `PATH`.
 
