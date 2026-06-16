@@ -15,6 +15,8 @@ let isDraggingProgress = false; // Flag for progress bar dragging
 let isPlayerInitialized = false;
 let areCustomControlsInitialized = false;
 let lastFocusedElementBeforeExport = null;
+let defaultExportRange = null;
+let hasInitializedExportRange = false;
 
 // Global player state - single source of truth for play/pause state
 let globalPlayerState = 'paused'; // 'playing', 'paused', or 'ended'
@@ -557,6 +559,8 @@ export function showPlayerScreen(files, options = {}) {
 
     // Initialize player UI
     initializePlayer();
+    defaultExportRange = normalizeExportRange(options.exportRange);
+    hasInitializedExportRange = false;
     initializeTimeline();
     initializeCustomControls();
     updatePlaybackControlAccessibility();
@@ -572,10 +576,11 @@ export function showPlayerScreen(files, options = {}) {
     });
 }
 
-export function showExportFlow(files) {
+export function showExportFlow(files, options = {}) {
     showPlayerScreen(files, {
         autoplay: false,
         openExportModal: true,
+        exportRange: options.exportRange,
     });
 }
 
@@ -924,6 +929,40 @@ function formatExportTime(seconds) {
     return `${String(mins).padStart(2, '0')}:${secondsWithMs}`;
 }
 
+function roundSecondsToMilliseconds(seconds) {
+    return Math.round(seconds * 1000) / 1000;
+}
+
+function normalizeExportRange(range) {
+    if (!range || !Number.isFinite(totalDuration) || totalDuration <= 0) {
+        return null;
+    }
+
+    const start = Math.max(0, Number(range.start));
+    const end = Math.min(totalDuration, Number(range.end));
+
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+        return null;
+    }
+
+    return {
+        start: roundSecondsToMilliseconds(start),
+        end: roundSecondsToMilliseconds(end),
+    };
+}
+
+function getInitialExportRange() {
+    if (hasInitializedExportRange) {
+        const currentRange = getExportRangeFromCurrentFields();
+        if (currentRange) return currentRange;
+    }
+
+    return normalizeExportRange(defaultExportRange) || {
+        start: 0,
+        end: totalDuration,
+    };
+}
+
 function parseExportTime(value) {
     const trimmed = String(value || '').trim();
     if (!trimmed) {
@@ -978,6 +1017,21 @@ function parseExportTime(value) {
     throw new Error('Use seconds, MM:SS.mmm, or HH:MM:SS.mmm');
 }
 
+function getExportRangeFromCurrentFields() {
+    const startEl = document.getElementById('exportRangeStart');
+    const endEl = document.getElementById('exportRangeEnd');
+    if (!startEl || !endEl) return null;
+
+    try {
+        return normalizeExportRange({
+            start: parseExportTime(startEl.value),
+            end: parseExportTime(endEl.value),
+        });
+    } catch {
+        return null;
+    }
+}
+
 function estimateProcessingTime(selectedDuration, quality) {
     const qualityFactors = {
         max: 0.9,
@@ -1022,6 +1076,7 @@ function updateExportEstimate() {
 
     try {
         const { start, end, speed, quality } = getExportSettingsFromForm();
+        defaultExportRange = { start, end };
         const selectedDuration = end - start;
         selectedDurationEl.textContent = formatExportTime(selectedDuration);
         outputDurationEl.textContent = formatExportTime(selectedDuration / speed);
@@ -1714,10 +1769,12 @@ function openExportModal() {
     lastFocusedElementBeforeExport = document.activeElement;
     
     // Update export info
+    const initialRange = getInitialExportRange();
     document.getElementById('exportVideoCount').textContent = videoFiles.length;
     document.getElementById('exportTotalDuration').textContent = formatExportTime(totalDuration);
-    document.getElementById('exportRangeStart').value = '00:00.000';
-    document.getElementById('exportRangeEnd').value = formatExportTime(totalDuration);
+    document.getElementById('exportRangeStart').value = formatExportTime(initialRange.start);
+    document.getElementById('exportRangeEnd').value = formatExportTime(initialRange.end);
+    hasInitializedExportRange = true;
 
     const playbackSpeed = Number(document.getElementById('speedInput').value) || 1;
     document.getElementById('exportSpeed').value = String(Math.max(0.1, Math.min(50, playbackSpeed)));

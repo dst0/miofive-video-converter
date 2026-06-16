@@ -1,5 +1,5 @@
 import { initializeFolderBrowser } from './folder-browser.js';
-import { initPlayer, showPlayerScreen, hidePlayerScreen, showExportFlow } from './player.js?v=export-ms-1';
+import { initPlayer, showPlayerScreen, hidePlayerScreen, showExportFlow } from './player.js?v=export-range-1';
 import { setupDemoMode, isGitHubPages } from './demo-api-mock.js';
 
 let scannedFiles = [];
@@ -293,6 +293,89 @@ function selectedChannels() {
     if (document.getElementById('channelA').checked) include.push('A');
     if (document.getElementById('channelB').checked) include.push('B');
     return include;
+}
+
+function roundSecondsToMilliseconds(seconds) {
+    return Math.round(seconds * 1000) / 1000;
+}
+
+function getSelectedTimelineRange() {
+    if (!timelineData) return null;
+
+    const { selectedStartTime, selectedEndTime } = timelineData;
+    if (
+        !Number.isFinite(selectedStartTime) ||
+        !Number.isFinite(selectedEndTime) ||
+        selectedEndTime <= selectedStartTime
+    ) {
+        return null;
+    }
+
+    return {
+        startTime: selectedStartTime,
+        endTime: selectedEndTime,
+    };
+}
+
+function getExportRangeFromTimelineSelection(selectedFiles) {
+    const selectedRange = getSelectedTimelineRange();
+    if (!selectedRange || selectedFiles.length === 0) return null;
+
+    const sortedFiles = [...selectedFiles].sort(
+        (a, b) => new Date(a.utcTime).getTime() - new Date(b.utcTime).getTime()
+    );
+    let globalOffset = 0;
+    let rangeStart = null;
+    let rangeEnd = null;
+
+    for (const file of sortedFiles) {
+        const duration = Number(file.duration);
+        if (!Number.isFinite(duration) || duration <= 0) {
+            return null;
+        }
+
+        const fileStart = new Date(file.utcTime).getTime();
+        const fileEnd = fileStart + duration * 1000;
+        const startsInSelectedRange =
+            fileStart >= selectedRange.startTime &&
+            fileStart <= selectedRange.endTime;
+
+        if (startsInSelectedRange) {
+            const overlapStart =
+                selectedRange.startTime > fileStart &&
+                selectedRange.startTime < fileEnd
+                    ? selectedRange.startTime
+                    : fileStart;
+            const overlapEnd =
+                selectedRange.endTime > fileStart &&
+                selectedRange.endTime < fileEnd
+                    ? selectedRange.endTime
+                    : fileEnd;
+            const startInFile = (overlapStart - fileStart) / 1000;
+            const endInFile = (overlapEnd - fileStart) / 1000;
+
+            if (rangeStart === null) {
+                rangeStart = globalOffset + startInFile;
+            }
+            rangeEnd = globalOffset + endInFile;
+        }
+
+        globalOffset += duration;
+    }
+
+    if (rangeStart === null || rangeEnd === null || rangeEnd <= rangeStart) {
+        return null;
+    }
+
+    return {
+        start: roundSecondsToMilliseconds(rangeStart),
+        end: roundSecondsToMilliseconds(rangeEnd),
+    };
+}
+
+function getPlayerOptionsForSelectedFiles(selectedFiles) {
+    const exportRange = getExportRangeFromTimelineSelection(selectedFiles);
+    return exportRange ? { exportRange } : {};
 }
 
 function toggleSelectAll() {
@@ -649,6 +732,9 @@ function initializeTimeline() {
             timelineData.minTime + (startPercent / 100) * timelineData.range;
         const endTime =
             timelineData.minTime + (endPercent / 100) * timelineData.range;
+
+        timelineData.selectedStartTime = startTime;
+        timelineData.selectedEndTime = endTime;
 
         document.getElementById('rangeStartDisplay').textContent = new Date(
             startTime
@@ -1026,7 +1112,7 @@ function playVideos() {
         return;
     }
 
-    showPlayerScreen(selectedFiles);
+    showPlayerScreen(selectedFiles, getPlayerOptionsForSelectedFiles(selectedFiles));
 }
 
 function exportSelectedVideos() {
@@ -1037,5 +1123,5 @@ function exportSelectedVideos() {
         return;
     }
 
-    showExportFlow(selectedFiles);
+    showExportFlow(selectedFiles, getPlayerOptionsForSelectedFiles(selectedFiles));
 }

@@ -109,6 +109,62 @@ test.describe('Video Player Export Functionality', () => {
         await expect(page.locator('#exportProcessingEstimate')).toContainText('~');
     });
 
+    test('should use selected scan timeline range when opening export from playback', async ({ page }) => {
+        await page.fill('#folderPath', TEST_DATA_PATH);
+        await page.click('#scanBtn');
+        await page.waitForSelector('.file-list', { timeout: 10000 });
+        await page.waitForFunction(() => document.getElementById('manualStartTime')?.value);
+
+        await page.evaluate(() => {
+            const startInput = document.getElementById('manualStartTime');
+            const endInput = document.getElementById('manualEndTime');
+            const startDate = new Date(startInput.value);
+            const endDate = new Date(startDate.getTime() + 1000);
+            const pad = (value, length = 2) => String(value).padStart(length, '0');
+            endInput.value =
+                `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}` +
+                `T${pad(endDate.getHours())}:${pad(endDate.getMinutes())}:${pad(endDate.getSeconds())}.` +
+                pad(endDate.getMilliseconds(), 3);
+            endInput.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        await expect(page.locator('.count')).toContainText('1 in selected range');
+
+        await page.click('#playVideosBtn');
+        await page.waitForSelector('#playerScreen', { state: 'visible', timeout: 5000 });
+        await page.click('#exportVideosBtn');
+        await page.waitForSelector('#exportModal', { state: 'visible' });
+
+        await expect(page.locator('#exportRangeStart')).toHaveValue('00:00.000');
+        await expect(page.locator('#exportRangeEnd')).toHaveValue('00:01.000');
+        await expect(page.locator('#exportSelectedDuration')).toHaveText('00:01.000');
+    });
+
+    test('should keep adjusted export range when export modal is reopened', async ({ page }) => {
+        await page.fill('#folderPath', TEST_DATA_PATH);
+        await page.click('#scanBtn');
+        await page.waitForSelector('.file-list', { timeout: 10000 });
+
+        await page.click('#playVideosBtn');
+        await page.waitForSelector('#playerScreen', { state: 'visible', timeout: 5000 });
+        await page.click('#exportVideosBtn');
+        await page.waitForSelector('#exportModal', { state: 'visible' });
+
+        await page.fill('#exportRangeStart', '00:03.000');
+        await page.fill('#exportRangeEnd', '00:07.000');
+        await expect(page.locator('#exportSelectedDuration')).toHaveText('00:04.000');
+
+        await page.click('#exportCancelBtn');
+        await expect(page.locator('#exportModal')).toBeHidden();
+
+        await page.click('#exportVideosBtn');
+        await page.waitForSelector('#exportModal', { state: 'visible' });
+
+        await expect(page.locator('#exportRangeStart')).toHaveValue('00:03.000');
+        await expect(page.locator('#exportRangeEnd')).toHaveValue('00:07.000');
+        await expect(page.locator('#exportSelectedDuration')).toHaveText('00:04.000');
+    });
+
     test('should send millisecond precise export range values', async ({ page }) => {
         // Scan for videos
         await page.fill('#folderPath', TEST_DATA_PATH);
