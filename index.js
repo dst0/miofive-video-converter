@@ -21,7 +21,100 @@ const BUNDLED_BIN_DIR = path.join(RESOURCE_DIR, 'bin');
 // MP4 duration extraction configuration
 const MP4_HEADER_BUFFER_SIZE = 1024 * 1024; // 1MB should be enough for headers
 
-// Simple in-memory rate limiting
+// Removable devices cache
+let removableDevices = [];
+let removableDevicesChecked = false;
+
+/**
+ * Find USB flash drives, SD cards, and other removable devices on macOS
+ */
+async function findRemovableDevices() {
+    if (process.platform !== 'darwin') return [];
+    
+    try {
+        // Get disk info for all mounted volumes
+        const { stdout } = await execPromise('diskutil list -plist', { timeout: 10000 });
+        const plist = parseDiskutilPlist(stdout);
+        
+        const devices = [];
+        for (const disk of plist) {
+            if (!disk.MountPoints || disk.MountPoints.length === 0) continue;
+            
+            const mountPoint = disk.MountPoints[0];
+            const deviceName = disk.DiskDescription || disk.DiskNode || '';
+            const isRemovable = disk.MediaRemovable === true || 
+                                (disk.MountPoint && disk.MountPoint !== '/') &&
+                                !disk.DiskNode.startsWith('/dev/disk0'); // Exclude internal disk
+            
+            // Check for USB/SD card indicators
+            const isExternal = deviceName.toLowerCase().includes('usb') ||
+                              deviceName.toLowerCase().includes('flash') ||
+                              deviceName.toLowerCase().includes('sd ') ||
+                              disk.DiskNode.includes('disk2') ||
+                              disk.DiskNode.includes('disk3') ||
+                              disk.DiskNode.includes('disk4') ||
+                              isRemovable;
+            
+            if (isExternal && mountPoint) {
+                const docsVideoPath = path.join(mountPoint, 'Documents', 'Video');
+                devices.push({
+                    deviceName: disk.DiskDescription || disk.DiskNode || mountPoint,
+                    mountPoint,
+                    documentsVideoPath: docsVideoPath,
+                    sizeBytes: disk.Size || 0,
+                });
+            }
+        }
+        
+        removableDevices = devices;
+        removableDevicesChecked = true;
+        return devices;
+    } catch (err) {
+        console.error('Failed to scan removable devices:', err.message);
+        return [];
+    }
+}
+
+/**
+ * Parse diskutil list -plist output (simplified plist parser)
+ */
+function parseDiskutilPlist(stdout) {
+    const devices = [];
+    // Simple plist parsing - extract disk info
+    const diskBlocks = stdout.split('<dict>').filter((b, i) => i > 0);
+    
+    for (const block of diskBlocks) {
+        const device = {};
+        
+        const descriptionMatch = block.match(/<key>DiskDescription<\/key>\s*<string>([^<]+)<\/string>/);
+        if (descriptionMatch) device.DiskDescription = descriptionMatch[1];
+        
+        const nodeMatch = block.match(/<key>DiskNode<\/key>\s*<string>([^<]+)<\/string>/);
+        if (nodeMatch) device.DiskNode = nodeMatch[1];
+        
+        const sizeMatch = block.match(/<key>Size<\/key>\s*<integer>([^<]+)<\/integer>/);
+        if (sizeMatch) device.Size = parseInt(sizeMatch[1]);
+        
+        const removableMatch = block.match(/<key>MediaRemovable<\/key>\s*<true\/><\/key>/);
+        device.MediaRemovable = !!removableMatch;
+        
+        // Extract mount points
+        const mountPoints = [];
+        const mpRegex = /<key>MountPoint<\/key>\s*<string>([^<]+)<\/string>/g;
+        let mpMatch;
+        while ((mpMatch = mpRegex.exec(block)) !== null) {
+            mountPoints.push(mpMatch[1]);
+        }
+        device.MountPoints = mountPoints;
+        device.MountPoint = mountPoints[0];
+        
+        if (device.DiskNode) {
+            devices.push(device);
+        }
+    }
+    
+    return devices;
+}
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
 const MAX_REQUESTS = 100; // Max requests per window
@@ -50,12 +143,22 @@ function runStream(command, { cwd, env } = {}) {
     });
 }
 
-function runProcess(command, args, { cwd, env } = {}) {
+function runProcess(command, args, { cwd, env, captureStderr = false } = {}) {
     return new Promise((resolve, reject) => {
-        const child = spawn(command, args, { stdio: 'inherit', cwd, env });
+        const stdio = captureStderr
+            ? ['pipe', 'inherit', 'pipe']
+            : 'inherit';
+        const child = spawn(command, args, { stdio, cwd, env });
+        let stderrOutput = '';
+        if (captureStderr) {
+            child.stderr.on('data', (data) => {
+                stderrOutput += data.toString();
+                process.stderr.write(data);
+            });
+        }
         child.on('error', reject);
         child.on('close', (code) => (
-            code === 0 ? resolve() : reject(new Error(`${command} failed with exit code ${code}`))
+            code === 0 ? resolve({ stderr: stderrOutput }) : reject(new Error(`${command} failed with exit code ${code}${stderrOutput ? ': ' + stderrOutput.trim().slice(-200) : ''}`))
         ));
     });
 }
@@ -324,6 +427,20 @@ function isPathInside(parentPath, childPath) {
     );
 }
 
+function parseTimestamp(timestamp) {
+    if (typeof timestamp === 'number') return timestamp;
+    if (!timestamp || timestamp === '') return 0;
+    // Handle MM:SS.mmm format
+    const match = timestamp.match(/^(\d{2}):(\d{2}\.\d{1,3})$/);
+    if (match) {
+        const minutes = Number(match[1]);
+        const seconds = Number(match[2]);
+        return minutes * 60 + seconds;
+    }
+    // Fall back to plain number
+    return Number(timestamp);
+}
+
 function toFiniteNumber(value, label) {
     const number = Number(value);
     if (!Number.isFinite(number)) {
@@ -508,10 +625,10 @@ function normalizeExportOptions({ rangeStart, rangeEnd, speed, quality }) {
 
     const normalizedStart = rangeStart === undefined || rangeStart === null || rangeStart === ''
         ? 0
-        : roundSecondsToMilliseconds(toFiniteNumber(rangeStart, 'Export start time'));
+        : roundSecondsToMilliseconds(Number(rangeStart));
     const normalizedEnd = rangeEnd === undefined || rangeEnd === null || rangeEnd === ''
         ? undefined
-        : roundSecondsToMilliseconds(toFiniteNumber(rangeEnd, 'Export end time'));
+        : roundSecondsToMilliseconds(Number(rangeEnd));
 
     if (normalizedStart < 0) {
         throw new Error('Export start time cannot be negative');
@@ -638,7 +755,7 @@ async function exportVideoRange({ files, finalOutputPath, rangeStart, rangeEnd, 
         `Exporting ${formatFilterNumber(endSeconds - startSeconds)}s range ` +
         `at ${formatFilterNumber(options.speed)}x using ${options.quality} quality...`
     );
-    await runProcess(resolveExecutable('ffmpeg'), args);
+    await runProcess(resolveExecutable('ffmpeg'), args, { captureStderr: true });
 
     return {
         rangeStart: startSeconds,
@@ -652,6 +769,30 @@ async function exportVideoRange({ files, finalOutputPath, rangeStart, rangeEnd, 
 }
 
 // Root: serve the HTML file explicitly (nice fallback)
+app.get('/api/removable-devices', async (req, res) => {
+    // Detect removable devices on startup
+    if (!removableDevicesChecked) {
+        await findRemovableDevices();
+    }
+    res.json(removableDevices);
+});
+
+app.post('/api/validate-path', async (req, res) => {
+    const { path: targetPath, type } = req.body; // type: 'scan' | 'export'
+    if (!targetPath) return res.status(400).json({ valid: false, error: 'Path required' });
+    
+    try {
+        const stats = await fs.stat(targetPath);
+        if (type === 'scan') {
+            return res.json({ valid: stats.isDirectory(), path: targetPath });
+        } else {
+            return res.json({ valid: stats.isDirectory(), path: targetPath });
+        }
+    } catch {
+        return res.json({ valid: false, path: targetPath });
+    }
+});
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(PUBLIC_DIR, 'index.html'));
 });
@@ -662,10 +803,16 @@ app.get('/check-ffmpeg', async (req, res) => {
 });
 
 // Check if demo mode is enabled
-app.get('/demo-mode', (req, res) => {
+app.get('/demo-mode', async (req, res) => {
+    // Detect removable devices on startup
+    if (!removableDevicesChecked) {
+        await findRemovableDevices();
+    }
+    
     res.json({
         enabled: DEMO_MODE,
-        demoPath: DEMO_MODE ? TEST_DATA_DIR : null
+        demoPath: DEMO_MODE ? TEST_DATA_DIR : null,
+        removableDevices,
     });
 });
 
@@ -950,7 +1097,7 @@ async function handleExportRequest(req, res) {
             details,
         });
     } catch (err) {
-        console.error('Failed to export videos:', err.message);
+        console.error('Failed to export videos:', err.message, err.stack);
         res.status(isClientInputError(err) ? 400 : 500).json({error: `Failed to export videos: ${err.message}`});
     }
 }

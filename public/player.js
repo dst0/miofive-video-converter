@@ -1812,6 +1812,8 @@ function closeExportModal() {
     const modal = document.getElementById('exportModal');
     modal.style.display = 'none';
     modal.setAttribute('aria-hidden', 'true');
+    // Clear export status so reopening the modal shows a clean state
+    document.getElementById('exportStatus').innerHTML = '';
     if (lastFocusedElementBeforeExport instanceof HTMLElement) {
         lastFocusedElementBeforeExport.focus({ preventScroll: true });
     }

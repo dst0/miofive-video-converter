@@ -7,17 +7,19 @@ let ffmpegAvailable = true;
 let timelineData = null;
 let demoMode = false;
 let demoPath = null;
+let removableDevices = [];
 
 document.addEventListener('DOMContentLoaded', () => {
     // Setup demo mode for GitHub Pages
     setupDemoMode();
     
-    // Check demo mode first
+    // Check demo mode first (also returns removable devices)
     fetch('/demo-mode')
         .then(r => r.json())
-        .then(data => {
+        .then(async data => {
             demoMode = data.enabled;
             demoPath = data.demoPath;
+            removableDevices = data.removableDevices || [];
             
             if (demoMode) {
                 // Show demo mode banner
@@ -51,9 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     // Don't save demo path to localStorage
                 }
             }
+            
+            // Load saved paths and validate against removable devices
+            await loadSavedPaths();
         })
         .catch(err => {
             console.error('Failed to check demo mode:', err);
+            // Load saved paths even if demo check fails
+            loadSavedPaths();
         });
     
     // Load saved values (only if not in demo mode)
@@ -80,17 +87,73 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('folderPath').addEventListener('input', savePaths);
 });
 
-// Function to load saved path values from localStorage
-function loadSavedPaths() {
+// Validate a path exists on the server
+async function validatePath(targetPath) {
+    try {
+        const res = await fetch('/api/validate-path', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ path: targetPath, type: 'scan' }),
+        });
+        const data = await res.json();
+        return data.valid;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * Get the best removable device (largest one, or first if none has size)
+ */
+function getBestRemovableDevice() {
+    if (!removableDevices.length) return null;
+    // Prefer device with largest capacity
+    return removableDevices.reduce((best, device) => {
+        return (!best || device.sizeBytes > best.sizeBytes) ? device : best;
+    }, null);
+}
+
+// Function to load saved path values from localStorage, with removable device fallback
+async function loadSavedPaths() {
     // Don't load saved paths in demo mode
     if (demoMode) {
         return;
     }
     
     const savedFolderPath = localStorage.getItem('mp4-combiner-folder-path');
-
+    const savedExportPath = localStorage.getItem('mp4-combiner-output-folder');
+    const folderPathInput = document.getElementById('folderPath');
+    
+    let scanPathValid = false;
+    let exportPathValid = false;
+    
+    // Validate saved paths
     if (savedFolderPath) {
-        document.getElementById('folderPath').value = savedFolderPath;
+        scanPathValid = await validatePath(savedFolderPath);
+    }
+    if (savedExportPath) {
+        exportPathValid = await validatePath(savedExportPath);
+    }
+    
+    // If scan path is invalid, try to auto-set from removable device
+    if (!scanPathValid) {
+        const device = getBestRemovableDevice();
+        if (device) {
+            folderPathInput.value = device.mountPoint;
+            localStorage.setItem('mp4-combiner-folder-path', device.mountPoint);
+            console.log(`[auto-path] Scan folder → ${device.deviceName}: ${device.mountPoint}`);
+        }
+    } else {
+        folderPathInput.value = savedFolderPath;
+    }
+    
+    // If export path is invalid, try to auto-set from removable device
+    if (!exportPathValid) {
+        const device = getBestRemovableDevice();
+        if (device) {
+            localStorage.setItem('mp4-combiner-output-folder', device.documentsVideoPath);
+            console.log(`[auto-path] Export folder → ${device.deviceName}: ${device.documentsVideoPath}`);
+        }
     }
 }
 
