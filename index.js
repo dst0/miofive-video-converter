@@ -27,48 +27,20 @@ let removableDevicesChecked = false;
 
 /**
  * Find USB flash drives, SD cards, and other removable devices on macOS
+ * Uses diskutil list text output for reliable detection
  */
 async function findRemovableDevices() {
     if (process.platform !== 'darwin') return [];
     
     try {
-        // Get disk info for all mounted volumes
-        const { stdout } = await execPromise('diskutil list -plist', { timeout: 10000 });
-        const plist = parseDiskutilPlist(stdout);
+        const { stdout: listOutput } = await execPromise('diskutil list', { timeout: 10000 });
+        const { stdout: volumesOutput } = await execPromise('ls /Volumes/', { timeout: 5000 });
+        const volumes = volumesOutput.trim().split('\n').filter(Boolean);
+        const listDevices = parseDiskutilList(listOutput, volumes);
         
-        const devices = [];
-        for (const disk of plist) {
-            if (!disk.MountPoints || disk.MountPoints.length === 0) continue;
-            
-            const mountPoint = disk.MountPoints[0];
-            const deviceName = disk.DiskDescription || disk.DiskNode || '';
-            const isRemovable = disk.MediaRemovable === true || 
-                                (disk.MountPoint && disk.MountPoint !== '/') &&
-                                !disk.DiskNode.startsWith('/dev/disk0'); // Exclude internal disk
-            
-            // Check for USB/SD card indicators
-            const isExternal = deviceName.toLowerCase().includes('usb') ||
-                              deviceName.toLowerCase().includes('flash') ||
-                              deviceName.toLowerCase().includes('sd ') ||
-                              disk.DiskNode.includes('disk2') ||
-                              disk.DiskNode.includes('disk3') ||
-                              disk.DiskNode.includes('disk4') ||
-                              isRemovable;
-            
-            if (isExternal && mountPoint) {
-                const docsVideoPath = path.join(mountPoint, 'Documents', 'Video');
-                devices.push({
-                    deviceName: disk.DiskDescription || disk.DiskNode || mountPoint,
-                    mountPoint,
-                    documentsVideoPath: docsVideoPath,
-                    sizeBytes: disk.Size || 0,
-                });
-            }
-        }
-        
-        removableDevices = devices;
+        removableDevices = listDevices;
         removableDevicesChecked = true;
-        return devices;
+        return listDevices;
     } catch (err) {
         console.error('Failed to scan removable devices:', err.message);
         return [];
@@ -76,44 +48,112 @@ async function findRemovableDevices() {
 }
 
 /**
- * Parse diskutil list -plist output (simplified plist parser)
+ * Parse diskutil list text output to find external/removable devices
  */
-function parseDiskutilPlist(stdout) {
+function parseDiskutilList(stdout, volumes) {
     const devices = [];
-    // Simple plist parsing - extract disk info
-    const diskBlocks = stdout.split('<dict>').filter((b, i) => i > 0);
+    const lines = stdout.split('\n');
     
-    for (const block of diskBlocks) {
-        const device = {};
-        
-        const descriptionMatch = block.match(/<key>DiskDescription<\/key>\s*<string>([^<]+)<\/string>/);
-        if (descriptionMatch) device.DiskDescription = descriptionMatch[1];
-        
-        const nodeMatch = block.match(/<key>DiskNode<\/key>\s*<string>([^<]+)<\/string>/);
-        if (nodeMatch) device.DiskNode = nodeMatch[1];
-        
-        const sizeMatch = block.match(/<key>Size<\/key>\s*<integer>([^<]+)<\/integer>/);
-        if (sizeMatch) device.Size = parseInt(sizeMatch[1]);
-        
-        const removableMatch = block.match(/<key>MediaRemovable<\/key>\s*<true\/><\/key>/);
-        device.MediaRemovable = !!removableMatch;
-        
-        // Extract mount points
-        const mountPoints = [];
-        const mpRegex = /<key>MountPoint<\/key>\s*<string>([^<]+)<\/string>/g;
-        let mpMatch;
-        while ((mpMatch = mpRegex.exec(block)) !== null) {
-            mountPoints.push(mpMatch[1]);
+    let currentDisk = null;
+    
+    for (const line of lines) {
+        // Match disk header: /dev/disk4 (external, physical):
+        const diskMatch = line.match(/\/dev\/(disk\d+)\s+\(([^)]+)\)/);
+        if (diskMatch) {
+            const diskNode = `/dev/${diskMatch[1]}`;
+            const description = diskMatch[2];
+            currentDisk = {
+                diskNode,
+                isExternal: description.includes('external'),
+                partitions: [],
+                sizeBytes: 0,
+            };
+            continue;
         }
-        device.MountPoints = mountPoints;
-        device.MountPoint = mountPoints[0];
         
-        if (device.DiskNode) {
-            devices.push(device);
+        // Match GUID_partition_scheme line for size:
+        //   0:      GUID_partition_scheme                        *123.9 GB   disk4
+        if (currentDisk && line.includes('GUID_partition_scheme')) {
+            const sizeMatch = line.match(/\*[\s]*(\d+\.?\d*)\s+(TB|GB|MB|KB)/);
+            if (sizeMatch) {
+                const value = parseFloat(sizeMatch[1]);
+                const unit = sizeMatch[2];
+                const multipliers = { KB: 1024, MB: 1024**2, GB: 1024**3, TB: 1024**4 };
+                currentDisk.sizeBytes = Math.round(value * (multipliers[unit] || 1));
+            }
+        }
+        
+        // Match partition lines - capture the identifier at end and everything before size as type+name
+        //   2:       Microsoft Basic Data XBOX ONE X              123.7 GB   disk4s2
+        const partMatch = line.match(/^\s+\d+:\s+(.+?)\s+(\d+\.?\d*)\s+(TB|GB|MB|KB)\s+(\S+)/);
+        if (currentDisk && partMatch) {
+            const typeAndName = partMatch[1].trim();
+            const partitionNode = partMatch[4];
+            
+            // Extract just the name portion (last word or words after known type keywords)
+            // Known type prefixes to strip:
+            const typePrefixes = [
+                'GUID_partition_scheme', 'Apple_APFS_ISC', 'Apple_APFS', 'APFS Volume',
+                'APFS Snapshot', 'Apple_APFS_Recovery', 'APFS Container Scheme -',
+                'Microsoft Basic Data', 'EFI', 'Linux Filesystem', 'Linux Swap',
+                'FAT32 Partition', 'ExFAT Media', 'HFS+', 'Apple_HFS',
+                'Apple_Boot', 'Apple_RAID', 'Apple_CORE',
+            ];
+            let name = typeAndName;
+            for (const prefix of typePrefixes) {
+                if (typeAndName.startsWith(prefix)) {
+                    name = typeAndName.slice(prefix.length).trim();
+                    break;
+                }
+            }
+            
+            currentDisk.partitions.push({ name, node: partitionNode });
+        }
+    }
+    
+    // Process external disks that have mounted partitions
+    if (currentDisk && currentDisk.isExternal) {
+        for (const part of currentDisk.partitions) {
+            if (volumes.includes(part.name) && part.name !== '') {
+                const mountPoint = path.join('/Volumes', part.name);
+                devices.push({
+                    deviceName: part.name,
+                    mountPoint,
+                    documentsVideoPath: path.join(mountPoint, 'Documents', 'Video'),
+                    sizeBytes: currentDisk.sizeBytes,
+                });
+            }
+        }
+        // If no partition name matched /Volumes, try diskutil info fallback
+        if (!devices.length) {
+            const firstPart = currentDisk.partitions[0];
+            if (firstPart) {
+                const mountPoint = guessMountPoint(currentDisk.diskNode, currentDisk.partitions, volumes);
+                if (mountPoint) {
+                    devices.push({
+                        deviceName: firstPart.name || currentDisk.diskNode,
+                        mountPoint,
+                        documentsVideoPath: path.join(mountPoint, 'Documents', 'Video'),
+                        sizeBytes: currentDisk.sizeBytes,
+                    });
+                }
+            }
         }
     }
     
     return devices;
+}
+
+/**
+ * Guess mount point for a disk when partition name doesn't match /Volumes
+ */
+function guessMountPoint(diskNode, partitions, volumes) {
+    // Check if any volume matches a substring of partition node
+    for (const vol of volumes) {
+        // Skip system volumes
+        if (vol === 'Macintosh HD' || vol === 'Preboot' || vol === 'Recovery' || vol === 'Data' || vol === 'VM') continue;
+    }
+    return null;
 }
 const rateLimitMap = new Map();
 const RATE_LIMIT_WINDOW = 60000; // 1 minute
