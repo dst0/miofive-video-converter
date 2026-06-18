@@ -64,6 +64,21 @@ test.describe('Export Modal - Folder Browser Integration', () => {
         await expect(page.locator('#exportModal')).toBeVisible();
     });
 
+    test('should allow navigating up from a folder with no subdirectories', async ({ page }) => {
+        await page.fill('#folderPath', TEST_DATA_PATH);
+        await page.click('#browseFolderBtn');
+        await page.waitForSelector('#folderBrowserModal', { state: 'visible', timeout: 5000 });
+
+        await expect(page.locator('#folderTree .empty-folder-message')).toContainText('No subdirectories found');
+        const parentFolder = page.locator('#folderTree .parent-folder');
+        await expect(parentFolder).toBeVisible();
+
+        await parentFolder.click();
+
+        await expect(page.locator('#currentPathDisplay')).toHaveText(path.dirname(TEST_DATA_PATH));
+        await expect(page.locator('#folderTree .folder-item').filter({ hasText: path.basename(TEST_DATA_PATH) })).toBeVisible();
+    });
+
     test('folder browser modal should render above export modal (z-index regression)', async ({ page }) => {
         await openExportModal(page);
         await page.click('#exportBrowseFolderBtn');

@@ -110,17 +110,12 @@ async function loadFolderContents(path, retryFromRoot = true) {
         
         const directories = data.directories || [];
         
-        if (directories.length === 0) {
-            folderTree.innerHTML = '<div class="empty-folder-message">No subdirectories found</div>';
-            return;
-        }
-        
         // Update current path display
         if (path) {
             currentPathDisplay.textContent = path;
         }
         
-        // Build folder tree HTML
+        // Build folder tree HTML. Keep parent navigation visible even for leaf folders.
         let html = '';
         
         // Add parent directory option if we're not at root
@@ -132,6 +127,10 @@ async function loadFolderContents(path, retryFromRoot = true) {
                     <span class="folder-name">.. (Parent Directory)</span>
                 </div>
             `;
+        }
+
+        if (directories.length === 0) {
+            html += '<div class="empty-folder-message">No subdirectories found</div>';
         }
         
         // Add all subdirectories with appropriate icons based on type
