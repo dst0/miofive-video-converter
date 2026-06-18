@@ -33,7 +33,7 @@ export function initializeFolderBrowser() {
 }
 
 // Open the folder browser modal
-async function openFolderBrowser() {
+export async function openFolderBrowser() {
     const modal = document.getElementById('folderBrowserModal');
     
     // Determine starting path based on whether we're browsing for output or input

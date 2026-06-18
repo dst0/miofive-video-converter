@@ -11,9 +11,8 @@ const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
 
 const RESOURCE_DIR = process.env.MIOFIVE_RESOURCE_DIR || path.join(__dirname, 'src-tauri', 'resources');
-const PUBLIC_DIR = fsSync.existsSync(path.join(RESOURCE_DIR, 'public'))
-    ? path.join(RESOURCE_DIR, 'public')
-    : path.join(__dirname, 'public');
+// Web assets always served from public/ (source of truth). Tauri build copies via copy:public.
+const PUBLIC_DIR = path.join(__dirname, 'public');
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
 const TEST_DATA_DIR = path.join(__dirname, 'test-data');
 const BUNDLED_BIN_DIR = path.join(RESOURCE_DIR, 'bin');
@@ -1073,10 +1072,14 @@ app.post('/scan', async (req, res) => {
         const startTs = startTime ? new Date(startTime).getTime() : null;
         const endTs = endTime ? new Date(endTime).getTime() : null;
         let files = await scanDirectory(folderPath, startTs, endTs);
+        if (channels) {
+        // Only filter when channels are explicitly specified
         files = files.filter(f => {
             const name = f.filename.toUpperCase();
             return (includeA && name.endsWith('A.MP4')) || (includeB && name.endsWith('B.MP4'));
         });
+    }
+    // If no channels specified, include all files
         
         // Probe video durations if requested
         if (includeDurations && files.length > 0) {

@@ -1,294 +1,739 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-    <meta name="theme-color" content="#2563eb" />
-    <title>Miofive Video Converter</title>
-    <link rel="icon" href="app-icon.svg" type="image/svg+xml" />
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=export-ms-1" />
-    <link rel="stylesheet" href="player-styles.css?v=export-ms-1" />
-</head>
-<body>
-<!-- Main Screen -->
-<div class="container" id="mainScreen">
-    <h1>Miofive Video Converter</h1>
-    <p class="subtitle">Scan timestamped videos, review playback, and export exact ranges</p>
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="theme-color" content="#2563eb" />
+        <title>Miofive Video Converter</title>
+        <link rel="icon" href="app-icon.svg" type="image/svg+xml" />
+        <link rel="manifest" href="manifest.webmanifest" />
+        <link rel="stylesheet" href="styles.css?v=export-ms-1" />
+        <link rel="stylesheet" href="player-styles.css?v=export-ms-1" />
+    </head>
+    <body>
+        <!-- Main Screen -->
+        <div class="container" id="mainScreen">
+            <h1>Miofive Video Converter</h1>
+            <p class="subtitle">
+                Scan timestamped videos, review playback, and export exact
+                ranges
+            </p>
 
-    <div id="ffmpegWarning"></div>
+            <div id="ffmpegWarning"></div>
 
-    <div class="section">
-        <div class="section-title">1. Scan Folder</div>
+            <div class="section">
+                <div class="section-title">1. Scan Folder</div>
 
-        <div class="input-group">
-            <label>Channels:</label>
-            <label><input type="checkbox" id="channelA" checked /> A</label>
-            <label><input type="checkbox" id="channelB" checked /> B</label>
-        </div>
-
-        <div class="input-group folder-browser-group">
-            <label>Folder:</label>
-            <div class="folder-browser-container">
-                <input type="text" id="folderPath" placeholder="No folder selected" />
-                <button type="button" id="browseFolderBtn" class="browse-btn">Browse</button>
-            </div>
-        </div>
-        
-        <div id="folderBrowserModal" class="modal" style="display: none;">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Select Folder</h3>
-                    <button type="button" class="close-btn" id="closeBrowserBtn">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <div class="current-path">
-                        <span id="currentPathDisplay">Loading...</span>
-                    </div>
-                    <div class="folder-tree" id="folderTree">
-                        <div class="loading-folders">Loading folders...</div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" id="selectFolderBtn" class="secondary">Select Current Folder</button>
-                    <button type="button" id="cancelBrowserBtn">Cancel</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="pre-scan-filters">
-            <div class="filter-header">
-                <label class="filter-toggle-label">
-                    <input type="checkbox" id="enablePreScanFilters" />
-                    Enable Pre-Scan Date Range Filters
-                </label>
-                <span class="filter-help">💡 Filter files by date before scanning to improve performance</span>
-            </div>
-            <div class="filter-controls" id="preScanFilterControls" style="display: none;">
-                <div class="filter-group">
-                    <label for="preScanStartTime">Start Date/Time:</label>
-                    <input type="datetime-local" id="preScanStartTime" step="0.001">
-                    <button type="button" class="clear-btn" id="clearStartTime">Clear</button>
-                </div>
-                <div class="filter-group">
-                    <label for="preScanEndTime">End Date/Time:</label>
-                    <input type="datetime-local" id="preScanEndTime" step="0.001">
-                    <button type="button" class="clear-btn" id="clearEndTime">Clear</button>
-                </div>
-                <div class="filter-presets">
-                    <span class="preset-label">Quick Presets:</span>
-                    <button type="button" class="preset-btn" data-preset="today">Today</button>
-                    <button type="button" class="preset-btn" data-preset="yesterday">Yesterday</button>
-                    <button type="button" class="preset-btn" data-preset="last7days">Last 7 Days</button>
-                    <button type="button" class="preset-btn" data-preset="thisweek">This Week</button>
-                    <button type="button" class="preset-btn" data-preset="lastweek">Last Week</button>
-                </div>
-            </div>
-        </div>
-
-        <div class="input-group">
-            <button id="scanBtn">Scan</button>
-        </div>
-    </div>
-
-    <div id="results"></div>
-</div>
-
-<!-- Player Screen -->
-<div class="player-container" id="playerScreen" style="display: none;">
-    <div class="player-header">
-        <h1 id="playerTitle">Video Player</h1>
-        <div class="player-header-buttons">
-            <button id="exportVideosBtn" class="export-btn">💾 Export Videos</button>
-            <button id="backBtn" class="back-btn">← Back to Main</button>
-        </div>
-    </div>
-
-    <div class="video-wrapper" id="videoWrapper" tabindex="0" role="region" aria-describedby="videoKeyboardHelp" aria-label="Video playback area">
-        <p id="videoKeyboardHelp" class="sr-only">Press Space or K to play or pause, Left and Right arrows to seek, M to mute, F for fullscreen, S for screenshot, and Escape to close dialogs or leave fullscreen.</p>
-        <div class="video-stage">
-            <video id="videoPlayer1" class="video-player active-player" autoplay playsinline aria-label="Current video" aria-hidden="false">
-                <source id="videoSource1" type="video/mp4">
-                Your browser does not support the video tag.
-            </video>
-            <video id="videoPlayer2" class="video-player" preload="auto" playsinline aria-label="Preloaded next video" aria-hidden="true">
-                <source id="videoSource2" type="video/mp4">
-                Your browser does not support the video tag.
-            </video>
-
-            <div id="videoInfo" class="video-info" aria-live="polite" aria-atomic="true">
-                <span id="currentVideoName"></span>
-                <span id="videoProgress"></span>
-            </div>
-        </div>
-        
-        <!-- Custom playback controls overlay -->
-        <div class="custom-controls-overlay">
-            <div class="playback-progress-bar" aria-label="Playback progress">
-                <div class="progress-bar-container" id="progressBarContainer" role="slider" tabindex="0" aria-label="Seek through selected videos" aria-valuemin="0" aria-valuemax="0" aria-valuenow="0" aria-valuetext="00:00 of 00:00">
-                    <div class="progress-bar-buffered" id="progressBuffered"></div>
-                    <div class="progress-bar-played" id="progressPlayed"></div>
-                    <div class="progress-bar-handle" id="progressHandle" aria-hidden="true"></div>
-                </div>
-                <div class="time-display">
-                    <span id="currentTime">00:00</span>
-                    <span class="time-separator">/</span>
-                    <span id="totalDuration">00:00</span>
-                </div>
-            </div>
-            <div class="control-buttons-row">
-                <button id="playPauseOverlayBtn" class="overlay-btn play-pause-btn" type="button" aria-label="Pause video" aria-pressed="true" title="Pause video">
-                    <span class="btn-icon" aria-hidden="true">⏸</span>
-                </button>
-                <div class="volume-control">
-                    <button id="muteBtn" class="overlay-btn" type="button" aria-label="Mute audio" aria-pressed="false" title="Mute audio">
-                        <span class="btn-icon" aria-hidden="true">🔊</span>
-                    </button>
-                    <input type="range" id="volumeSlider" min="0" max="100" value="100" class="volume-slider" aria-label="Volume" aria-valuetext="100 percent">
-                </div>
-                <div class="overlay-speed-control" role="group" aria-label="Playback speed controls">
-                    <button id="speedDownBtn" class="speed-step-btn" type="button" aria-label="Decrease playback speed" title="Slower">
-                        <span aria-hidden="true">−</span>
-                    </button>
-                    <button id="speedDisplayBtn" class="speed-display" type="button" aria-label="Reset playback speed to 1.0x" title="Reset playback speed to 1.0x">
-                        <span id="speedValue" aria-live="polite">1.0x</span>
-                    </button>
-                    <button id="speedUpBtn" class="speed-step-btn" type="button" aria-label="Increase playback speed" title="Faster">
-                        <span aria-hidden="true">+</span>
-                    </button>
-                </div>
-                <button id="screenshotBtn" class="overlay-btn" type="button" aria-label="Take screenshot" title="Take Screenshot (S)">
-                    <span class="btn-icon" aria-hidden="true">📷</span>
-                </button>
-                <button id="fullscreenBtn" class="overlay-btn" type="button" aria-label="Enter fullscreen" aria-pressed="false" title="Enter fullscreen">
-                    <span class="btn-icon" aria-hidden="true">⛶</span>
-                </button>
-            </div>
-        </div>
-    </div>
-
-    <div class="timeline-section">
-        <div class="section-title">Video Navigation Timeline</div>
-        <div class="timeline-legend">
-            <span class="legend-label">File Markers:</span>
-            <span class="legend-item"><span class="legend-marker legend-marker-normal"></span> Normal</span>
-            <span class="legend-item"><span class="legend-marker legend-marker-emr"></span> Emergency</span>
-            <span class="legend-item"><span class="legend-marker legend-marker-park"></span> Parking</span>
-            <span class="legend-item"><span class="legend-marker legend-marker-other"></span> Other</span>
-        </div>
-        <div class="timeline-container">
-            <div class="timeline-labels">
-                <span class="timeline-label-start" id="timelineStart"></span>
-                <span class="timeline-label-end" id="timelineEnd"></span>
-            </div>
-            <div class="timeline-track" id="timelineTrack">
-                <div class="timeline-background"></div>
-                <div class="time-markers" id="timeMarkers"></div>
-                <div id="fileMarkers"></div>
-                <div class="playback-position" id="playbackPosition"></div>
-            </div>
-        </div>
-    </div>
-
-    <div class="controls-section">
-        <div class="playback-controls">
-            <button id="prevBtn" class="control-btn" type="button" aria-label="Previous video">⏮ Previous</button>
-            <button id="playPauseBtn" class="control-btn" type="button" aria-label="Pause video" aria-pressed="true">⏸ Pause</button>
-            <button id="nextBtn" class="control-btn" type="button" aria-label="Next video">⏭ Next</button>
-        </div>
-        <div class="speed-control">
-            <label for="speedInput">Playback Speed:</label>
-            <input type="number" id="speedInput" min="0.1" max="50" step="0.1" value="1.0" class="speed-input">
-            <input type="range" id="speedSlider" min="0.1" max="50" step="0.1" value="1.0" class="speed-slider" aria-label="Playback speed">
-            <div class="speed-presets">
-                <button class="preset-speed-btn" type="button" data-speed="0.1" aria-label="Set playback speed to 0.1x">0.1x</button>
-                <button class="preset-speed-btn" type="button" data-speed="0.25" aria-label="Set playback speed to 0.25x">0.25x</button>
-                <button class="preset-speed-btn" type="button" data-speed="0.5" aria-label="Set playback speed to 0.5x">0.5x</button>
-                <button class="preset-speed-btn" type="button" data-speed="1" aria-label="Set playback speed to 1x">1x</button>
-                <button class="preset-speed-btn" type="button" data-speed="2" aria-label="Set playback speed to 2x">2x</button>
-                <button class="preset-speed-btn" type="button" data-speed="5" aria-label="Set playback speed to 5x">5x</button>
-                <button class="preset-speed-btn" type="button" data-speed="10" aria-label="Set playback speed to 10x">10x</button>
-                <button class="preset-speed-btn" type="button" data-speed="25" aria-label="Set playback speed to 25x">25x</button>
-                <button class="preset-speed-btn" type="button" data-speed="50" aria-label="Set playback speed to 50x">50x</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Export Videos Modal -->
-    <div id="exportModal" class="modal" role="dialog" aria-modal="true" aria-labelledby="exportModalTitle" aria-hidden="true" style="display: none;">
-        <div class="modal-content" role="document">
-            <div class="modal-header">
-                <h3 id="exportModalTitle">Export Videos</h3>
-                <button type="button" class="close-btn" id="closeExportModalBtn" aria-label="Close export dialog">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="export-info">
-                    <p><strong>Total Videos:</strong> <span id="exportVideoCount">0</span></p>
-                    <p><strong>Total Duration:</strong> <span id="exportTotalDuration">00:00.000</span></p>
-                    <p><strong>Selected Range:</strong> <span id="exportSelectedDuration">00:00.000</span></p>
-                    <p><strong>Output Duration:</strong> <span id="exportOutputDuration">00:00.000</span></p>
-                    <p><strong>Processing Time:</strong> <span id="exportProcessingEstimate">~00:10</span></p>
-                </div>
-                <div class="export-options-grid">
-                    <div class="input-group">
-                        <label for="exportRangeStart">Start Time:</label>
-                        <div class="range-input-row">
-                            <input type="text" id="exportRangeStart" inputmode="numeric" placeholder="00:00.000" />
-                            <button type="button" id="exportSetStartBtn" class="secondary small-btn">Use Current</button>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label for="exportRangeEnd">End Time:</label>
-                        <div class="range-input-row">
-                            <input type="text" id="exportRangeEnd" inputmode="numeric" placeholder="01:00.000" />
-                            <button type="button" id="exportSetEndBtn" class="secondary small-btn">Use Current</button>
-                        </div>
-                    </div>
-                    <div class="input-group">
-                        <label for="exportSpeed">Output Speed:</label>
-                        <input type="number" id="exportSpeed" min="0.1" max="50" step="0.1" value="1.0" />
-                    </div>
-                    <div class="input-group">
-                        <label for="exportQuality">Quality:</label>
-                        <select id="exportQuality">
-                            <option value="max" selected>Maximum</option>
-                            <option value="high">High</option>
-                            <option value="standard">Standard</option>
-                            <option value="compact">Compact</option>
-                        </select>
-                    </div>
-                </div>
-                <div class="input-group folder-browser-group">
-                    <label for="exportOutputFolder">Output Folder:</label>
-                    <div class="folder-browser-container">
-                        <input type="text" id="exportOutputFolder" placeholder="No folder selected" readonly />
-                        <button type="button" id="exportBrowseFolderBtn" class="browse-btn">Browse</button>
-                    </div>
-                </div>
                 <div class="input-group">
-                    <label for="exportOutputFilename">Output Filename:</label>
-                    <input type="text" id="exportOutputFilename" placeholder="exported_video.mp4" />
+                    <label>Channels:</label>
+                    <label
+                        ><input type="checkbox" id="channelA" checked />
+                        A</label
+                    >
+                    <label
+                        ><input type="checkbox" id="channelB" checked />
+                        B</label
+                    >
                 </div>
-                <div id="exportStatus"></div>
+
+                <div class="input-group folder-browser-group">
+                    <label>Folder:</label>
+                    <div class="folder-browser-container">
+                        <input
+                            type="text"
+                            id="folderPath"
+                            placeholder="No folder selected"
+                        />
+                        <button
+                            type="button"
+                            id="browseFolderBtn"
+                            class="browse-btn"
+                        >
+                            Browse
+                        </button>
+                    </div>
+                </div>
+
+                <div class="pre-scan-filters">
+                    <div class="filter-header">
+                        <label class="filter-toggle-label">
+                            <input type="checkbox" id="enablePreScanFilters" />
+                            Enable Pre-Scan Date Range Filters
+                        </label>
+                        <span class="filter-help"
+                            >💡 Filter files by date before scanning to improve
+                            performance</span
+                        >
+                    </div>
+                    <div
+                        class="filter-controls"
+                        id="preScanFilterControls"
+                        style="display: none"
+                    >
+                        <div class="filter-group">
+                            <label for="preScanStartTime"
+                                >Start Date/Time:</label
+                            >
+                            <input
+                                type="datetime-local"
+                                id="preScanStartTime"
+                                step="0.001"
+                            />
+                            <button
+                                type="button"
+                                class="clear-btn"
+                                id="clearStartTime"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                        <div class="filter-group">
+                            <label for="preScanEndTime">End Date/Time:</label>
+                            <input
+                                type="datetime-local"
+                                id="preScanEndTime"
+                                step="0.001"
+                            />
+                            <button
+                                type="button"
+                                class="clear-btn"
+                                id="clearEndTime"
+                            >
+                                Clear
+                            </button>
+                        </div>
+                        <div class="filter-presets">
+                            <span class="preset-label">Quick Presets:</span>
+                            <button
+                                type="button"
+                                class="preset-btn"
+                                data-preset="today"
+                            >
+                                Today
+                            </button>
+                            <button
+                                type="button"
+                                class="preset-btn"
+                                data-preset="yesterday"
+                            >
+                                Yesterday
+                            </button>
+                            <button
+                                type="button"
+                                class="preset-btn"
+                                data-preset="last7days"
+                            >
+                                Last 7 Days
+                            </button>
+                            <button
+                                type="button"
+                                class="preset-btn"
+                                data-preset="thisweek"
+                            >
+                                This Week
+                            </button>
+                            <button
+                                type="button"
+                                class="preset-btn"
+                                data-preset="lastweek"
+                            >
+                                Last Week
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="input-group">
+                    <button id="scanBtn">Scan</button>
+                </div>
             </div>
-            <div class="modal-footer">
-                <button type="button" id="exportConfirmBtn" class="primary">Export</button>
-                <button type="button" id="exportCancelBtn" class="secondary">Cancel</button>
+
+            <div id="results"></div>
+        </div>
+
+        <!-- Player Screen -->
+        <div class="player-container" id="playerScreen" style="display: none">
+            <div class="player-header">
+                <h1 id="playerTitle">Video Player</h1>
+                <div class="player-header-buttons">
+                    <button id="exportVideosBtn" class="export-btn">
+                        💾 Export Videos
+                    </button>
+                    <button id="backBtn" class="back-btn">
+                        ← Back to Main
+                    </button>
+                </div>
+            </div>
+
+            <div
+                class="video-wrapper"
+                id="videoWrapper"
+                tabindex="0"
+                role="region"
+                aria-describedby="videoKeyboardHelp"
+                aria-label="Video playback area"
+            >
+                <p id="videoKeyboardHelp" class="sr-only">
+                    Press Space or K to play or pause, Left and Right arrows to
+                    seek, M to mute, F for fullscreen, S for screenshot, and
+                    Escape to close dialogs or leave fullscreen.
+                </p>
+                <div class="video-stage">
+                    <video
+                        id="videoPlayer1"
+                        class="video-player active-player"
+                        autoplay
+                        playsinline
+                        aria-label="Current video"
+                        aria-hidden="false"
+                    >
+                        <source id="videoSource1" type="video/mp4" />
+                        Your browser does not support the video tag.
+                    </video>
+                    <video
+                        id="videoPlayer2"
+                        class="video-player"
+                        preload="auto"
+                        playsinline
+                        aria-label="Preloaded next video"
+                        aria-hidden="true"
+                    >
+                        <source id="videoSource2" type="video/mp4" />
+                        Your browser does not support the video tag.
+                    </video>
+
+                    <div
+                        id="videoInfo"
+                        class="video-info"
+                        aria-live="polite"
+                        aria-atomic="true"
+                    >
+                        <span id="currentVideoName"></span>
+                        <span id="videoProgress"></span>
+                    </div>
+                </div>
+
+                <!-- Custom playback controls overlay -->
+                <div class="custom-controls-overlay">
+                    <div
+                        class="playback-progress-bar"
+                        aria-label="Playback progress"
+                    >
+                        <div
+                            class="progress-bar-container"
+                            id="progressBarContainer"
+                            role="slider"
+                            tabindex="0"
+                            aria-label="Seek through selected videos"
+                            aria-valuemin="0"
+                            aria-valuemax="0"
+                            aria-valuenow="0"
+                            aria-valuetext="00:00 of 00:00"
+                        >
+                            <div
+                                class="progress-bar-buffered"
+                                id="progressBuffered"
+                            ></div>
+                            <div
+                                class="progress-bar-played"
+                                id="progressPlayed"
+                            ></div>
+                            <div
+                                class="progress-bar-handle"
+                                id="progressHandle"
+                                aria-hidden="true"
+                            ></div>
+                        </div>
+                        <div class="time-display">
+                            <span id="currentTime">00:00</span>
+                            <span class="time-separator">/</span>
+                            <span id="totalDuration">00:00</span>
+                        </div>
+                    </div>
+                    <div class="control-buttons-row">
+                        <button
+                            id="playPauseOverlayBtn"
+                            class="overlay-btn play-pause-btn"
+                            type="button"
+                            aria-label="Pause video"
+                            aria-pressed="true"
+                            title="Pause video"
+                        >
+                            <span class="btn-icon" aria-hidden="true">⏸</span>
+                        </button>
+                        <div class="volume-control">
+                            <button
+                                id="muteBtn"
+                                class="overlay-btn"
+                                type="button"
+                                aria-label="Mute audio"
+                                aria-pressed="false"
+                                title="Mute audio"
+                            >
+                                <span class="btn-icon" aria-hidden="true"
+                                    >🔊</span
+                                >
+                            </button>
+                            <input
+                                type="range"
+                                id="volumeSlider"
+                                min="0"
+                                max="100"
+                                value="100"
+                                class="volume-slider"
+                                aria-label="Volume"
+                                aria-valuetext="100 percent"
+                            />
+                        </div>
+                        <div
+                            class="overlay-speed-control"
+                            role="group"
+                            aria-label="Playback speed controls"
+                        >
+                            <button
+                                id="speedDownBtn"
+                                class="speed-step-btn"
+                                type="button"
+                                aria-label="Decrease playback speed"
+                                title="Slower"
+                            >
+                                <span aria-hidden="true">−</span>
+                            </button>
+                            <button
+                                id="speedDisplayBtn"
+                                class="speed-display"
+                                type="button"
+                                aria-label="Reset playback speed to 1.0x"
+                                title="Reset playback speed to 1.0x"
+                            >
+                                <span id="speedValue" aria-live="polite"
+                                    >1.0x</span
+                                >
+                            </button>
+                            <button
+                                id="speedUpBtn"
+                                class="speed-step-btn"
+                                type="button"
+                                aria-label="Increase playback speed"
+                                title="Faster"
+                            >
+                                <span aria-hidden="true">+</span>
+                            </button>
+                        </div>
+                        <button
+                            id="screenshotBtn"
+                            class="overlay-btn"
+                            type="button"
+                            aria-label="Take screenshot"
+                            title="Take Screenshot (S)"
+                        >
+                            <span class="btn-icon" aria-hidden="true">📷</span>
+                        </button>
+                        <button
+                            id="fullscreenBtn"
+                            class="overlay-btn"
+                            type="button"
+                            aria-label="Enter fullscreen"
+                            aria-pressed="false"
+                            title="Enter fullscreen"
+                        >
+                            <span class="btn-icon" aria-hidden="true">⛶</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="timeline-section">
+                <div class="section-title">Video Navigation Timeline</div>
+                <div class="timeline-legend">
+                    <span class="legend-label">File Markers:</span>
+                    <span class="legend-item"
+                        ><span
+                            class="legend-marker legend-marker-normal"
+                        ></span>
+                        Normal</span
+                    >
+                    <span class="legend-item"
+                        ><span class="legend-marker legend-marker-emr"></span>
+                        Emergency</span
+                    >
+                    <span class="legend-item"
+                        ><span class="legend-marker legend-marker-park"></span>
+                        Parking</span
+                    >
+                    <span class="legend-item"
+                        ><span class="legend-marker legend-marker-other"></span>
+                        Other</span
+                    >
+                </div>
+                <div class="timeline-container">
+                    <div class="timeline-labels">
+                        <span
+                            class="timeline-label-start"
+                            id="timelineStart"
+                        ></span>
+                        <span
+                            class="timeline-label-end"
+                            id="timelineEnd"
+                        ></span>
+                    </div>
+                    <div class="timeline-track" id="timelineTrack">
+                        <div class="timeline-background"></div>
+                        <div class="time-markers" id="timeMarkers"></div>
+                        <div id="fileMarkers"></div>
+                        <div
+                            class="playback-position"
+                            id="playbackPosition"
+                        ></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="controls-section">
+                <div class="playback-controls">
+                    <button
+                        id="prevBtn"
+                        class="control-btn"
+                        type="button"
+                        aria-label="Previous video"
+                    >
+                        ⏮ Previous
+                    </button>
+                    <button
+                        id="playPauseBtn"
+                        class="control-btn"
+                        type="button"
+                        aria-label="Pause video"
+                        aria-pressed="true"
+                    >
+                        ⏸ Pause
+                    </button>
+                    <button
+                        id="nextBtn"
+                        class="control-btn"
+                        type="button"
+                        aria-label="Next video"
+                    >
+                        ⏭ Next
+                    </button>
+                </div>
+                <div class="speed-control">
+                    <label for="speedInput">Playback Speed:</label>
+                    <input
+                        type="number"
+                        id="speedInput"
+                        min="0.1"
+                        max="50"
+                        step="0.1"
+                        value="1.0"
+                        class="speed-input"
+                    />
+                    <input
+                        type="range"
+                        id="speedSlider"
+                        min="0.1"
+                        max="50"
+                        step="0.1"
+                        value="1.0"
+                        class="speed-slider"
+                        aria-label="Playback speed"
+                    />
+                    <div class="speed-presets">
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="0.1"
+                            aria-label="Set playback speed to 0.1x"
+                        >
+                            0.1x
+                        </button>
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="0.25"
+                            aria-label="Set playback speed to 0.25x"
+                        >
+                            0.25x
+                        </button>
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="0.5"
+                            aria-label="Set playback speed to 0.5x"
+                        >
+                            0.5x
+                        </button>
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="1"
+                            aria-label="Set playback speed to 1x"
+                        >
+                            1x
+                        </button>
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="2"
+                            aria-label="Set playback speed to 2x"
+                        >
+                            2x
+                        </button>
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="5"
+                            aria-label="Set playback speed to 5x"
+                        >
+                            5x
+                        </button>
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="10"
+                            aria-label="Set playback speed to 10x"
+                        >
+                            10x
+                        </button>
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="25"
+                            aria-label="Set playback speed to 25x"
+                        >
+                            25x
+                        </button>
+                        <button
+                            class="preset-speed-btn"
+                            type="button"
+                            data-speed="50"
+                            aria-label="Set playback speed to 50x"
+                        >
+                            50x
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Folder Browser Modal (moved to root level so it works from player screen) -->
+            <div id="folderBrowserModal" class="modal" style="display: none">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>Select Folder</h3>
+                        <button
+                            type="button"
+                            class="close-btn"
+                            id="closeBrowserBtn"
+                        >
+                            &times;
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="current-path">
+                            <span id="currentPathDisplay">Loading...</span>
+                        </div>
+                        <div class="folder-tree" id="folderTree">
+                            <div class="loading-folders">
+                                Loading folders...
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            type="button"
+                            id="selectFolderBtn"
+                            class="secondary"
+                        >
+                            Select Current Folder
+                        </button>
+                        <button type="button" id="cancelBrowserBtn">
+                            Cancel
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Export Videos Modal -->
+            <div
+                id="exportModal"
+                class="modal"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="exportModalTitle"
+                aria-hidden="true"
+                style="display: none"
+            >
+                <div class="modal-content" role="document">
+                    <div class="modal-header">
+                        <h3 id="exportModalTitle">Export Videos</h3>
+                        <button
+                            type="button"
+                            class="close-btn"
+                            id="closeExportModalBtn"
+                            aria-label="Close export dialog"
+                        >
+                            &times;
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="export-info">
+                            <p>
+                                <strong>Total Videos:</strong>
+                                <span id="exportVideoCount">0</span>
+                            </p>
+                            <p>
+                                <strong>Total Duration:</strong>
+                                <span id="exportTotalDuration">00:00.000</span>
+                            </p>
+                            <p>
+                                <strong>Selected Range:</strong>
+                                <span id="exportSelectedDuration"
+                                    >00:00.000</span
+                                >
+                            </p>
+                            <p>
+                                <strong>Output Duration:</strong>
+                                <span id="exportOutputDuration">00:00.000</span>
+                            </p>
+                            <p>
+                                <strong>Processing Time:</strong>
+                                <span id="exportProcessingEstimate"
+                                    >~00:10</span
+                                >
+                            </p>
+                        </div>
+                        <div class="export-options-grid">
+                            <div class="input-group">
+                                <label for="exportRangeStart"
+                                    >Start Time:</label
+                                >
+                                <div class="range-input-row">
+                                    <input
+                                        type="text"
+                                        id="exportRangeStart"
+                                        inputmode="numeric"
+                                        placeholder="00:00.000"
+                                    />
+                                    <button
+                                        type="button"
+                                        id="exportSetStartBtn"
+                                        class="secondary small-btn"
+                                    >
+                                        Use Current
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="exportRangeEnd">End Time:</label>
+                                <div class="range-input-row">
+                                    <input
+                                        type="text"
+                                        id="exportRangeEnd"
+                                        inputmode="numeric"
+                                        placeholder="01:00.000"
+                                    />
+                                    <button
+                                        type="button"
+                                        id="exportSetEndBtn"
+                                        class="secondary small-btn"
+                                    >
+                                        Use Current
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <label for="exportSpeed">Output Speed:</label>
+                                <input
+                                    type="number"
+                                    id="exportSpeed"
+                                    min="0.1"
+                                    max="50"
+                                    step="0.1"
+                                    value="1.0"
+                                />
+                            </div>
+                            <div class="input-group">
+                                <label for="exportQuality">Quality:</label>
+                                <select id="exportQuality">
+                                    <option value="max" selected>
+                                        Maximum
+                                    </option>
+                                    <option value="high">High</option>
+                                    <option value="standard">Standard</option>
+                                    <option value="compact">Compact</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="input-group folder-browser-group">
+                            <label for="exportOutputFolder"
+                                >Output Folder:</label
+                            >
+                            <div class="folder-browser-container">
+                                <input
+                                    type="text"
+                                    id="exportOutputFolder"
+                                    placeholder="No folder selected"
+                                    readonly
+                                />
+                                <button
+                                    type="button"
+                                    id="exportBrowseFolderBtn"
+                                    class="browse-btn"
+                                >
+                                    Browse
+                                </button>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label for="exportOutputFilename"
+                                >Output Filename:</label
+                            >
+                            <input
+                                type="text"
+                                id="exportOutputFilename"
+                                placeholder="exported_video.mp4"
+                            />
+                        </div>
+                        <div id="exportStatus"></div>
+                    </div>
+                    <div class="modal-footer">
+                        <button
+                            type="button"
+                            id="exportConfirmBtn"
+                            class="primary"
+                        >
+                            Export
+                        </button>
+                        <button
+                            type="button"
+                            id="exportCancelBtn"
+                            class="secondary"
+                        >
+                            Cancel
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
-    </div>
-</div>
 
-<!-- Snackbar container for notifications -->
-<div id="snackbar" class="snackbar" role="status" aria-live="polite" aria-atomic="true"></div>
+        <!-- Snackbar container for notifications -->
+        <div
+            id="snackbar"
+            class="snackbar"
+            role="status"
+            aria-live="polite"
+            aria-atomic="true"
+        ></div>
 
-<script type="module" src="app.js?v=export-range-1"></script>
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/service-worker.js').catch(() => {});
-        });
-    }
-</script>
-</body>
+        <script type="module" src="app.js?v=export-range-1"></script>
+        <script>
+            if ('serviceWorker' in navigator) {
+                window.addEventListener('load', () => {
+                    navigator.serviceWorker
+                        .register('/service-worker.js')
+                        .catch(() => {});
+                });
+            }
+        </script>
+    </body>
 </html>

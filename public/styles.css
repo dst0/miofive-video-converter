@@ -29,7 +29,7 @@ body {
     background: white;
     border-radius: 12px;
     padding: 30px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
 
 h1 {
@@ -60,7 +60,7 @@ h1 {
     margin-bottom: 20px;
     text-align: center;
     font-size: 14px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .section {
@@ -88,8 +88,8 @@ h1 {
 }
 
 /* Common input styles */
-input[type="text"],
-input[type="datetime-local"] {
+input[type='text'],
+input[type='datetime-local'] {
     flex: 1;
     padding: 10px;
     border: 2px solid #ddd;
@@ -98,8 +98,8 @@ input[type="datetime-local"] {
     transition: border-color 0.3s;
 }
 
-input[type="text"]:focus,
-input[type="datetime-local"]:focus {
+input[type='text']:focus,
+input[type='datetime-local']:focus {
     outline: none;
     border-color: #667eea;
 }
@@ -227,8 +227,12 @@ button.play-button:hover {
 }
 
 @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
+    0% {
+        transform: rotate(0deg);
+    }
+    100% {
+        transform: rotate(360deg);
+    }
 }
 
 /* Timeline Styles */
@@ -342,7 +346,9 @@ button.play-button:hover {
     background: #667eea;
     border-radius: 4px;
     transform: translate(-50%, -50%);
-    transition: opacity 0.3s, transform 0.2s;
+    transition:
+        opacity 0.3s,
+        transform 0.2s;
     z-index: 4;
     cursor: pointer;
     pointer-events: auto;
@@ -433,7 +439,7 @@ button.play-button:hover {
     border-radius: 50%;
     transform: translate(-50%, -50%);
     cursor: grab;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
     transition: transform 0.2s;
     z-index: 4;
     display: flex;
@@ -577,11 +583,15 @@ button.play-button:hover {
     gap: 5px;
 }
 
-
-
 .timeline-separator {
     height: 1px;
-    background: linear-gradient(to right, transparent, #ddd 20%, #ddd 80%, transparent);
+    background: linear-gradient(
+        to right,
+        transparent,
+        #ddd 20%,
+        #ddd 80%,
+        transparent
+    );
     margin: 20px 0;
 }
 
@@ -633,14 +643,14 @@ button.play-button:hover {
     content: '⏭ ';
 }
 
-.manual-edit-group input[type="datetime-local"] {
+.manual-edit-group input[type='datetime-local'] {
     padding: 8px;
     border: 1px solid #ccc;
     border-radius: 4px;
     font-size: 13px;
 }
 
-.manual-edit-group input[type="datetime-local"]:focus {
+.manual-edit-group input[type='datetime-local']:focus {
     border-color: #667eea;
     outline: none;
 }
@@ -666,7 +676,7 @@ button.play-button:hover {
     margin: 0;
 }
 
-.select-all-label input[type="checkbox"] {
+.select-all-label input[type='checkbox'] {
     margin-right: 10px;
     transform: scale(1.1);
 }
@@ -742,7 +752,7 @@ button.play-button:hover {
     align-items: center;
 }
 
-.folder-browser-container input[type="text"] {
+.folder-browser-container input[type='text'] {
     flex: 1;
     background-color: #f8f9fa;
 }
@@ -769,6 +779,11 @@ button.play-button:hover {
     align-items: center;
     justify-content: center;
     z-index: 1000;
+}
+
+/* Folder browser modal always renders above other modals */
+#folderBrowserModal {
+    z-index: 2000;
 }
 
 .modal-content {
@@ -1012,7 +1027,7 @@ button.play-button:hover {
     align-items: center;
 }
 
-.filename-container input[type="text"] {
+.filename-container input[type='text'] {
     flex: 1;
 }
 /* Snackbar Notification Styles */
@@ -1026,12 +1041,14 @@ button.play-button:hover {
     max-width: 500px;
     padding: 16px 24px;
     border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     font-size: 14px;
     font-weight: 500;
     z-index: 10000;
     opacity: 0;
-    transition: opacity 0.3s ease, visibility 0.3s ease;
+    transition:
+        opacity 0.3s ease,
+        visibility 0.3s ease;
 }
 
 .snackbar.show {

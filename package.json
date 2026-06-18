@@ -7,6 +7,7 @@
     "start": "node index.js",
     "build:ffmpeg": "scripts/build-ffmpeg-macos-arm64.sh",
     "copy:ffmpeg": "node scripts/copy-ffmpeg-binaries.js",
+    "copy:public": "cp -R public/. src-tauri/resources/public/",
     "build:sidecar": "npm run copy:ffmpeg && node scripts/build-sidecar.js",
     "desktop": "tauri dev",
     "build:mac": "npm run dist:mac",

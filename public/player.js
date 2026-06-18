@@ -1,5 +1,7 @@
 // Video Player JavaScript - Dual Player Architecture (SPA Module)
 
+import { openFolderBrowser } from './folder-browser.js';
+
 let videoFiles = [];
 let currentVideoIndex = 0;
 let timelineData = null;
@@ -1822,10 +1824,9 @@ function closeExportModal() {
 function openExportFolderBrowser() {
     // Set flag to indicate we're browsing for export output
     window.browsingForExport = true;
-    
-    // Trigger the folder browser
-    const browseFolderBtn = document.getElementById('browseFolderBtn');
-    browseFolderBtn.click();
+
+    // Open folder browser directly (avoids z-index conflict with export modal)
+    openFolderBrowser();
 }
 
 async function performExport() {
