@@ -16,6 +16,7 @@ module.exports = defineConfig({
     baseURL: 'http://localhost:3000',
     trace: 'on-first-retry',
     actionTimeout: 10000, // 10 seconds for actions like click, fill
+    serviceWorkers: 'block',
   },
 
   projects: [

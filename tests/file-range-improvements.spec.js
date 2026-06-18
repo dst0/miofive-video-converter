@@ -10,7 +10,7 @@ test.describe('File Range and Player Sync Improvements', () => {
         await page.waitForLoadState('networkidle');
         
         // Initialize player with mock data directly using page.evaluate
-        await page.evaluate(() => {
+        await page.evaluate(async () => {
             // Create mock video files data
             const mockFiles = [
                 {
@@ -40,9 +40,8 @@ test.describe('File Range and Player Sync Improvements', () => {
             ];
             
             // Import and call showPlayerScreen
-            import('/player.js?v=export-ms-1').then(module => {
-                module.showPlayerScreen(mockFiles);
-            });
+            const module = await import('/player.js?v=export-range-1');
+            module.showPlayerScreen(mockFiles);
         });
         
         // Wait for player screen to be visible

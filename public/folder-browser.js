@@ -82,7 +82,7 @@ function selectCurrentFolder() {
 }
 
 // Load and display folder contents
-async function loadFolderContents(path) {
+async function loadFolderContents(path, retryFromRoot = true) {
     const folderTree = document.getElementById('folderTree');
     const currentPathDisplay = document.getElementById('currentPathDisplay');
     
@@ -99,6 +99,11 @@ async function loadFolderContents(path) {
         const data = await response.json();
         
         if (!response.ok) {
+            if (path && retryFromRoot) {
+                currentBrowsePath = null;
+                await loadFolderContents(null, false);
+                return;
+            }
             folderTree.innerHTML = `<div class="empty-folder-message">Error: ${data.error}</div>`;
             return;
         }

@@ -7,8 +7,10 @@
     "start": "node index.js",
     "build:ffmpeg": "scripts/build-ffmpeg-macos-arm64.sh",
     "copy:ffmpeg": "node scripts/copy-ffmpeg-binaries.js",
-    "copy:public": "cp -R public/. src-tauri/resources/public/",
-    "build:sidecar": "npm run copy:ffmpeg && node scripts/build-sidecar.js",
+    "copy:resources": "node scripts/copy-resources.js",
+    "copy:resources:demo": "node scripts/copy-resources.js --include-demo-videos",
+    "build:sidecar": "npm run copy:ffmpeg && npm run copy:resources && node scripts/build-sidecar.js",
+    "build:sidecar:demo": "npm run copy:ffmpeg && npm run copy:resources:demo && node scripts/build-sidecar.js",
     "desktop": "tauri dev",
     "build:mac": "npm run dist:mac",
     "install:mac": "mkdir -p \"$HOME/Applications\" && rm -rf \"$HOME/Applications/Miofive Video Converter.app\" && cp -R \"src-tauri/target/release/bundle/macos/Miofive Video Converter.app\" \"$HOME/Applications/\"",
@@ -30,8 +32,7 @@
   "license": "MIT",
   "pkg": {
     "assets": [
-      "public/**/*",
-      "test-data/**/*"
+      "public/**/*"
     ]
   },
   "dependencies": {

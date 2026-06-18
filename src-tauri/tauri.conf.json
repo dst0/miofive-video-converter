@@ -6,8 +6,8 @@
   "build": {
     "frontendDist": "../public",
     "devUrl": "http://localhost:3000",
-    "beforeDevCommand": "npm run build:sidecar && npm run copy:public",
-    "beforeBuildCommand": "npm run build:sidecar && npm run copy:public"
+    "beforeDevCommand": "npm run build:sidecar:demo",
+    "beforeBuildCommand": "npm run build:sidecar"
   },
   "app": {
     "windows": [
@@ -30,12 +30,8 @@
     "active": true,
     "targets": ["app", "dmg"],
     "category": "Video",
-    "resources": [
-      "resources/**/*"
-    ],
-    "externalBin": [
-      "binaries/miofive-server"
-    ],
+    "resources": ["resources/**/*"],
+    "externalBin": ["binaries/miofive-server"],
     "macOS": {
       "minimumSystemVersion": "10.13"
     }

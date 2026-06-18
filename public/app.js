@@ -151,8 +151,13 @@ async function loadSavedPaths() {
     if (!exportPathValid) {
         const device = getBestRemovableDevice();
         if (device) {
-            localStorage.setItem('mp4-combiner-output-folder', device.documentsVideoPath);
-            console.log(`[auto-path] Export folder → ${device.deviceName}: ${device.documentsVideoPath}`);
+            const preferredExportPath = await validatePath(device.documentsVideoPath)
+                ? device.documentsVideoPath
+                : device.mountPoint;
+            localStorage.setItem('mp4-combiner-output-folder', preferredExportPath);
+            console.log(`[auto-path] Export folder → ${device.deviceName}: ${preferredExportPath}`);
+        } else if (savedExportPath) {
+            localStorage.removeItem('mp4-combiner-output-folder');
         }
     }
 }

@@ -5,7 +5,13 @@ const path = require('path');
 
 test.describe('Application Basic Tests', () => {
   test.beforeEach(async ({ page }) => {
+    await page.route('**/demo-mode', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ enabled: false, demoPath: null, removableDevices: [] }),
+    }));
     await page.goto('/');
+    await page.waitForLoadState('networkidle');
   });
 
   test('should load homepage with correct structure', async ({ page }) => {
@@ -32,13 +38,13 @@ test.describe('Application Basic Tests', () => {
   });
 
   test('should check FFmpeg availability', async ({ page }) => {
-    // Listen for the API call
-    const responsePromise = page.waitForResponse('/check-ffmpeg');
-    
-    const response = await responsePromise;
-    expect(response.ok()).toBeTruthy();
-    
-    const data = await response.json();
+    const data = await page.evaluate(async () => {
+      const response = await fetch('/check-ffmpeg');
+      if (!response.ok) {
+        throw new Error(`Unexpected /check-ffmpeg status: ${response.status}`);
+      }
+      return response.json();
+    });
     expect(data).toHaveProperty('available');
   });
 
@@ -70,7 +76,13 @@ test.describe('Application Basic Tests', () => {
 
 test.describe('Pre-Scan Filters', () => {
   test.beforeEach(async ({ page }) => {
+    await page.route('**/demo-mode', route => route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ enabled: false, demoPath: null, removableDevices: [] }),
+    }));
     await page.goto('/');
+    await page.waitForLoadState('networkidle');
   });
 
   test('should have pre-scan filter controls and toggle visibility', async ({ page }) => {

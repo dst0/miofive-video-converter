@@ -11,10 +11,19 @@ const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
 
 const RESOURCE_DIR = process.env.MIOFIVE_RESOURCE_DIR || path.join(__dirname, 'src-tauri', 'resources');
-// Web assets always served from public/ (source of truth). Tauri build copies via copy:public.
-const PUBLIC_DIR = path.join(__dirname, 'public');
+function resolveResourceDirectory(name) {
+    const sourceDir = path.join(__dirname, name);
+    if (fsSync.existsSync(sourceDir)) {
+        return sourceDir;
+    }
+
+    return path.join(RESOURCE_DIR, name);
+}
+
+// Web assets are served from source in local dev and from copied resources in Tauri.
+const PUBLIC_DIR = resolveResourceDirectory('public');
 const DEMO_MODE = process.env.DEMO_MODE === 'true';
-const TEST_DATA_DIR = path.join(__dirname, 'test-data');
+const TEST_DATA_DIR = resolveResourceDirectory('test-data');
 const BUNDLED_BIN_DIR = path.join(RESOURCE_DIR, 'bin');
 
 // MP4 duration extraction configuration

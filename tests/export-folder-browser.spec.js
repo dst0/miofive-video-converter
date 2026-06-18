@@ -95,8 +95,8 @@ test.describe('Export Modal - Folder Browser Integration', () => {
         await page.click('#exportBrowseFolderBtn');
         await page.waitForSelector('#folderBrowserModal', { state: 'visible', timeout: 5000 });
 
-        // Wait for folder tree to load
-        await expect(page.locator('#folderTree')).not.toContainText('Loading folders...');
+        // Wait for folder tree to load and populate
+        await expect(page.locator('#folderTree').locator('.folder-item').first()).toBeVisible({ timeout: 10000 });
 
         // Look for a folder to navigate to
         const folders = page.locator('#folderTree').locator('.folder-item');
@@ -143,6 +143,9 @@ test.describe('Export Modal - Folder Browser Integration', () => {
         await openExportModal(page);
         await page.click('#exportBrowseFolderBtn');
         await page.waitForSelector('#folderBrowserModal', { state: 'visible' });
+
+        // Wait for folder tree to populate
+        await expect(page.locator('#folderTree').locator('.folder-item').first()).toBeVisible({ timeout: 10000 });
 
         // Select a folder
         const folders = page.locator('#folderTree').locator('.folder-item');
