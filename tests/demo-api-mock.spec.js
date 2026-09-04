@@ -54,7 +54,7 @@ test.describe('Demo API Mock Module Tests', () => {
         
         const result = await page.evaluate(async () => {
             const module = await import('/demo-api-mock.js');
-            return await module.DemoAPI.listDirectories({ currentPath: '' });
+            return await module.DemoAPI.listDirectories({ path: '' });
         });
         
         expect(result).toHaveProperty('directories');
@@ -69,7 +69,7 @@ test.describe('Demo API Mock Module Tests', () => {
         
         const result = await page.evaluate(async () => {
             const module = await import('/demo-api-mock.js');
-            return await module.DemoAPI.listDirectories({ currentPath: 'test-data' });
+            return await module.DemoAPI.listDirectories({ path: 'test-data' });
         });
         
         expect(result).toHaveProperty('directories');
@@ -84,7 +84,7 @@ test.describe('Demo API Mock Module Tests', () => {
         
         const result = await page.evaluate(async () => {
             const module = await import('/demo-api-mock.js');
-            return await module.DemoAPI.listDirectories({ currentPath: 'test-data/Normal' });
+            return await module.DemoAPI.listDirectories({ path: 'test-data/Normal' });
         });
         
         expect(result).toHaveProperty('directories');
@@ -100,7 +100,7 @@ test.describe('Demo API Mock Module Tests', () => {
             const module = await import('/demo-api-mock.js');
             return await module.DemoAPI.scan({ 
                 folderPath: 'test-data/Normal',
-                channels: ['A', 'B']
+                channels: ['A']
             });
         });
         
@@ -133,13 +133,13 @@ test.describe('Demo API Mock Module Tests', () => {
             const module = await import('/demo-api-mock.js');
             return await module.DemoAPI.scan({ 
                 folderPath: 'test-data/Normal',
-                channels: ['A', 'B']
+                channels: ['A']
             });
         });
         
         expect(result.files).toHaveLength(10);
         // Every file should have a duration property
-        expect(result.files.every(f => f.hasOwnProperty('duration'))).toBe(true);
+        expect(result.files.every(f => Object.hasOwn(f, 'duration'))).toBe(true);
         // Every duration should be 2 seconds
         expect(result.files.every(f => f.duration === 2)).toBe(true);
     });

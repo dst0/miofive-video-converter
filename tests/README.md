@@ -1,128 +1,40 @@
-# Test Suite
+# Test suite
 
-This directory contains end-to-end tests for the Miofive Video Converter application using Playwright.
+The repository has two layers:
 
-## Test Structure
+- `tests/unit/*.test.js`: Node's built-in test runner for parsers and trust-boundary helpers.
+- `tests/*.spec.js`: Playwright browser and API coverage, including real FFmpeg export tests.
 
-- **api.spec.js** - API endpoint tests that verify server responses
-- **app.spec.js** - Basic application UI tests
-- **folder-browser.spec.js** - Folder browser functionality tests
-- **scan.spec.js** - Video scanning functionality tests
-
-## Running Tests
-
-### Prerequisites
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Install Playwright browsers (first time only):
-   ```bash
-   npx playwright install chromium
-   ```
-
-### Run All Tests
+## Run
 
 ```bash
-npm test
+npm ci --ignore-scripts
+npx playwright install chromium
+npm run check:ffmpeg
+npm run test:unit
+npm run test:e2e
 ```
 
-### Run Tests in Headed Mode
+`npm test` runs both test layers. `npm run precommit` is the quick local gate; `npm run prepush` also runs the complete browser and Rust checks.
 
-To see the browser while tests run:
+Validation gates:
 
-```bash
-npm run test:headed
-```
+- Unit tests (`tests/unit/*.test.js`): run via `npm run test:unit`, including backend helpers, process/scan lifecycle regressions and build tooling/manifest resolvers. Do not enumerate a subset when reporting the global gate.
+- Rust unit tests and Clippy (`npm run check:rust`): runs Clippy with warnings denied and tests loopback sidecar URL validation in `src-tauri/src/lib.rs`.
+- End-to-end browser and API tests (`tests/*.spec.js`): run via `npm run test:e2e`, executing Playwright across all browser and API specifications in single-worker mode.
+- Local merge gates: run `npm run precommit` before committing and `npm run prepush` before pushing. Full pre-push and remote CI validation on the exact PR head remain required for merge.
 
-### Run Tests in UI Mode
+The Playwright configuration starts a fresh backend at `127.0.0.1:3000`, never reuses an unknown local server, blocks service workers, and writes an HTML report without opening an interactive report server. It strictly uses one worker (`workers: 1`) because export/API flows share one backend-wide FFmpeg mutex, and it permits no retries. CI installs Chromium runtime dependencies and FFmpeg explicitly.
 
-To use Playwright's interactive UI:
+Every API and UI export test creates a unique directory under the operating-system temporary directory and removes it in cleanup, including after a failed assertion. The tests intentionally use ordinary uncompressed temporary MP4 files because FFmpeg and browser media decoders require random access and do not support a Brotli-wrapped input.
 
-```bash
-npm run test:ui
-```
+When adding tests:
 
-### Run Specific Test File
+- cover malformed input and failure behavior, not only success;
+- make media state deterministic instead of relying on decoder timing;
+- use asymmetric date fixtures when validating compact date formats;
+- assert that descendants and inherited pipes are gone in any future process-timeout test;
+- keep unit tests portable and vendor-free: validate per-build identity via isolated fixtures and recorded digests rather than asserting uncommitted workstation artifact paths or environment-specific hashes;
+- never place real card paths, customer filenames, credentials, or sensitive payloads in fixtures or reports.
 
-```bash
-npx playwright test tests/api.spec.js
-```
-
-### Run Tests with Debugging
-
-```bash
-npx playwright test --debug
-```
-
-## Test Coverage
-
-The test suite covers:
-
-1. **Application Loading**
-   - Homepage loads with correct title
-   - All UI elements are visible and functional
-   - FFmpeg availability check
-
-2. **Pre-Scan Filters**
-   - Filter controls visibility
-   - Date preset functionality
-   - Clear button functionality
-
-3. **Folder Browser**
-   - Modal open/close functionality
-   - Folder navigation
-   - Path persistence
-
-4. **Scan Functionality**
-   - Video file scanning
-   - Channel filtering (A/B)
-   - Timeline display
-   - File list generation
-   - Select all functionality
-
-5. **API Endpoints**
-   - `/check-ffmpeg` - FFmpeg availability
-   - `/list-directories` - Directory listing
-   - `/scan` - Video scanning
-   - `/export` - Video export
-
-## CI/CD Integration
-
-Tests are automatically run in GitHub Actions on every push and pull request. The CI workflow:
-
-1. Uses a Docker container with FFmpeg pre-installed
-2. Installs Node.js and dependencies
-3. Installs Playwright browsers
-4. Runs the test suite
-
-## Writing New Tests
-
-When adding new tests:
-
-1. Follow the existing test structure
-2. Use descriptive test names
-3. Clean up any test data in `afterEach` hooks
-4. Use appropriate timeouts for async operations
-5. Add both positive and negative test cases
-
-## Debugging Failed Tests
-
-If a test fails:
-
-1. Check the test output for error messages
-2. Review screenshots in `test-results/` directory
-3. View the trace file:
-   ```bash
-   npx playwright show-trace test-results/<trace-file>.zip
-   ```
-4. Run the specific test in headed mode to see what's happening
-
-## Notes
-
-- Tests create temporary directories in `/tmp` for mock video files
-- All test data is cleaned up after each test
-- The server is automatically started before tests and stopped after
-- Tests use the configuration in `playwright.config.js`
+`tests/product-reliability.spec.js` exercises storage-denied startup/export, unknown and late-arriving durations, scan cancellation controls, keyboard/modal focus, immutable running-export settings, literal paths, viewport-edge scrubbing, explicit output choice, and a synthetic network-playlist trap. `tests/unit/lifecycle.test.js` starts isolated ephemeral servers and self-expiring probe descendants; it checks the queue, processes, inherited pipes, mutex reuse and graceful exit. Fixture source is syntax-checked before execution. Temporary live probe journals remain ordinary appendable text and are removed after the test; retained completed logs use Brotli Q6. Scanner/source snapshots stay readable by their tools during verification; do not compress active inputs into unsupported wrappers.

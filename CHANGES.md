@@ -1,5 +1,8 @@
 # Changelog
 
+> [!WARNING]
+> **Historical Record (Non-Current):** This document tracks historical changes up to the dual-player implementation (PR #14). It is preserved for historical context and does NOT represent current verification evidence or active runtime contracts. For canonical specifications, see [`docs/architecture.md`](docs/architecture.md) and [`README.md`](README.md).
+
 This document tracks all significant changes to the Miofive Video Converter application.
 
 ## Latest: Dual-Player Architecture Implementation

@@ -5,7 +5,6 @@
   "identifier": "com.dst.miofive-video-converter",
   "build": {
     "frontendDist": "../public",
-    "devUrl": "http://localhost:3000",
     "beforeDevCommand": "npm run build:sidecar:demo",
     "beforeBuildCommand": "npm run build:sidecar"
   },
@@ -23,7 +22,7 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; base-uri 'none'; connect-src 'self' http://127.0.0.1:*; font-src 'self'; form-action 'self'; frame-ancestors 'none'; img-src 'self' data:; media-src 'self' blob: http://127.0.0.1:*; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self'"
     }
   },
   "bundle": {
@@ -33,7 +32,7 @@
     "resources": ["resources/**/*"],
     "externalBin": ["binaries/miofive-server"],
     "macOS": {
-      "minimumSystemVersion": "10.13"
+      "minimumSystemVersion": "11.0"
     }
   }
 }

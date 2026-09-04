@@ -128,7 +128,7 @@ export class DemoAPI {
      * Mock /list-directories endpoint
      */
     static async listDirectories(data) {
-        const { currentPath = '' } = data;
+        const currentPath = data.path ?? data.currentPath ?? '';
 
         // Root level - show test-data
         if (!currentPath || currentPath === '') {
@@ -181,7 +181,10 @@ export class DemoAPI {
      * Mock /scan endpoint
      */
     static async scan(data) {
-        const { channels = ['A', 'B'], startTime, endTime } = data;
+        const { channels = ['A'], startTime, endTime } = data;
+        if (!Array.isArray(channels) || channels.length !== 1 || !['A', 'B'].includes(channels[0])) {
+            throw new Error('Select exactly one camera channel (A or B)');
+        }
 
         // Filter files by channel
         let files = MOCK_VIDEO_FILES.filter(file => {
@@ -208,7 +211,7 @@ export class DemoAPI {
     /**
      * Mock /export endpoint - always fails in demo mode
      */
-    static async export(data) {
+    static async export(_data) {
         throw new Error('Video export is disabled in demo mode. Download the full application to use this feature.');
     }
 

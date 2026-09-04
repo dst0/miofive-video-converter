@@ -1,16 +1,20 @@
-const CACHE_NAME = 'miofive-video-converter-v3';
+const CACHE_NAME = 'miofive-video-converter-v5';
+const APP_BASE_URL = new URL('./', self.registration.scope);
 const STATIC_ASSETS = [
-    '/',
-    '/index.html',
-    '/styles.css',
-    '/player-styles.css',
-    '/app.js',
-    '/player.js',
-    '/folder-browser.js',
-    '/demo-api-mock.js',
-    '/manifest.webmanifest',
-    '/app-icon.svg',
-];
+    '',
+    'index.html',
+    'styles.css',
+    'player-styles.css',
+    'app.js',
+    'player.js',
+    'folder-browser.js',
+    'dialog.js',
+    'demo-api-mock.js',
+    'security.js',
+    'manifest.webmanifest',
+    'app-icon.svg',
+].map((assetPath) => new URL(assetPath, APP_BASE_URL).href);
+const STATIC_ASSET_PATHS = new Set(STATIC_ASSETS.map((assetUrl) => new URL(assetUrl).pathname));
 
 self.addEventListener('install', (event) => {
     event.waitUntil(
@@ -31,14 +35,17 @@ self.addEventListener('fetch', (event) => {
     const { request } = event;
     const url = new URL(request.url);
 
-    if (request.method !== 'GET' || url.origin !== self.location.origin || url.pathname.startsWith('/api/')) {
+    if (
+        request.method !== 'GET' ||
+        url.origin !== self.location.origin ||
+        !url.pathname.startsWith(APP_BASE_URL.pathname)
+    ) {
         return;
     }
 
     const isAppShellRequest =
         request.mode === 'navigate' ||
-        STATIC_ASSETS.includes(url.pathname) ||
-        (url.pathname === '/' && STATIC_ASSETS.includes('/'));
+        STATIC_ASSET_PATHS.has(url.pathname);
 
     if (!isAppShellRequest) {
         return;
@@ -55,6 +62,13 @@ self.addEventListener('fetch', (event) => {
                 }
                 return response;
             })
-            .catch(() => caches.match(request))
+            .catch(async () => {
+                const cached = await caches.match(request, {ignoreSearch: true});
+                if (cached) return cached;
+                if (request.mode === 'navigate') {
+                    return caches.match(new URL('index.html', APP_BASE_URL).href);
+                }
+                return undefined;
+            })
     );
 });

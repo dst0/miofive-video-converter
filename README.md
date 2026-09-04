@@ -1,247 +1,139 @@
 # Miofive Video Converter
 
-A web-based tool to scan, organize, review, and export precise ranges from Miofive S1 Ultra dashcam recordings stored on microSD cards.
+Miofive Video Converter scans Miofive S1 Ultra dashcam recordings, lets you review the timeline, and exports an exact range as one MP4. It runs as a local web application or a Tauri macOS application; selected videos are processed locally with FFmpeg.
 
-## Table of Contents
+[Open the static demo](https://dst0.github.io/miofive-video-converter/) (sample data only; export is disabled).
 
-- [Problem Statement](#problem-statement)
-- [Miofive S1 Ultra File System](#miofive-s1-ultra-file-system)
-- [Solution](#solution)
-- [Installation](#installation)
-- [Usage](#usage)
-- [Features](#features)
-- [Requirements](#requirements)
+## Supported recordings
 
-## Problem Statement
+The scanner recursively finds front (`A`) and rear (`B`) recordings whose names use:
 
-The Miofive S1 Ultra dashcam records video footage continuously in short segments (typically 1-5 minutes each) and stores them on a microSD card. This creates several challenges:
-
-1. **Fragmented footage**: A single driving session is split into dozens or hundreds of small video files scattered across the SD card
-2. **Dual camera files**: The dashcam records from both front (A) and rear (B) cameras simultaneously, creating separate files for each view
-3. **Complex filenames**: Files use a timestamp-based naming scheme that's difficult to parse manually
-4. **Manual merging**: Combining these files in chronological order to create a continuous video is tedious and error-prone
-
-This tool solves these problems by automatically scanning the microSD card, identifying all video files, sorting them chronologically, and exporting a continuous video file from the selected playback range.
-
-## Miofive S1 Ultra File System
-
-### MicroSD Card Folder Structure
-
-When you insert a Miofive S1 Ultra dashcam microSD card into your computer, you'll typically find a structure similar to:
-
-```
-/
-|── CarDV/                      # Main directory for camera files
-|    |── Movie/                 # Recording videos
-|    |    |── Emr/                # Emergency recording mode videos (also car start and stop)
-|    |    |── Normal/          # Regular recording mode videos
-|    |    |── Park/               # Parking recording mode videos (mostly when there is a movement outside)
-|    |── Photo/                 # Photo snapshots (if enabled)
-|── LOG/                         # System log files
-|    |── DEVLOG/                 # Dev logs
-|    |── GPSLOG/                 # GPS logs
-└── [other root files]       # Other: `.fseventsd`, `.Trashes`, `.Spotlight-V100`
+```text
+{MMDDYY}_{HHMMSS}_{MMDDYY}_{HHMMSS}_{dddddd}{C}.MP4
 ```
 
-**Note**: The exact folder structure may vary depending on firmware version and dashcam settings. Videos may be stored directly in the root, in dated subdirectories, or in other organizational schemes.
+- The first date/time is interpreted as UTC.
+- The second date/time is the camera's recorded wall-clock time, not the viewing computer's timezone. It is validated without applying the computer's daylight-saving rules.
+- `dddddd` is the sequence number and `C` is channel `A` or `B`.
 
-### File Naming Convention
+For example, `010125_143052_010125_093052_000001A.MP4` represents a front-camera recording that began at 2025-01-01 14:30:52 UTC and 09:30:52 local time. Firmware variants may use another naming convention; unmatched or impossible dates are intentionally ignored rather than guessed.
 
-Each video file follows a specific naming pattern that encodes timing information:
+Typical cards contain `CarDV/Movie/Normal`, `CarDV/Movie/Emr`, and `CarDV/Movie/Park`, but the scanner does not require that exact hierarchy.
 
-**Format** (depends on configuration):
-  `{MMDDYY}_{HHMMSS}_{MMDDYY}_{HHMMSS}_{dddddd}{C}.MP4`
+## Run from source
 
-**Components** (depends on configuration):
-- **First timestamp** (`MMDDYY_HHMMSS`): UTC date and time when recording started
-- **Second timestamp** (`MMDDYY_HHMMSS`): Local date and time when recording started
-- **Sequence number** (`dddddd`): 6-digit sequential counter
-- **Camera channel** (`C`): Either `A` (front camera) or `B` (rear camera)
+Requirements:
 
-**Note**: Timestamp interpretation may vary depending on firmware version or timezone settings. The tool uses the first timestamp for sorting and filtering.
+- Node.js `^22.13.0 || >=24` (Node 23 is excluded; use a supported LTS release for development)
+- FFmpeg and FFprobe on `PATH`, in the standard Homebrew locations, or configured together with `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` (an explicit invalid path fails closed instead of falling back; system availability is checked via `npm run check:ffmpeg`)
+- Rust and the Tauri platform prerequisites only when building the desktop app
 
-**Example**: `010125_143052_010125_093052_000001A.MP4`
-- UTC time: January 1, 2025, 14:30:52
-- Local time: January 1, 2025, 09:30:52 (UTC-5)
-- Sequence: 000001
-- Camera: A (front)
+Install exactly the locked JavaScript dependency graph and verify media tools:
 
-### Dual Camera Recording
+```bash
+npm ci --ignore-scripts
+npm run check:ffmpeg
+```
 
-The dashcam records simultaneously from two cameras:
-- **Channel A**: Front-facing camera (primary view)
-- **Channel B**: Rear-facing or interior camera (secondary view)
+Dependency installation never invokes a system package manager (`.npmrc` disables lifecycle scripts; legacy host-mutating installer scripts have been removed). Install FFmpeg yourself using your platform's trusted package source when the explicit check fails.
 
-Each recording session creates paired files with identical timestamps but different channel suffixes (A/B). These files are synchronized and can be combined separately or together.
+Start the local server:
 
-## Solution
+```bash
+npm start
+```
 
-This tool provides a simple web interface that:
+Open `http://127.0.0.1:3000`. The backend deliberately binds only to loopback because its API can read selected local videos and write exports. LAN binding and reverse-proxy deployment are unsupported.
 
-1. **Scans** the microSD card (or any folder) recursively to find all Miofive video files
-2. **Parses** the complex filename format to extract timestamps
-3. **Filters** videos by date/time range and camera channel
-4. **Sorts** files chronologically for seamless playback
-5. **Exports** selected videos through one precise FFmpeg flow with millisecond start/end range selection
-
-The result is a continuous video file that's much easier to review, share, or archive.
-
-## Installation
-
-### Prerequisites
-
-- **Node.js** (v18 or higher) - [Download here](https://nodejs.org/)
-- **FFmpeg and FFprobe** available through `PATH`, Homebrew paths, or `MIOFIVE_FFMPEG_PATH` / `MIOFIVE_FFPROBE_PATH`
-
-### Setup Steps
-
-1. **Clone or download this repository**:
-   ```bash
-   git clone https://github.com/dst0/miofive-video-converter.git
-   cd miofive-video-converter
-   ```
-
-2. **Install dependencies**:
-   ```bash
-   npm install
-   ```
-   
-   This will install required Node.js packages. The post-install check can install FFmpeg through your system package manager if it is not already present; it does not download npm FFmpeg binary packages.
-
-3. **Verify FFmpeg installation**:
-   ```bash
-   ffmpeg -version
-   ffprobe -version
-   ```
-
-## Usage
-
-### Demo Mode
-
-Try the application with test data without needing a real dashcam SD card:
+To explore bundled samples without granting access outside the repository's test data:
 
 ```bash
 DEMO_MODE=true npm start
 ```
 
-In demo mode:
-- The application restricts access to only the `test-data` directory
-- Pre-populated with sample videos for testing
-- Perfect for exploring features before using with real dashcam footage
-- A demo banner appears in the UI to indicate you're in demo mode
+Demo mode resolves real paths before access checks, so sibling paths and symlinks cannot escape `test-data`.
 
-Visit the [live demo deployment](#) to see the application in action (demo mode enabled).
+## Use the converter
 
-### Running the Application
+1. Insert the microSD card and choose its video folder.
+2. Optionally restrict clip start times using the computer-local date/time fields and select exactly one camera channel, A or B. Simultaneous channels are not concatenated because that would duplicate elapsed time rather than form one exact timeline. To include clips overlapping a boundary, scan without the pre-filter and use the timeline selection.
+3. Scan, select recordings, and review them in the dual-video player. **Cancel scan** stops pending work; changing the source or filters also cancels the in-flight scan.
+4. Choose an exact export range, speed, quality, output directory, and `.mp4` filename.
+5. Export. Existing files are never overwritten; a numeric suffix is selected instead. Source container metadata, including GPS/location and comments, is removed from the shareable clip.
 
-This server is designed to run on a system where the microSD card from your Miofive S1 Ultra dashcam is inserted (via USB card reader or built-in SD card slot).
+Keep the original card or a backup until you verify an export. Long ranges can require substantial time and free disk space.
 
-#### macOS Desktop App
+Export offsets follow the selected clips concatenated in timestamp order; gaps between recordings are not filled. Clips with unreadable scan durations cannot be silently treated as one-second clips for an exact export, even if preview later loads their metadata. Rescan or exclude those clips so the selected range can be rebuilt from confirmed durations. Choose the output folder yourself (Browse or paste a path); finding a recording card never automatically makes it the export destination. Saved preferences are optional: the app continues working when browser storage is blocked.
 
-Run the Tauri desktop app during development:
+## Desktop app
+
+Development mode:
 
 ```bash
 npm run desktop
 ```
 
-Build the native macOS app:
+Build the Apple Silicon macOS 11.0-or-newer app and DMG:
 
 ```bash
 npm run build:mac
 ```
 
-Install the built app for the current macOS user:
+The release build compiles FFmpeg 9.0.1 and x264 from checksum-pinned source archives for the same macOS 11.0 deployment floor, disables FFmpeg networking and nonfree components, and verifies the resulting version, architecture, deployment target, license output, and build manifest before copying any binary. A stale ignored `vendor/ffmpeg` build is rebuilt instead of silently reused. The first build requires Xcode Command Line Tools plus `curl`, `make`, `tar`, and `shasum`.
+
+Install the built app for the current user:
 
 ```bash
 npm run install:mac
 open "$HOME/Applications/Miofive Video Converter.app"
 ```
 
-The generated `.app` is written to `src-tauri/target/release/bundle/macos/`, and the `.dmg` installer is written to `src-tauri/target/release/bundle/dmg/`. For a manual install, open the `.dmg` and drag `Miofive Video Converter` to Applications.
+If an app already exists, the installer first copies into a sibling staging path, then atomically installs it while preserving the previous bundle as a timestamped backup. A packaged app includes the Node sidecar, FFmpeg/FFprobe and project/third-party notices; end users do not need the development toolchain. If the backend stops unexpectedly, the app displays a recovery message instead of leaving an apparently working player. Quit and reopen it, and check the output destination before retrying an interrupted export.
 
-The installed Apple Silicon macOS app bundles the Node.js backend plus static FFmpeg/FFprobe binaries, so users do not need to install Node.js, npm, Rust, Homebrew, FFmpeg, or FFprobe separately.
+> [!WARNING]
+> **Distribution & Release Integrity Boundary:** The repository builds local macOS desktop binaries, but automated cryptographic code signing, Apple notarization, SLSA provenance/SBOM generation, and exact-byte rollback target verification are currently NOT implemented. Distribution must fail closed until these signing and release pipeline requirements are fulfilled.
 
-By default the release build builds FFmpeg 8.1.1 and x264 from pinned upstream source archives for Apple Silicon macOS, verifies their SHA-256 checksums, inspects `ffmpeg -L` / `ffprobe -L`, and rejects binaries whose output reports nonfree components. The first source build can take several minutes and requires Xcode Command Line Tools plus standard macOS command-line tools (`curl`, `make`, `tar`, and `shasum`). You can run that step directly with `npm run build:ffmpeg`. To bundle a different redistributable LGPL/GPL build, set both `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` before running `npm run build:mac`. To build without bundled FFmpeg for development only, set `MIOFIVE_SKIP_FFMPEG_BUNDLE=true`.
+Advanced build options:
 
-#### Web Server
+- Run `npm run build:ffmpeg` to build only the pinned media bundle.
+- Set `MIOFIVE_FFMPEG_BUILD_JOBS` (1–16, default 2) to control compilation parallelism on shared hosts.
+- Set both `MIOFIVE_FFMPEG_PATH` and `MIOFIVE_FFPROBE_PATH` to bundle a separately reviewed redistributable build.
+- Set `MIOFIVE_SKIP_FFMPEG_BUNDLE=true` only for a development build without bundled media tools.
 
-1. **Insert the microSD card** into your computer using a card reader
+## Validation
 
-2. **Start the server**:
-   ```bash
-   npm start
-   ```
+Fast pre-commit gate:
 
-3. **Open your web browser** and navigate to:
-   ```
-   http://localhost:3000
-   ```
+```bash
+npm run precommit
+```
 
-4. **Using the web interface**:
-   
-   a. **Select folder**: Browse to the microSD card mount point
-      - Windows: Usually `D:\`, `E:\`, or similar drive letter
-      - macOS: `/Volumes/[card-name]/`
-      - Linux: `/media/[user]/[card-name]/` or `/mnt/`
-   
-   b. **Choose date/time range** (optional): Filter videos by recording time
-   
-   c. **Select camera channels**: Choose front (A), rear (B), or both cameras
-   
-   d. **Scan**: Click "Scan" to find all matching video files
-   
-   e. **Review**: Check the list of found files and their timestamps
-   
-   f. **Play or export**: Use the selected files in the player, then choose the exact export start/end time down to milliseconds
+Full local pre-push gate (requires installed Playwright Chromium and FFmpeg; uses a single worker to prevent FFmpeg export mutex contention):
 
-   g. **Set output**: Choose where to save the exported video, output speed, and quality
+```bash
+npx playwright install chromium
+npm run prepush
+```
 
-5. **Wait for processing**: FFmpeg will export the selected range (this may take several minutes depending on total file size and quality)
+Dependency security checks:
 
-6. **Access your video**: The exported video will be saved to your specified output location
+```bash
+npm audit --omit=dev --audit-level=moderate
+npm audit --audit-level=high
+cargo audit --file src-tauri/Cargo.lock
+```
 
-### Tips for Best Results
+Validation status:
 
-- **Keep original files**: Always work with a copy or ensure you have backups before processing
-- **Large files**: Combining many hours of footage creates large files (gigabytes). Ensure adequate disk space
-- **Filter by time**: Use date/time filters to create smaller, more manageable output files
-- **One camera at a time**: For easier viewing, process front and rear cameras separately
-- **Regular exports**: Export and archive footage regularly to prevent SD card from filling up
+- Canonical pre-commit gate (`npm run precommit`) validates ESLint across the codebase, runs the complete unit suite across runtime and tooling modules, checks open-source license notices, and verifies Rust formatting.
+- Comprehensive pre-push gate (`npm run prepush`) additionally validates end-to-end browser and API flows via Playwright (configured with a single worker) and verifies Rust Clippy warnings and unit tests (`npm run check:rust`).
+- Dependency and supply-chain checks must be rerun against the exact lockfiles before publication. License metadata checks are not formal legal compliance certification. Local build manifests establish source-pin and binary-hash consistency, not cryptographic signed provenance.
+- Dated review evidence and unresolved release boundaries are tracked in [docs/product-review.md](docs/product-review.md). A local pass never substitutes for clean-checkout CI on the exact pull-request head. The static demo deploys only from `main` and does not establish desktop release readiness.
 
-## Features
+See [docs/architecture.md](docs/architecture.md) for runtime and trust-boundary details, [security_best_practices_report.md](security_best_practices_report.md) for the security review, and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) before distributing builds.
 
-- ✅ Recursive scanning of entire microSD card structure
-- ✅ Automatic filename parsing with UTC and local timezone support
-- ✅ Date/time range filtering
-- ✅ Dual camera channel selection (A/B)
-- ✅ Interactive folder browser
-- ✅ Chronological sorting
-- ✅ Single FFmpeg-based export flow for full-video and selected-range exports
-- ✅ Millisecond-precise export start/end selection
-- ✅ Real-time progress display
-- ✅ Installable Tauri macOS desktop app
-- ✅ Bundled Node.js sidecar for clean Mac installs
-- ✅ Bundled GPL FFmpeg/FFprobe for Apple Silicon macOS releases
-- ✅ PWA metadata for future mobile/home-screen installation
-- ✅ Cross-platform support (Windows, macOS, Linux)
-
-## Requirements
-
-- **Installed macOS app**: Apple Silicon macOS; no Node.js, npm, Rust, Homebrew, FFmpeg, or FFprobe installation required
-- **Source/development mode**: Node.js v18 or higher, Rust toolchain, and Xcode Command Line Tools
-- **Storage**: Free disk space equal to the size of videos you want to export
-- **Card Reader**: USB card reader or built-in SD card slot to access the microSD card
+Report suspected vulnerabilities through the private process in [SECURITY.md](SECURITY.md), without attaching real recordings or sensitive local data to public issues.
 
 ## License
 
-This project is MIT licensed. See [LICENSE](LICENSE).
-
-Runtime and build dependencies are open-source packages. The release app bundles GPL-3.0-or-later FFmpeg/FFprobe binaries. The app does not depend on npm FFmpeg/FFprobe binary packages because tested Apple Silicon static npm binaries reported `--enable-nonfree` and "not legally redistributable". See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) before distributing builds.
-
-## Author
-
-Dmytro Stepanov (dst0)
-
-## Contributing
-
-Issues and pull requests are welcome!
+Project source is MIT licensed; see [LICENSE](LICENSE). The release app bundles GPL-3.0-or-later FFmpeg/FFprobe and x264-derived functionality under their applicable licenses. Third-party terms remain applicable to distributed artifacts.

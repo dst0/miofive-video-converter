@@ -13,12 +13,18 @@
     "build:sidecar:demo": "npm run copy:ffmpeg && npm run copy:resources:demo && node scripts/build-sidecar.js",
     "desktop": "tauri dev",
     "build:mac": "npm run dist:mac",
-    "install:mac": "mkdir -p \"$HOME/Applications\" && rm -rf \"$HOME/Applications/Miofive Video Converter.app\" && cp -R \"src-tauri/target/release/bundle/macos/Miofive Video Converter.app\" \"$HOME/Applications/\"",
+    "install:mac": "node scripts/install-mac-app.js",
     "pack:mac": "tauri build --bundles app",
     "dist:mac": "tauri build --bundles dmg,app",
     "check:licenses": "node scripts/check-open-source-licenses.js",
-    "postinstall": "node install-ffmpeg.js",
-    "test": "playwright test",
+    "check:ffmpeg": "node scripts/check-ffmpeg.js",
+    "lint": "eslint .",
+    "test:unit": "node --test tests/unit/*.test.js",
+    "test:e2e": "playwright test",
+    "test": "npm run test:unit && npm run test:e2e",
+    "check:rust": "node scripts/check-rust.js",
+    "precommit": "npm run lint && npm run test:unit && npm run check:licenses && cargo fmt --manifest-path src-tauri/Cargo.toml --check",
+    "prepush": "npm run precommit && npm run test:e2e && npm run check:rust",
     "test:headed": "playwright test --headed",
     "test:ui": "playwright test --ui"
   },
@@ -30,17 +36,27 @@
   ],
   "author": "dst",
   "license": "MIT",
+  "engines": {
+    "node": "^22.13.0 || >=24"
+  },
   "pkg": {
     "assets": [
       "public/**/*"
     ]
   },
   "dependencies": {
-    "express": "^4.18.2"
+    "express": "5.2.1",
+    "helmet": "8.3.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.56.1",
-    "@tauri-apps/cli": "^2.9.1",
-    "@yao-pkg/pkg": "6.12.0"
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.62.1",
+    "@tauri-apps/cli": "2.11.4",
+    "@yao-pkg/pkg": "6.22.0",
+    "eslint": "10.9.1",
+    "globals": "17.12.0"
+  },
+  "overrides": {
+    "tar": "7.5.22"
   }
 }

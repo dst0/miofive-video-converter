@@ -1,6 +1,8 @@
 // Video Player JavaScript - Dual Player Architecture (SPA Module)
 
 import { openFolderBrowser } from './folder-browser.js';
+import {escapeHtml, safeClassToken, safeStorage as localStorage} from './security.js';
+import {showDialogPanel, closeDialogPanel} from './dialog.js';
 
 let videoFiles = [];
 let currentVideoIndex = 0;
@@ -11,14 +13,81 @@ let videoSources = [null, null]; // References to both source elements
 let totalDuration = 0; // Total duration of all videos combined
 let videoDurations = []; // Array of individual video durations
 let videoStartTimes = []; // Array of start times for each video in combined timeline
-let isSeekingGlobal = false; // Flag for global seeking
 let currentGlobalTime = 0; // Current playback time across all videos
 let isDraggingProgress = false; // Flag for progress bar dragging
-let isPlayerInitialized = false;
 let areCustomControlsInitialized = false;
-let lastFocusedElementBeforeExport = null;
 let defaultExportRange = null;
 let hasInitializedExportRange = false;
+let pendingSeekByPlayer = [null, null];
+let exportAbortController = null;
+let exportRequestGeneration = 0;
+let playbackRequestTokens = [0, 0];
+let playerSourceTokens = [0, 0];
+let playerReadyWaitCleanups = [null, null];
+
+function cancelPlayerReadyWait(playerIndex) {
+    const cleanup = playerReadyWaitCleanups[playerIndex];
+    playerReadyWaitCleanups[playerIndex] = null;
+    if (cleanup) cleanup();
+}
+
+function invalidatePlayerSource(playerIndex) {
+    cancelPlayerReadyWait(playerIndex);
+    playerSourceTokens[playerIndex]++;
+    return playerSourceTokens[playerIndex];
+}
+
+function isCurrentPlayerSource(playerIndex, sourceToken, videoIndex) {
+    const player = videoPlayers[playerIndex];
+    return Boolean(
+        player &&
+        playerSourceTokens[playerIndex] === sourceToken &&
+        Number(player.dataset.videoIndex) === videoIndex
+    );
+}
+
+function waitForPlayerSource({
+    playerIndex,
+    sourceToken,
+    videoIndex,
+    onReady,
+    onFailure,
+    timeoutMessage = 'Timeout waiting for video to load',
+}) {
+    cancelPlayerReadyWait(playerIndex);
+    const player = videoPlayers[playerIndex];
+    if (!player) return;
+
+    let finished = false;
+    let timeoutId;
+    const cleanup = () => {
+        player.removeEventListener('loadeddata', handleReady);
+        player.removeEventListener('error', handleFailure);
+        clearTimeout(timeoutId);
+        if (playerReadyWaitCleanups[playerIndex] === cleanup) {
+            playerReadyWaitCleanups[playerIndex] = null;
+        }
+    };
+    const finish = (callback) => {
+        if (finished) return;
+        finished = true;
+        cleanup();
+        if (!isCurrentPlayerSource(playerIndex, sourceToken, videoIndex)) return;
+        callback?.(player);
+    };
+    const handleReady = () => finish(onReady);
+    const handleFailure = () => finish(onFailure);
+
+    player.addEventListener('loadeddata', handleReady);
+    player.addEventListener('error', handleFailure);
+    timeoutId = setTimeout(() => {
+        if (isCurrentPlayerSource(playerIndex, sourceToken, videoIndex)) {
+            console.error(timeoutMessage);
+        }
+        finish(onFailure);
+    }, 10000);
+    playerReadyWaitCleanups[playerIndex] = cleanup;
+}
 
 // Global player state - single source of truth for play/pause state
 let globalPlayerState = 'paused'; // 'playing', 'paused', or 'ended'
@@ -26,6 +95,7 @@ let globalPlayerState = 'paused'; // 'playing', 'paused', or 'ended'
 const SEEK_STEP_SECONDS = 5;
 const LARGE_SEEK_STEP_SECONDS = 30;
 const PLAYBACK_SPEED_PRESETS = [0.1, 0.25, 0.5, 1, 2, 5, 10, 25, 50];
+const MAX_CALENDAR_MARKER_DAYS = 64;
 
 // Detect supported playback rate range for the browser/device
 function detectPlaybackRateRange() {
@@ -50,12 +120,6 @@ function detectPlaybackRateRange() {
 // Export the detected playback rate range
 export const PlaybackRateRange = detectPlaybackRateRange();
 
-// HTML escape function to prevent XSS
-function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-}
 
 // Show snackbar notification
 function showSnackbar(message, type = 'info', duration = 3000) {
@@ -214,13 +278,38 @@ function toggleFullscreen() {
 }
 
 function handlePlayPromiseError(err, message = 'Error playing video:') {
+    if (err?.name === 'AbortError') {
+        return null;
+    }
     if (err?.name === 'NotAllowedError') {
         setGlobalPlayerState('paused');
-        return;
+        return null;
     }
 
     console.error(message, err);
     setGlobalPlayerState('paused');
+}
+
+function pausePlayer(playerIndex) {
+    playbackRequestTokens[playerIndex]++;
+    const player = videoPlayers[playerIndex];
+    if (player) player.pause();
+}
+
+async function requestPlay(playerIndex, message = 'Error playing video:') {
+    const player = videoPlayers[playerIndex];
+    if (!player) return;
+    const requestToken = ++playbackRequestTokens[playerIndex];
+    try {
+        await player.play();
+        const requestIsCurrent = requestToken === playbackRequestTokens[playerIndex];
+        if (!requestIsCurrent || playerIndex !== activePlayerIndex || globalPlayerState !== 'playing') {
+            pausePlayer(playerIndex);
+        }
+    } catch (error) {
+        if (requestToken !== playbackRequestTokens[playerIndex] || error?.name === 'AbortError') return;
+        handlePlayPromiseError(error, message);
+    }
 }
 
 function clampGlobalTime(value) {
@@ -325,8 +414,13 @@ function updateOverlaySpeedControls(speed) {
     }
 }
 
+let isPlayerModuleInitialized = false;
+
 // Initialize the player module (called once on page load)
 export function initPlayer() {
+    if (isPlayerModuleInitialized) return;
+    isPlayerModuleInitialized = true;
+
     // Initialize dual players references
     videoPlayers[0] = document.getElementById('videoPlayer1');
     videoPlayers[1] = document.getElementById('videoPlayer2');
@@ -373,7 +467,7 @@ export function initPlayer() {
     });
 
     document.getElementById('nextBtn').addEventListener('click', () => {
-        playNextVideo();
+        playNextVideo(true);
     });
 
     document.getElementById('playPauseBtn').addEventListener('click', () => {
@@ -418,17 +512,21 @@ export function initPlayer() {
     // Video player events for both players
     videoPlayers.forEach((player, index) => {
         player.addEventListener('ended', () => {
+            if (player.dataset.videoIndex === undefined) return;
+            if (document.getElementById('playerScreen').style.display === 'none') return;
             if (index === activePlayerIndex) {
                 // Check if this is the last video
-                if (currentVideoIndex >= videoFiles.length - 1) {
+                if (videoFiles.length > 0 && currentVideoIndex >= videoFiles.length - 1) {
                     setGlobalPlayerState('ended');
-                } else {
-                    playNextVideo();
+                } else if (videoFiles.length > 0) {
+                    playNextVideo(false);
                 }
             }
         });
 
         player.addEventListener('timeupdate', () => {
+            if (player.dataset.videoIndex === undefined) return;
+            if (document.getElementById('playerScreen').style.display === 'none') return;
             if (index === activePlayerIndex && !isDraggingProgress) {
                 updatePlaybackPosition();
                 updateVideoInfo();
@@ -437,6 +535,8 @@ export function initPlayer() {
         });
 
         player.addEventListener('play', () => {
+            if (player.dataset.videoIndex === undefined) return;
+            if (document.getElementById('playerScreen').style.display === 'none') return;
             if (index === activePlayerIndex) {
                 console.log('play event triggered at player index', index);
                 setGlobalPlayerState('playing');
@@ -444,11 +544,13 @@ export function initPlayer() {
         });
 
         player.addEventListener('pause', () => {
+            if (player.dataset.videoIndex === undefined) return;
+            if (document.getElementById('playerScreen').style.display === 'none') return;
             if (index === activePlayerIndex) {
                 console.log('pause event triggered at player index', index);
-                // Only update state if not ended
+                // Only update state if not ended and play intent is not active
                 const activePlayer = videoPlayers[activePlayerIndex];
-                if (!activePlayer.ended) {
+                if (activePlayer && !activePlayer.ended && globalPlayerState !== 'playing') {
                     setGlobalPlayerState('paused');
                 }
             }
@@ -459,6 +561,12 @@ export function initPlayer() {
                 const videoIdx = parseInt(player.dataset.videoIndex);
                 videoDurations[videoIdx] = player.duration || 0;
                 updateTotalDuration();
+                const exportModal = document.getElementById('exportModal');
+                if (exportModal && exportModal.style.display === 'flex') {
+                    const totalDurEl = document.getElementById('exportTotalDuration');
+                    if (totalDurEl) totalDurEl.textContent = formatExportTime(totalDuration);
+                    updateExportEstimate();
+                }
                 // Only update progress bar if this is the active player
                 if (index === activePlayerIndex) {
                     updateCustomProgressBar();
@@ -488,7 +596,6 @@ export function initPlayer() {
         });
     });
 
-    isPlayerInitialized = true;
 }
 
 // Set global player state and sync UI
@@ -522,24 +629,16 @@ function applyStateToPlayers() {
     
     if (globalPlayerState === 'playing') {
         if (activePlayer.paused) {
-            activePlayer.play().catch(err => {
-                handlePlayPromiseError(err);
-            });
+            void requestPlay(activePlayerIndex);
         }
     } else {
         // paused or ended
         if (!activePlayer.paused) {
-            activePlayer.pause();
+            pausePlayer(activePlayerIndex);
         }
     }
 }
 
-function setPlaybackBtnToPlay() {
-    document.getElementById('playPauseBtn').textContent = '⏸ Pause';
-    document.querySelector('#playPauseOverlayBtn .btn-icon').textContent = '⏸';
-    updatePlaybackControlAccessibility();
-    console.log('Set play/pause button to Play state');
-}
 
 // Show player screen and start playback
 export function showPlayerScreen(files, options = {}) {
@@ -548,9 +647,8 @@ export function showPlayerScreen(files, options = {}) {
         return;
     }
 
-    // Set video files and sort by timestamp
-    videoFiles = files;
-    videoFiles.sort(
+    // Set video files and sort by timestamp without mutating input array
+    videoFiles = [...files].sort(
         (a, b) => new Date(a.utcTime).getTime() - new Date(b.utcTime).getTime()
     );
 
@@ -561,7 +659,7 @@ export function showPlayerScreen(files, options = {}) {
 
     // Initialize player UI
     initializePlayer();
-    defaultExportRange = normalizeExportRange(options.exportRange);
+    defaultExportRange = options.exportRange ? { ...options.exportRange } : null;
     hasInitializedExportRange = false;
     initializeTimeline();
     initializeCustomControls();
@@ -589,9 +687,12 @@ export function showExportFlow(files, options = {}) {
 // Hide player screen and return to main
 export function hidePlayerScreen() {
     // Pause playback
-    videoPlayers.forEach((player) => {
-        player.pause();
+    videoPlayers.forEach((player, index) => {
+        pausePlayer(index);
+        invalidatePlayerSource(index);
+        videoSources[index]?.removeAttribute('src');
         player.removeAttribute('src');
+        delete player.dataset.videoIndex;
         player.load(); // Reset the video element
     });
     globalPlayerState = 'paused';
@@ -603,6 +704,10 @@ export function hidePlayerScreen() {
     videoDurations = [];
     videoStartTimes = [];
     totalDuration = 0;
+    defaultExportRange = null;
+    hasInitializedExportRange = false;
+    pendingSeekByPlayer = [null, null];
+
 
     // Hide player screen and show main screen
     document.getElementById('playerScreen').style.display = 'none';
@@ -625,13 +730,13 @@ function initializePlayer() {
     let hasPreloadedDurations = false;
     for (let i = 0; i < videoFiles.length; i++) {
         if (
-            videoFiles[i].duration !== undefined &&
-            videoFiles[i].duration !== null
+            Number.isFinite(videoFiles[i].duration) &&
+            videoFiles[i].duration > 0
         ) {
             videoDurations[i] = videoFiles[i].duration;
             hasPreloadedDurations = true;
         } else {
-            videoDurations[i] = 1;
+            videoDurations[i] = 0;
         }
     }
 
@@ -664,6 +769,9 @@ function loadVideoIntoPlayer(videoIndex, playerIndex) {
     const player = videoPlayers[playerIndex];
     const source = videoSources[playerIndex];
 
+    playbackRequestTokens[playerIndex]++;
+    const sourceToken = invalidatePlayerSource(playerIndex);
+
     // Set video source
     // In GitHub Pages demo mode, use relative path directly
     // Secure check: hostname must END with .github.io
@@ -675,6 +783,7 @@ function loadVideoIntoPlayer(videoIndex, playerIndex) {
     player.dataset.videoIndex = videoIndex;
     player.load();
     player.playbackRate = getNearestSupportedSpeed(getSelectedPlaybackSpeed());
+    return sourceToken;
 }
 
 // Preload the next video into the inactive player
@@ -687,11 +796,17 @@ function preloadNextVideo() {
 }
 
 // Switch to the next video (seamless transition using dual players)
-function switchToNextVideo() {
+function switchToNextVideo(isUserAction = false) {
     const nextVideoIndex = currentVideoIndex + 1;
     if (nextVideoIndex >= videoFiles.length) {
         setGlobalPlayerState('ended');
         return false;
+    }
+
+    const nextPlayerIndex = 1 - activePlayerIndex;
+    let nextSourceToken = playerSourceTokens[nextPlayerIndex];
+    if (Number(videoPlayers[nextPlayerIndex].dataset.videoIndex) !== nextVideoIndex) {
+        nextSourceToken = loadVideoIntoPlayer(nextVideoIndex, nextPlayerIndex);
     }
 
     // Remember if we were playing
@@ -702,11 +817,12 @@ function switchToNextVideo() {
 
     // Switch active player BEFORE pausing the old one
     // This prevents the pause event from triggering the button state update
-    activePlayerIndex = 1 - activePlayerIndex;
+    activePlayerIndex = nextPlayerIndex;
     currentVideoIndex = nextVideoIndex;
 
-    // Now pause the previous player (it's no longer active)
-    videoPlayers[previousPlayerIndex].pause();
+    // A manual navigation cancels the old play request immediately. During auto-advance,
+    // the ended player is already stopped and is invalidated when reused for preloading.
+    if (isUserAction) pausePlayer(previousPlayerIndex);
 
     // Hide previous player, show new active player
     videoPlayers[previousPlayerIndex].classList.remove('active-player');
@@ -714,9 +830,7 @@ function switchToNextVideo() {
 
     // Update video info
     const videoFile = videoFiles[currentVideoIndex];
-    document.getElementById('currentVideoName').innerHTML = escapeHtml(
-        videoFile.filename
-    );
+    document.getElementById('currentVideoName').textContent = videoFile.filename;
 
     updateNavigationButtonStates();
     updateActivePlayerAccessibility();
@@ -724,32 +838,27 @@ function switchToNextVideo() {
     // Start playback on new active player if we were playing before
     const newActivePlayer = videoPlayers[activePlayerIndex];
     if (wasPlaying) {
-        if (newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        if (
+            isCurrentPlayerSource(activePlayerIndex, nextSourceToken, nextVideoIndex) &&
+            newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+        ) {
             newActivePlayer.currentTime = 0;
-            newActivePlayer.play().catch((err) => {
-                handlePlayPromiseError(err);
-            });
+            void requestPlay(activePlayerIndex);
         } else {
-            // Wait for video to be ready before playing
-            let timeoutId;
-            const playWhenReady = () => {
-                newActivePlayer.removeEventListener('loadeddata', playWhenReady);
-                newActivePlayer.removeEventListener('error', playWhenReady);
-                clearTimeout(timeoutId);
-                newActivePlayer.currentTime = 0;
-                newActivePlayer.play().catch((err) => {
-                    handlePlayPromiseError(err);
-                });
-            };
-            newActivePlayer.addEventListener('loadeddata', playWhenReady);
-            newActivePlayer.addEventListener('error', playWhenReady);
-            // Timeout after 10 seconds to prevent memory leak
-            timeoutId = setTimeout(() => {
-                newActivePlayer.removeEventListener('loadeddata', playWhenReady);
-                newActivePlayer.removeEventListener('error', playWhenReady);
-                console.error('Timeout waiting for video to load');
-                setGlobalPlayerState('paused');
-            }, 10000);
+            const targetPlayerIndex = activePlayerIndex;
+            waitForPlayerSource({
+                playerIndex: targetPlayerIndex,
+                sourceToken: nextSourceToken,
+                videoIndex: nextVideoIndex,
+                onReady: (player) => {
+                    if (targetPlayerIndex !== activePlayerIndex || globalPlayerState !== 'playing') return;
+                    player.currentTime = 0;
+                    void requestPlay(targetPlayerIndex);
+                },
+                onFailure: () => {
+                    if (targetPlayerIndex === activePlayerIndex) setGlobalPlayerState('paused');
+                },
+            });
         }
     }
 
@@ -770,7 +879,7 @@ function loadVideo(index, shouldPause = true) {
         setGlobalPlayerState('paused');
         
         // Pause both players to prevent event conflicts
-        videoPlayers.forEach((player) => player.pause());
+        videoPlayers.forEach((_player, playerIndex) => pausePlayer(playerIndex));
         
         // Sync UI to paused state
         syncUIWithPlayerState();
@@ -781,13 +890,11 @@ function loadVideo(index, shouldPause = true) {
     const videoFile = videoFiles[index];
 
     // Load into active player
-    loadVideoIntoPlayer(index, activePlayerIndex);
+    const activeSourceToken = loadVideoIntoPlayer(index, activePlayerIndex);
 
     // Update video info - textContent is safe from XSS (unlike innerHTML)
     // It treats the value as plain text, not HTML
-    document.getElementById('currentVideoName').innerHTML = escapeHtml(
-        videoFile.filename
-    );
+    document.getElementById('currentVideoName').textContent = videoFile.filename;
 
     updateNavigationButtonStates();
     updateActivePlayerAccessibility();
@@ -806,23 +913,29 @@ function loadVideo(index, shouldPause = true) {
     
     // If not pausing (initial load), ensure playback starts
     if (!shouldPause) {
+        setGlobalPlayerState('playing');
         const activePlayer = videoPlayers[activePlayerIndex];
         // Wait for video to be ready before playing
         if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-            activePlayer.play().catch(err => {
-                handlePlayPromiseError(err, 'Error playing video on initial load:');
-            });
+            void requestPlay(activePlayerIndex, 'Error playing video on initial load:');
         } else {
-            // Wait for video to load
-            const playWhenReady = () => {
-                activePlayer.removeEventListener('loadeddata', playWhenReady);
-                activePlayer.play().catch(err => {
-                    handlePlayPromiseError(err, 'Error playing video on initial load:');
-                });
-            };
-            activePlayer.addEventListener('loadeddata', playWhenReady);
+            const targetPlayerIndex = activePlayerIndex;
+            waitForPlayerSource({
+                playerIndex: targetPlayerIndex,
+                sourceToken: activeSourceToken,
+                videoIndex: index,
+                onReady: () => {
+                    if (targetPlayerIndex !== activePlayerIndex || globalPlayerState !== 'playing') return;
+                    void requestPlay(targetPlayerIndex, 'Error playing video on initial load:');
+                },
+                onFailure: () => {
+                    if (targetPlayerIndex === activePlayerIndex) setGlobalPlayerState('paused');
+                },
+            });
         }
     }
+
+    return activeSourceToken;
 }
 
 function setPlaybackBtnToPause() {
@@ -833,9 +946,9 @@ function setPlaybackBtnToPause() {
 }
 
 // Play next video
-function playNextVideo() {
+function playNextVideo(isUserAction = false) {
     // Try seamless transition first
-    if (switchToNextVideo()) {
+    if (switchToNextVideo(isUserAction)) {
         updateVideoInfo();
         highlightCurrentMarker();
         updatePlaybackPosition();
@@ -853,14 +966,13 @@ function playNextVideo() {
 // Play previous video
 function playPreviousVideo() {
     if (currentVideoIndex > 0) {
-        loadVideo(currentVideoIndex - 1);
+        const wasPlaying = globalPlayerState === 'playing';
+        loadVideo(currentVideoIndex - 1, !wasPlaying);
     }
 }
 
 // Toggle play/pause
 function togglePlayPause() {
-    const activePlayer = videoPlayers[activePlayerIndex];
-    
     // Toggle based on global state
     if (globalPlayerState === 'playing') {
         setGlobalPlayerState('paused');
@@ -959,9 +1071,26 @@ function getInitialExportRange() {
         if (currentRange) return currentRange;
     }
 
-    return normalizeExportRange(defaultExportRange) || {
+    const normalizedDefault = normalizeExportRange(defaultExportRange);
+    if (normalizedDefault) {
+        return normalizedDefault;
+    }
+
+    if (
+        defaultExportRange &&
+        Number.isFinite(Number(defaultExportRange.start)) &&
+        Number.isFinite(Number(defaultExportRange.end)) &&
+        Number(defaultExportRange.end) > Number(defaultExportRange.start)
+    ) {
+        return {
+            start: roundSecondsToMilliseconds(Math.max(0, Number(defaultExportRange.start))),
+            end: roundSecondsToMilliseconds(Number(defaultExportRange.end)),
+        };
+    }
+
+    return {
         start: 0,
-        end: totalDuration,
+        end: Math.max(0, totalDuration || 0),
     };
 }
 
@@ -1048,6 +1177,12 @@ function estimateProcessingTime(selectedDuration, quality) {
 }
 
 function getExportSettingsFromForm() {
+    // The selected exact range was built from scan metadata, not later preview metadata.
+    // A recovered preview duration must not authorize that incomplete, shorter range.
+    if (videoFiles.some((file) => !Number.isFinite(file.duration) || file.duration <= 0) ||
+        videoDurations.some((duration) => !Number.isFinite(duration) || duration <= 0)) {
+        throw new Error('Some clip durations are unavailable. Rescan or exclude unreadable clips before exporting an exact range.');
+    }
     const start = parseExportTime(document.getElementById('exportRangeStart').value);
     const end = parseExportTime(document.getElementById('exportRangeEnd').value);
     const speed = Number(document.getElementById('exportSpeed').value);
@@ -1056,7 +1191,7 @@ function getExportSettingsFromForm() {
     if (!Number.isFinite(speed) || speed < 0.1 || speed > 50) {
         throw new Error('Speed must be between 0.1x and 50x');
     }
-    if (start < 0 || end < 0) {
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end < 0) {
         throw new Error('Start and end times cannot be negative');
     }
     if (end <= start) {
@@ -1094,23 +1229,31 @@ function updateExportEstimate() {
 function initializeTimeline() {
     if (videoFiles.length === 0) return;
 
-    const times = videoFiles.map((f) => new Date(f.utcTime).getTime());
-    const minTime = Math.min(...times);
-    const maxTime = Math.max(...times);
+    const startTimes = videoFiles.map((f) => new Date(f.utcTime).getTime());
+    const minTime = Math.min(...startTimes);
+    const endTimes = videoFiles.map((f) => {
+        const start = new Date(f.utcTime).getTime();
+        const duration = Number(f.duration);
+        return start + (Number.isFinite(duration) && duration > 0 ? duration * 1000 : 0);
+    });
+    const maxTime = Math.max(...endTimes);
+    const timeRange = maxTime - minTime;
+    const actualMin = timeRange <= 0 ? minTime - 1800000 : minTime;
+    const actualMax = timeRange <= 0 ? maxTime + 1800000 : maxTime;
 
     timelineData = {
-        minTime,
-        maxTime,
-        range: maxTime - minTime || 3600000, // 1 hour minimum if all same time
+        minTime: actualMin,
+        maxTime: actualMax,
+        range: actualMax - actualMin || 3600000,
         files: videoFiles,
     };
 
     // Update timeline labels
     document.getElementById('timelineStart').textContent = new Date(
-        minTime
+        actualMin
     ).toLocaleString();
     document.getElementById('timelineEnd').textContent = new Date(
-        maxTime
+        actualMax
     ).toLocaleString();
 
     // Generate file markers
@@ -1134,7 +1277,7 @@ function initializeTimeline() {
             const duration = file.duration ? formatTime(file.duration) : 'Unknown';
             const fileTypeDisplay = file.fileType || 'Other';
             
-             return `<div class="file-marker file-marker-${escapeHtml(fileType)}"
+             return `<div class="file-marker file-marker-${safeClassToken(fileType)}"
                       data-index="${index}"
                       data-filename="${escapeHtml(file.filename)}"
                       data-timestamp="${escapeHtml(timestamp)}"
@@ -1213,6 +1356,9 @@ function generateTimeMarkers(minTime, maxTime) {
     const markers = [];
     const startDate = new Date(minTime);
     const endDate = new Date(maxTime);
+    const daySpan = Math.max(1, Math.ceil((maxTime - minTime) / 86400000));
+    const markerStepDays = Math.max(1, Math.ceil(daySpan / MAX_CALENDAR_MARKER_DAYS));
+    let generatedDays = 0;
 
     const currentDate = new Date(
         startDate.getFullYear(),
@@ -1220,7 +1366,8 @@ function generateTimeMarkers(minTime, maxTime) {
         startDate.getDate()
     );
 
-    while (currentDate <= endDate) {
+    while (currentDate <= endDate && generatedDays < MAX_CALENDAR_MARKER_DAYS) {
+        generatedDays++;
         const dayStart = new Date(currentDate);
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(currentDate);
@@ -1264,7 +1411,7 @@ function generateTimeMarkers(minTime, maxTime) {
             }
         }
 
-        currentDate.setDate(currentDate.getDate() + 1);
+        currentDate.setDate(currentDate.getDate() + markerStepDays);
     }
 
     return markers.join('');
@@ -1413,7 +1560,7 @@ function initializeCustomControls() {
         if (!isDragging) return;
 
         const rect = progressContainer.getBoundingClientRect();
-        const clickX = (e.clientX || e.touches?.[0]?.clientX) - rect.left;
+        const clickX = (e.clientX ?? e.touches?.[0]?.clientX) - rect.left;
         const percent = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
 
         // Update progress bar visually
@@ -1426,7 +1573,7 @@ function initializeCustomControls() {
 
         const rect = progressContainer.getBoundingClientRect();
         const clickX =
-            (e.clientX || e.changedTouches?.[0]?.clientX) - rect.left;
+            (e.clientX ?? e.changedTouches?.[0]?.clientX) - rect.left;
         const percent = Math.max(0, Math.min(100, (clickX / rect.width) * 100));
 
         // Seek to the clicked position (will remain paused)
@@ -1517,7 +1664,7 @@ function seekToGlobalPercent(percent) {
 }
 
 // Seek to a specific time in the global timeline
-function seekToGlobalTime(targetTime) {
+export function seekToGlobalTime(targetTime) {
     targetTime = clampGlobalTime(targetTime);
     currentGlobalTime = targetTime;
 
@@ -1538,29 +1685,49 @@ function seekToGlobalTime(targetTime) {
 
     // If we need to change videos
     if (targetVideoIndex !== currentVideoIndex) {
+        const wasPlaying = globalPlayerState === 'playing';
         currentVideoIndex = targetVideoIndex;
-        loadVideo(targetVideoIndex);
-
-        // Wait for video to load, then seek (with timeout to prevent memory leak)
-        let attempts = 0;
-        const maxAttempts = 100; // 5 seconds max (100 * 50ms)
-        const checkLoaded = setInterval(() => {
-            attempts++;
-            const activePlayer = videoPlayers[activePlayerIndex];
-            if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
-                clearInterval(checkLoaded);
-                activePlayer.currentTime = localTime;
-                updateCustomProgressBar();
-            } else if (attempts >= maxAttempts) {
-                clearInterval(checkLoaded);
-                console.error('Timeout waiting for video to load');
+        const targetPlayerIndex = activePlayerIndex;
+        pendingSeekByPlayer[targetPlayerIndex] = localTime;
+        const sourceToken = loadVideo(targetVideoIndex, !wasPlaying);
+        const activePlayer = videoPlayers[targetPlayerIndex];
+        const applySeek = (player) => {
+            if (
+                targetPlayerIndex !== activePlayerIndex ||
+                currentVideoIndex !== targetVideoIndex ||
+                !isCurrentPlayerSource(targetPlayerIndex, sourceToken, targetVideoIndex)
+            ) return;
+            const targetSeekTime = pendingSeekByPlayer[targetPlayerIndex] !== null
+                ? pendingSeekByPlayer[targetPlayerIndex]
+                : localTime;
+            pendingSeekByPlayer[targetPlayerIndex] = null;
+            player.currentTime = targetSeekTime;
+            updateCustomProgressBar();
+            if (wasPlaying && globalPlayerState === 'playing') {
+                void requestPlay(targetPlayerIndex);
             }
-        }, 50);
+        };
+
+        if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+            applySeek(activePlayer);
+        } else {
+            waitForPlayerSource({
+                playerIndex: targetPlayerIndex,
+                sourceToken,
+                videoIndex: targetVideoIndex,
+                onReady: applySeek,
+                timeoutMessage: 'Timeout waiting to seek in video',
+            });
+        }
     } else {
         // Same video, just seek
+        pendingSeekByPlayer[activePlayerIndex] = localTime;
         const activePlayer = videoPlayers[activePlayerIndex];
         activePlayer.currentTime = localTime;
         updateCustomProgressBar();
+        if (globalPlayerState === 'playing') {
+            void requestPlay(activePlayerIndex);
+        }
     }
 }
 
@@ -1710,7 +1877,7 @@ function takeScreenshot() {
             
             // Show success feedback (don't show full filename for security)
             showScreenshotFeedback(true, 'Screenshot captured successfully');
-            console.log('Screenshot saved:', filename);
+
         }, 'image/png');
         
     } catch (err) {
@@ -1767,8 +1934,6 @@ function showScreenshotFeedback(success, message) {
 
 // Export functionality
 function openExportModal() {
-    const modal = document.getElementById('exportModal');
-    lastFocusedElementBeforeExport = document.activeElement;
     
     // Update export info
     const initialRange = getInitialExportRange();
@@ -1802,34 +1967,56 @@ function openExportModal() {
     updateExportEstimate();
     
     // Show modal
-    modal.style.display = 'flex';
-    modal.removeAttribute('aria-hidden');
-    requestAnimationFrame(() => {
-        const firstFocusableElement = getExportModalFocusableElements()[0];
-        firstFocusableElement?.focus();
-    });
+    showDialogPanel('exportModal', 'exportModalTitle', closeExportModal);
+}
+
+function setExportControlsBusy(busy) {
+    const controls = document.querySelectorAll(
+        '#exportModal .modal-body input, #exportModal .modal-body select, #exportModal .modal-body button, #exportConfirmBtn'
+    );
+    controls.forEach((control) => { control.disabled = busy; });
+    if (busy) document.getElementById('exportCancelBtn').focus();
 }
 
 function closeExportModal() {
-    const modal = document.getElementById('exportModal');
-    modal.style.display = 'none';
-    modal.setAttribute('aria-hidden', 'true');
+    if (exportAbortController) {
+        exportAbortController.abort();
+        exportAbortController = null;
+    }
+    exportRequestGeneration++;
+    closeDialogPanel('exportModal');
+    setExportControlsBusy(false);
     // Clear export status so reopening the modal shows a clean state
     document.getElementById('exportStatus').innerHTML = '';
-    if (lastFocusedElementBeforeExport instanceof HTMLElement) {
-        lastFocusedElementBeforeExport.focus({ preventScroll: true });
-    }
 }
 
 function openExportFolderBrowser() {
-    // Set flag to indicate we're browsing for export output
-    window.browsingForExport = true;
-
     // Open folder browser directly (avoids z-index conflict with export modal)
-    openFolderBrowser();
+    openFolderBrowser({purpose: 'export'});
+}
+
+function validateExportFilename(filename) {
+    if (!filename) return 'Please enter an output filename';
+    if (
+        filename === '.' ||
+        filename === '..' ||
+        filename.length > 240 ||
+        /[\0/\\<>:"|?*]/.test(filename) ||
+        /[. ]$/.test(filename)
+    ) {
+        return 'Use a plain filename without folders or reserved characters';
+    }
+    if (!/\.mp4$/i.test(filename)) return 'Output filename must end in .mp4';
+
+    const stem = filename.slice(0, -4);
+    if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(stem)) {
+        return 'That filename is reserved by the operating system';
+    }
+    return null;
 }
 
 async function performExport() {
+    if (exportAbortController) return;
     const outputFolder = document.getElementById('exportOutputFolder').value.trim();
     const outputFilename = document.getElementById('exportOutputFilename').value.trim();
     const statusDiv = document.getElementById('exportStatus');
@@ -1840,8 +2027,9 @@ async function performExport() {
         return;
     }
     
-    if (!outputFilename) {
-        statusDiv.innerHTML = '<div class="error">Please enter an output filename</div>';
+    const filenameError = validateExportFilename(outputFilename);
+    if (filenameError) {
+        statusDiv.innerHTML = `<div class="error">${escapeHtml(filenameError)}</div>`;
         return;
     }
 
@@ -1854,31 +2042,49 @@ async function performExport() {
         return;
     }
     
-    // Construct the full output path
-    const separator = outputFolder.includes('\\') ? '\\' : '/';
-    const outputPath = outputFolder.endsWith(separator) 
-        ? `${outputFolder}${outputFilename}` 
-        : `${outputFolder}${separator}${outputFilename}`;
-    
+    if (!videoFiles || videoFiles.length === 0) {
+        statusDiv.innerHTML = '<div class="error">No video files selected for export</div>';
+        return;
+    }
+
+    const channels = new Set(
+        videoFiles
+            .map(f => /([AB])\.MP4$/i.exec(f.path || f.name || '')?.[1]?.toUpperCase())
+            .filter(Boolean)
+    );
+    if (channels.size > 1) {
+        statusDiv.innerHTML = '<div class="error">Mixed camera channels cannot be exported together. Please select clips from only camera A or camera B.</div>';
+        return;
+    }
+
     // Get all video file paths
     const filePaths = videoFiles.map(f => f.path);
     
-    // Disable export button during export
-    const exportBtn = document.getElementById('exportConfirmBtn');
-    exportBtn.disabled = true;
+    // The submitted destination/range is immutable until completion or cancellation.
+    // Keep Cancel/Close available, but do not open a child dialog over an active job.
+    setExportControlsBusy(true);
     
     const selectedDuration = exportSettings.end - exportSettings.start;
     statusDiv.innerHTML =
         `<div class="loading"><div class="spinner"></div>` +
         `Exporting ${formatExportTime(selectedDuration)} from ${videoFiles.length} video(s)...</div>`;
+
+    if (exportAbortController) {
+        exportAbortController.abort();
+    }
+    exportAbortController = new AbortController();
+    const currentGeneration = ++exportRequestGeneration;
+    const signal = exportAbortController.signal;
     
     try {
         const response = await fetch('/export', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal,
             body: JSON.stringify({
                 files: filePaths,
-                outputPath,
+                outputFolder,
+                outputFilename,
                 rangeStart: exportSettings.start,
                 rangeEnd: exportSettings.end,
                 speed: exportSettings.speed,
@@ -1887,12 +2093,15 @@ async function performExport() {
         });
         
         const data = await response.json();
+
+        if (currentGeneration !== exportRequestGeneration || signal.aborted) {
+            return;
+        }
         
         if (!response.ok) {
-            // Show error snackbar
-            showSnackbar(`Export failed: ${data.error}`, 'error', 5000);
-            closeExportModal();
-            exportBtn.disabled = false;
+            const errorMsg = data.error || 'Export failed';
+            showSnackbar(`Export failed: ${errorMsg}`, 'error', 5000);
+            statusDiv.innerHTML = `<div class="error">${escapeHtml(errorMsg)}</div>`;
             return;
         }
         
@@ -1904,12 +2113,18 @@ async function performExport() {
         
         // Close modal immediately
         closeExportModal();
-        exportBtn.disabled = false;
         
     } catch (error) {
-        // Show network error snackbar
-        showSnackbar('Export failed: Network error', 'error', 5000);
-        closeExportModal();
-        exportBtn.disabled = false;
+        if (currentGeneration !== exportRequestGeneration || signal.aborted || error.name === 'AbortError') {
+            return;
+        }
+        const errorMsg = error.message || 'Export failed: Network error';
+        showSnackbar(`Export failed: ${errorMsg}`, 'error', 5000);
+        statusDiv.innerHTML = `<div class="error">${escapeHtml(errorMsg)}</div>`;
+    } finally {
+        if (currentGeneration === exportRequestGeneration) {
+            exportAbortController = null;
+            setExportControlsBusy(false);
+        }
     }
 }

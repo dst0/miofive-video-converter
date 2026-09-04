@@ -12,7 +12,7 @@ startServer({
         url: `http://${host}:${port}`,
         hasFFmpeg,
     }) + '\n');
-}).catch((err) => {
-    console.error(err);
+}).catch(() => {
+    console.error('The Miofive backend failed to start.');
     process.exit(1);
 });

@@ -24,6 +24,7 @@ const VIDEO_DURATION = 2; // seconds
 const VIDEO_WIDTH = 160;
 const VIDEO_HEIGHT = 120;
 const VIDEO_FPS = 15;
+const MAX_ERROR_TAIL_BYTES = 16 * 1024;
 const OUTPUT_DIR = path.join(__dirname, 'test-data', 'Normal');
 
 // Base timestamp for filenames (Jan 1, 2025, 10:00:00 UTC)
@@ -98,7 +99,7 @@ function generateVideo(number) {
         
         let stderr = '';
         ffmpeg.stderr.on('data', (data) => {
-            stderr += data.toString();
+            stderr = (stderr + data.toString()).slice(-MAX_ERROR_TAIL_BYTES);
         });
         
         ffmpeg.on('close', (code) => {

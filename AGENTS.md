@@ -1,18 +1,40 @@
-# Repository agent instructions
+# Agent Working Agreement
+
+## Private UI verification
+
+- Capture only an identified application window or the task's browser tab. Verify the target PID/window/tab before capture. If it cannot be identified, stop that capture path; never substitute a desktop/coordinate-region screenshot and crop it later. Unrelated windows and user data must not enter diagnostic artifacts.
+- Dialog tests must use actual UI entry points, never force display styles after an opening failure. Validate the single native modal boundary and retained-panel transitions in the packaged WebKit app; Chromium visibility or z-index assertions do not prove native accessibility.
+- Process titles/arguments can contain injected credentials even without an environment-output flag. Resolve owned PIDs without printing command lines (`pgrep -f`, not `pgrep -fl`); inspect only needed fields such as PID, PPID and executable name with `ps -o pid,ppid,comm`. Never publish raw process arguments or environment dumps.
+
+## Long validation commands
+
+- If lean-ctx reports its 120-second capture limit, do not count pass-looking text as a successful gate. Use its streaming track mode (`lean-ctx -t 'npm run prepush'`) and require the real zero exit status; do not shorten or skip tests to fit the capture window.
+- Run the release build and timing-sensitive process/browser gates sequentially on a shared workstation. If fixture startup or cleanup times out under build contention, preserve the failure and rerun the unchanged containing gate after the build; do not increase lifecycle deadlines just to make a loaded run green.
+- Inspect `git diff --cached --summary` as well as the text diff before committing: preserve executable bits on existing shebang entry points unless their removal is intentional and verified.
+
+## Durable Learning Capture
+
+- Treat every resolved bug, regression, setup trap, operator mistake, failed experiment, and unexpected behavior as a learning opportunity, not only as a code change.
+- Before or while fixing an issue, preserve the observable symptom and decisive evidence. Once understood, record the root cause rather than only the final patch.
+- Record enough detail to make the learning reusable: what failed and why, attempted approaches and outcomes, unexpected constraints, the verified correction, and the regression prevention.
+- Put durable guidance in the appropriate canonical repository document in the same change: use `AGENTS.md` for agent behavior, `README.md` for user or setup paths, and canonical architecture or product documentation for design and runtime contracts.
+- Do not leave important learnings only in chat, temporary notes, commit history, or a pull-request discussion.
+- If an issue exposes repeated agent friction, add the shortest durable instruction here that would have prevented it.
+- Keep learning records safe: never store credentials, tokens, private keys, customer data, or sensitive payloads; sanitize examples and evidence.
 
 ## Mandatory Learning Log
 
-- Maintain the repository-wide append-only learning collection in `docs/leanings/`.
-- Create exactly one Markdown file per learning in the same change whenever work reveals a resolved bug or regression, failed or misleading experiment, unexpected behavior, setup or environment trap, non-obvious constraint, important workaround, or rejected approach with reusable rationale.
+- Maintain the repository-wide append-only journal at `docs/learnings.md`.
+- Add an entry in the same change whenever work reveals a resolved bug or regression, failed or misleading experiment, unexpected behavior, setup or environment trap, non-obvious constraint, important workaround, or rejected approach with reusable rationale.
 - Routine successful work does not need an entry unless it produces a reusable insight.
-- Follow the filename convention and exact entry structure documented in `docs/leanings/README.md`. Include the task/context, observation or failure, evidence, approaches tried and their outcomes, root cause, resolution, verification, prevention or follow-up, and the reusable learning.
+- Use the exact entry structure documented in `docs/learnings.md`. Include the task/context, observation or failure, evidence, approaches tried and their outcomes, root cause, resolution, verification, prevention or follow-up, and the reusable learning.
 - Mark uncertainty honestly. If root cause or resolution is incomplete, record the entry as `Partial` or `Open` and state what evidence is still missing.
-- Keep learning files append-only by default: do not delete or rewrite older files merely to make the history cleaner. Put later discoveries in a new file that links the earlier learning.
+- Keep the journal append-only by default: do not delete or rewrite older entries merely to make the history cleaner.
 - Exception for confirmed falsehoods: when authoritative evidence proves that an entry itself was fabricated, hallucinated, or factually false, correct or remove the false content so future agents do not reuse it.
-- A confirmed-falsehood correction must never be silent. Mark the affected file `Corrected` and add a dated correction note stating what was wrong, the authoritative evidence used, and what was changed. Do not repeat removed sensitive content.
-- If the evidence is incomplete or disputed, do not rewrite the original file; add a dated `Partial` or `Open` learning file that links it.
+- A confirmed-falsehood correction must never be silent. Mark the entry `Corrected` and add a dated correction note stating what was wrong, the authoritative evidence used, and what was changed. Do not repeat removed sensitive content.
+- If the evidence is incomplete or disputed, do not rewrite the original entry; add a dated `Partial` or `Open` follow-up instead.
 - Link relevant issues, commits, logs, or regression tests when safe and useful.
-- Never place credentials, tokens, private keys, customer data, sensitive payloads, or unsanitized production evidence in learning files.
+- Never place credentials, tokens, private keys, customer data, sensitive payloads, or unsanitized production evidence in the journal.
 
 <!-- destinationworks-universal-agent-baseline:v1 -->
 ## Universal Delivery Baseline (v1)
@@ -32,17 +54,17 @@ These rules are the portable minimum for Destination Works repositories. Reposit
 
 ### Durable learning capture
 
-- Maintain `docs/leanings/` as the repository-wide learning collection. Create exactly one Markdown file per material resolved bug/regression, failed or misleading experiment, unexpected behavior, setup/environment trap, non-obvious constraint, important workaround, or rejected approach with reusable rationale; routine successful work needs no learning file.
-- Follow the filename convention and exact entry structure in `docs/leanings/README.md`. Record the task/context, observable symptom, sanitized decisive evidence, approaches tried and why each worked or failed, root cause or honest uncertainty, resolution, verification, prevention/follow-up, reusable rule, and safe references. Use `Resolved`, `Partial`, or `Open` status truthfully.
-- Keep published learning files append-only by default. Correct prior understanding with a new dated file that links the earlier learning rather than rewriting history.
-- Exception: when authoritative evidence proves an existing statement was fabricated, hallucinated, or factually false, correct or remove the false content so it cannot mislead future work. Mark the affected file `Corrected` and add a dated note stating what was wrong, the authoritative evidence, and what changed; never use this exception for disputed interpretation, ordinary staleness, or changed external conditions.
-- Promote the shortest prevention rule into the appropriate canonical instructions, setup guide, architecture contract, or operator runbook in the same change. Do not leave durable knowledge only in chat, commit history, a PR, or the learning collection.
+- Maintain `docs/learnings.md` as the repository-wide learning journal. Add an entry in the same work that reveals a material resolved bug/regression, failed or misleading experiment, unexpected behavior, setup/environment trap, non-obvious constraint, important workaround, or rejected approach with reusable rationale; routine successful work needs no entry.
+- Record the task/context, observable symptom, sanitized decisive evidence, approaches tried and why each worked or failed, root cause or honest uncertainty, resolution, verification, prevention/follow-up, reusable rule, and safe references. Use `Resolved`, `Partial`, or `Open` status truthfully.
+- Keep entries append-only by default. Correct prior understanding with a new linked entry rather than rewriting history.
+- Exception: when authoritative evidence proves an existing statement was fabricated, hallucinated, or factually false, correct or remove the false content so it cannot mislead future work. Mark the entry `Corrected` and add a dated note stating what was wrong, the authoritative evidence, and what changed; never use this exception for disputed interpretation, ordinary staleness, or changed external conditions.
+- Promote the shortest prevention rule into the appropriate canonical instructions, setup guide, architecture contract, or operator runbook in the same change. Do not leave durable knowledge only in chat, commit history, a PR, or the journal.
 - Never record secrets, credentials, private keys, customer data, sensitive payloads, device codes, or unsanitized production evidence.
 
 ### Validation and test quality
 
 - Discover and use the repository's canonical commands; do not invent shared command names where the project does not define them.
-- Use a validation ladder: fast targeted feedback while iterating, the repository pre-commit gate before commit, and the full pre-push/release-relevant gate before push. If a named gate does not exist, run the closest repository-native equivalent and document the exact evidence.
+- Use a validation ladder: fast targeted feedback while iterating, the repository pre-commit gate before commit, and the full pre-push/release-relevant gate before push. If a named gate does not exist, run the closest repository-native equivalent and document the exact evidence. Respect exclusive runtime resources; do not force parallel worker execution on test flows that share an application-wide lock or mutex (such as the single active FFmpeg export lock).
 - A hook is developer feedback, not the authoritative merge gate. CI must rerun required checks from a clean checkout.
 - Never weaken, skip, or replace a failing check merely to make it green. Read the failure, fix the cause, rerun the narrowest relevant test, then rerun the containing gate.
 - Validate generated artifacts against their source and canonical generator. Do not hand-edit generated output or accept drift.
@@ -64,7 +86,7 @@ These rules are the portable minimum for Destination Works repositories. Reposit
 - Run unrelated repository or organization runner services under distinct Unix service accounts so user-scoped signals and cleanup cannot cross repository boundaries. After a runner migration, disable superseded services and watchdogs immediately; never leave a deleted registration in an automatic restart loop.
 - Containers that bind-mount a reusable self-hosted worktree must write generated files as the runner UID/GID, or normalize ownership before exit even on failure. Prove a subsequent clean checkout can remove prior outputs.
 - Scope runner prerequisites to the job's actual contract: native test jobs must not require release-only cross-platform emulation, while every published platform must fail closed unless its build and execution prerequisites are verified.
-- PR descriptions must explain why the change was needed, what changed, approaches rejected, exact validation, bugs found/fixed with regression evidence, learning records, risk, and rollback.
+- PR descriptions must explain why the change was needed, what changed, approaches rejected, exact validation, bugs found/fixed with regression evidence, learning-log entries, risk, and rollback.
 
 ### Security and supply chain
 
