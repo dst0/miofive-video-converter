@@ -623,3 +623,66 @@ Sanitize all evidence and never include credentials, tokens, private keys, custo
 - **Prevention/follow-up:** Inspect staged modes/renames/deletions in addition to source content and tests.
 - **Reusable learning:** A passing interpreter invocation does not verify a script's executable entry point.
 - **References:** `scripts/copy-ffmpeg-binaries.js`, `AGENTS.md`
+
+### 2026-09-05 — A passing local gate is not a passing hosted security analysis
+
+- **Status:** Resolved
+- **Task/context:** Exact-head PR #45 validation after source publication.
+- **Unexpected observation or failure:** Clean local scanners and JavaScript/Rust CI passed, but CodeQL reported 26 alerts and failed its result check.
+- **Evidence:** Analysis `1727707788` at `5bab61c647fbf3662f895e8c39f7a9bcaa3bc9b6`; source/sink review identified missing control-route rate limiting, unsafe manifest replacement and a predictable test temporary directory among intentional local-path/tool-selection flows.
+- **Approaches tried:**
+  - **Attempt:** Reuse the ad hoc browse/video counter and infer security status from local gates.
+    - **Outcome:** Did not work
+    - **Why:** Other expensive private routes had no quota, and local scanners do not run CodeQL's dataflow queries.
+  - **Attempt:** Trace every alert with independent read-only reviews, implement real fixes, and document exact false-positive evidence without query exclusions.
+    - **Outcome:** Worked
+    - **Why:** The code corrections address observable behavior while preserving the tool's future coverage.
+- **Root cause:** Incomplete middleware coverage, validation followed by a truncating pathname write, and predictable test fixture allocation; generic web-service queries also lack this product's intentional local-operator path semantics.
+- **Resolution:** Maintained private-route quotas before costly work, separate media budget, private `mkdtemp` fixtures, and no-follow manifest reads plus exclusive atomic sibling publication. Explicit parent/host trust assumptions are documented rather than inferred from loopback.
+- **Verification:** Unit tests exercise actual route exhaustion, window reset, rejected-origin budget isolation, spoofed forwarding headers, symlink manifest substitution and interrupted writes; the containing gate and final hosted state are tracked in `docs/product-review.md` and PR #45.
+- **Prevention/follow-up:** Never replace a hosted failure with a different scanner's pass. Any alert disposition must name the exact dataflow and be revalidated on the current head.
+- **Reusable learning:** Distinguish genuine vulnerabilities, intentional privileged interfaces and unproven assumptions; no broad suppression follows from a locally trusted application model.
+- **References:** `docs/codeql-triage.md`, `tests/unit/rate-limits.test.js`, `tests/unit/tooling.test.js`, `tests/frontend-regressions.spec.js`
+
+### 2026-09-05 — Exclusive creation does not protect a later pathname reopen
+
+- **Status:** Resolved
+- **Task/context:** Adversarial review of CodeQL output-path and cleanup flows.
+- **Unexpected observation or failure:** Export created a public file with `wx`, closed it, then FFmpeg reopened that pathname with overwrite enabled. Failure cleanup later unlinked the same public name without retaining ownership.
+- **Evidence:** The published sequence at `5bab61c` allowed replacement between reservation and encoding/cleanup. Regression fixtures now insert competing files/symlinks, retarget a selected directory alias and cancel on either side of publication.
+- **Approaches tried:**
+  - **Attempt:** Rely on initial `wx` reservation or add an inode check before deleting a public path.
+    - **Outcome:** Did not work
+    - **Why:** Reopening loses the descriptor's identity, and check-then-unlink is not an atomic compare-and-delete operation.
+  - **Attempt:** Encode privately and use rename/copy as a universal publication fallback.
+    - **Outcome:** Did not work
+    - **Why:** Ordinary rename can overwrite, while exclusive copy does not promise atomic complete-file visibility. This alternative was rejected by API semantics, not a successful implementation experiment.
+  - **Attempt:** Canonical private staging with atomic no-clobber hard-link publication, capability preflight and a clear unsupported-filesystem error.
+    - **Outcome:** Worked
+    - **Why:** No public name is reopened by FFmpeg or unlinked on cancellation; successful publication is an explicit commit point.
+- **Root cause:** Filename reservation was incorrectly treated as continuing ownership across independent opens and deletes.
+- **Resolution:** Added `export-output.js`; unsupported destinations fail before encoding, late disconnect keeps completed output, and cleanup touches only known staging entries under an identity-checked directory. Parent directories must remain trusted/stable.
+- **Verification:** Seven focused publication tests and the real HTTP-disconnect regression pass; competing data survives and partial staging is removed. The first real-export assertion exposed macOS `/var` versus `/private/var` canonical aliases; assertions now compare the actual canonical output path instead of requiring an obsolete lexical alias.
+- **Prevention/follow-up:** Preserve no-clobber publication and both cancellation-boundary tests. README explains APFS/local-disk export followed by a manual copy for exFAT/FAT, canonical returned paths and abrupt-termination staging inspection. Power-loss durability and hostile parent replacement are not certified.
+- **Reusable learning:** A safe output workflow needs private work, one publication commit point, and cleanup ownership; exclusive creation alone is not that workflow.
+- **References:** `export-output.js`, `tests/unit/export-output.test.js`, `tests/unit/index.test.js`, `tests/api.spec.js`, `docs/architecture.md`
+
+### 2026-09-05 — A retry rejected before a mutex cannot prove its release
+
+- **Status:** Resolved
+- **Task/context:** Independent adversarial review of export cancellation regressions.
+- **Unexpected observation or failure:** Three tests claimed to prove mutex release by submitting an empty file list and expecting HTTP 400.
+- **Evidence:** `handleExportRequest` rejects empty files before checking `exportInProgress`; that assertion would pass even with a permanently stuck mutex.
+- **Approaches tried:**
+  - **Attempt:** Assert only that the retry is not HTTP 409.
+    - **Outcome:** Did not work
+    - **Why:** The request never reached admission.
+  - **Attempt:** Submit valid files/output while deliberately making FFmpeg unavailable, then assert the post-mutex tool-preflight error.
+    - **Outcome:** Worked
+    - **Why:** That response can only occur after crossing and acquiring the export mutex; it needs no expensive second transcode.
+- **Root cause:** The assertion observed a status code without tracing the handler's validation order.
+- **Resolution:** Strengthened encoding-, duration-probe- and audio-probe-cancellation retries and added a concise prevention rule to `AGENTS.md`.
+- **Verification:** The containing unit/pre-push gates in `docs/product-review.md` include the strengthened requests; real process termination and staging cleanup assertions remain intact.
+- **Prevention/follow-up:** Test state transitions using a stimulus that can actually reach the claimed transition, and assert a response unique to the post-transition path.
+- **Reusable learning:** Negative input validation is not evidence that a protected operation can be admitted again.
+- **References:** `tests/unit/index.test.js`, `index.js`, `AGENTS.md`

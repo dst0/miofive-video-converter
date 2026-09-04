@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const {spawnSync} = require('node:child_process');
 const fs = require('node:fs');
 const fsPromises = require('node:fs/promises');
@@ -26,6 +27,71 @@ const {copyResources} = require('../../scripts/copy-resources');
 const {verifyExecution} = require('../../scripts/check-ffmpeg');
 
 const repositoryRoot = path.resolve(__dirname, '..', '..');
+
+async function manifestFixture(t) {
+    const directory = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'miofive-manifest-race-'));
+    t.after(() => fsPromises.rm(directory, {recursive: true, force: true}));
+    await fsPromises.mkdir(path.join(directory, 'bin'));
+    for (const name of ['ffmpeg', 'ffprobe']) {
+        await fsPromises.writeFile(path.join(directory, 'bin', name), `synthetic ${name}`);
+    }
+    const record = recordSourceBuildManifest(directory);
+    return {directory, ...record};
+}
+
+test('cached manifest regeneration rejects an existing symlink without touching its target', {skip: process.platform === 'win32'}, async (t) => {
+    const {directory, manifestFile, manifestText} = await manifestFixture(t);
+    const sentinel = path.join(directory, 'sentinel.txt');
+    await fsPromises.writeFile(sentinel, manifestText);
+    await fsPromises.unlink(manifestFile);
+    await fsPromises.symlink(sentinel, manifestFile);
+    assert.throws(() => regenerateAndValidateManifest(directory), {code: 'ELOOP'});
+    assert.equal(await fsPromises.readFile(sentinel, 'utf8'), manifestText);
+    assert.ok((await fsPromises.lstat(manifestFile)).isSymbolicLink());
+});
+
+test('manifest publication replaces a swapped symlink without following or truncating its target', {skip: process.platform === 'win32'}, async (t) => {
+    const {directory, manifestFile} = await manifestFixture(t);
+    const sentinel = path.join(directory, 'sentinel.txt');
+    await fsPromises.writeFile(sentinel, 'unrelated content');
+    const originalRename = fs.renameSync;
+    t.mock.method(fs, 'renameSync', (from, to) => {
+        assert.equal(to, manifestFile);
+        fs.unlinkSync(to);
+        fs.symlinkSync(sentinel, to);
+        return originalRename(from, to);
+    });
+    const result = regenerateAndValidateManifest(directory);
+    assert.equal(await fsPromises.readFile(sentinel, 'utf8'), 'unrelated content');
+    assert.equal(await fsPromises.readFile(manifestFile, 'utf8'), result.manifestText);
+    assert.ok((await fsPromises.lstat(manifestFile)).isFile());
+    assert.equal((await fsPromises.readdir(directory)).some((name) => name.endsWith('.tmp')), false);
+});
+
+test('failed temporary manifest write preserves the previous record and removes its own temporary file', async (t) => {
+    const {directory, manifestFile, manifestText} = await manifestFixture(t);
+    const originalWrite = fs.writeFileSync;
+    t.mock.method(fs, 'writeFileSync', (file, ...args) => {
+        if (typeof file === 'number') {
+            originalWrite(file, 'incomplete');
+            throw Object.assign(new Error('synthetic disk full'), {code: 'ENOSPC'});
+        }
+        return originalWrite(file, ...args);
+    });
+    assert.throws(() => regenerateAndValidateManifest(directory), {code: 'ENOSPC'});
+    assert.equal(await fsPromises.readFile(manifestFile, 'utf8'), manifestText);
+    assert.deepEqual((await fsPromises.readdir(directory)).sort(), ['BUILD-MANIFEST.txt', 'bin']);
+});
+
+test('an exclusive manifest temporary-name collision never deletes the competing file', async (t) => {
+    const {directory, manifestFile, manifestText} = await manifestFixture(t);
+    const competing = `${manifestFile}.synthetic-collision.tmp`;
+    await fsPromises.writeFile(competing, 'unrelated file');
+    t.mock.method(crypto, 'randomUUID', () => 'synthetic-collision');
+    assert.throws(() => regenerateAndValidateManifest(directory), {code: 'EEXIST'});
+    assert.equal(await fsPromises.readFile(competing, 'utf8'), 'unrelated file');
+    assert.equal(await fsPromises.readFile(manifestFile, 'utf8'), manifestText);
+});
 
 test('clean checkout can validate operator-managed PATH tools without a generated bundle', {skip: process.platform === 'win32'}, async () => {
     const directory = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'miofive-system-tools-'));

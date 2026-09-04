@@ -323,8 +323,33 @@ function recordSourceBuildManifest(targetDir = sourceBuiltDir) {
     verifySourceBuildArtifacts(fields, binDirectory);
 
     const manifestFile = path.join(targetDir, 'BUILD-MANIFEST.txt');
-    fs.writeFileSync(manifestFile, manifestText, 'utf8');
+    writeManifestAtomically(manifestFile, manifestText);
     return {manifestText, fields, manifestFile};
+}
+
+function writeManifestAtomically(manifestFile, manifestText) {
+    // The parent build directory must be operator-owned and not concurrently
+    // replaced. Never truncate/reopen a potentially replaced destination link.
+    const temporaryFile = `${manifestFile}.${crypto.randomUUID()}.tmp`;
+    let descriptor;
+    let ownsTemporary = false;
+    try {
+        descriptor = fs.openSync(temporaryFile, 'wx', 0o600);
+        ownsTemporary = true;
+        fs.writeFileSync(descriptor, manifestText, 'utf8');
+        fs.fsyncSync(descriptor);
+        fs.closeSync(descriptor);
+        descriptor = undefined;
+        fs.renameSync(temporaryFile, manifestFile);
+    } catch (error) {
+        if (descriptor !== undefined) {
+            try { fs.closeSync(descriptor); } catch { /* Keep the decisive write failure. */ }
+        }
+        if (ownsTemporary) {
+            try { fs.unlinkSync(temporaryFile); } catch { /* Preserve uncertain cleanup state. */ }
+        }
+        throw error;
+    }
 }
 
 function regenerateAndValidateManifest(targetDir = sourceBuiltDir) {
@@ -337,12 +362,21 @@ function regenerateAndValidateManifest(targetDir = sourceBuiltDir) {
     }
 
     const manifestFile = path.join(targetDir, 'BUILD-MANIFEST.txt');
-    if (!fs.existsSync(manifestFile)) {
-        throw new Error(`Cannot regenerate cached manifest without existing build manifest in ${targetDir}`);
-    }
-
     // 1. Validate the existing trusted record: repository pins + matching binary hashes
-    const existingText = fs.readFileSync(manifestFile, 'utf8');
+    let descriptor;
+    let existingText;
+    try {
+        descriptor = fs.openSync(manifestFile, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
+        if (!fs.fstatSync(descriptor).isFile()) throw new Error('Build manifest must be a regular file');
+        existingText = fs.readFileSync(descriptor, 'utf8');
+    } catch (error) {
+        if (error.code === 'ENOENT') {
+            throw new Error(`Cannot regenerate cached manifest without existing build manifest in ${targetDir}`, {cause: error});
+        }
+        throw error;
+    } finally {
+        if (descriptor !== undefined) fs.closeSync(descriptor);
+    }
     const existingFields = assertPinnedBuildManifest(existingText);
     // verifySourceBuildArtifacts proves binary bytes match the recorded hashes
     verifySourceBuildArtifacts(existingFields, binDirectory);
@@ -366,7 +400,7 @@ function regenerateAndValidateManifest(targetDir = sourceBuiltDir) {
 
     const fields = assertPinnedBuildManifest(manifestText);
     verifySourceBuildArtifacts(fields, binDirectory);
-    fs.writeFileSync(manifestFile, manifestText, 'utf8');
+    writeManifestAtomically(manifestFile, manifestText);
     return {manifestText, fields, manifestFile};
 }
 

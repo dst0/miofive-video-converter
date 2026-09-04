@@ -8,8 +8,7 @@ test.describe('Frontend Correctness & Regression Suite', () => {
     let testDir;
 
     test.beforeEach(async () => {
-        testDir = path.join(os.tmpdir(), `fe-regressions-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`);
-        await fs.mkdir(testDir, { recursive: true });
+        testDir = await fs.mkdtemp(path.join(os.tmpdir(), 'fe-regressions-'));
     });
 
     test.afterEach(async () => {

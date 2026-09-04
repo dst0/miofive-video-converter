@@ -39,7 +39,7 @@ test.describe('API Endpoint Tests', () => {
 
       expect(response.ok()).toBeTruthy();
       const data = await response.json();
-      expect(data.output).toBe(path.join(outputDir, 'existing_1.mp4'));
+      expect(data.output).toBe(await fs.realpath(path.join(outputDir, 'existing_1.mp4')));
       expect(await fs.readFile(outputPath)).toEqual(sentinel);
       expect((await fs.stat(data.output)).size).toBeGreaterThan(0);
     } finally {
@@ -259,7 +259,7 @@ test.describe('API Endpoint Tests', () => {
       expect(response.ok()).toBeTruthy();
       const data = await response.json();
       expect(data.success).toBeTruthy();
-      expect(data.output).toBe(outputPath);
+      expect(data.output).toBe(await fs.realpath(outputPath));
       expect(data.details.rangeStart).toBe(0.5);
       expect(data.details.rangeEnd).toBe(2.375);
       expect(data.details.selectedDuration).toBeCloseTo(1.875, 3);
@@ -303,7 +303,7 @@ test.describe('API Endpoint Tests', () => {
       expect(response.ok()).toBeTruthy();
       const data = await response.json();
       expect(data.success).toBeTruthy();
-      expect(data.output).toBe(outputPath);
+      expect(data.output).toBe(await fs.realpath(outputPath));
       expect(data.details.selectedDuration).toBeCloseTo(20, 1);
 
       const stat = await fs.stat(outputPath);

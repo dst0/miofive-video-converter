@@ -63,6 +63,8 @@ Demo mode resolves real paths before access checks, so sibling paths and symlink
 
 Keep the original card or a backup until you verify an export. Long ranges can require substantial time and free disk space.
 
+Exports are encoded in a private temporary folder and published as a complete file without overwriting an existing name. The destination must support hard links (for example the Mac's APFS disk); exFAT/FAT destinations fail with guidance before encoding. Export to a supported local disk, verify the result, then copy it to the removable drive if needed. A selected folder symlink is resolved once; success reports the actual canonical output path. Cancellation before publication removes private partial bytes; a completed file is kept if the client disconnects just after publication. Do not replace the destination directory while export is running.
+
 Export offsets follow the selected clips concatenated in timestamp order; gaps between recordings are not filled. Clips with unreadable scan durations cannot be silently treated as one-second clips for an exact export, even if preview later loads their metadata. Rescan or exclude those clips so the selected range can be rebuilt from confirmed durations. Choose the output folder yourself (Browse or paste a path); finding a recording card never automatically makes it the export destination. Saved preferences are optional: the app continues working when browser storage is blocked.
 
 ## Desktop app

@@ -23,7 +23,7 @@ The static GitHub Pages demo is a separate, frontend-only mode. `public/demo-api
 
 ## Trust boundaries
 
-The backend is a local privileged component: folder browsing, scanning, video streaming, and export intentionally operate on paths selected by the local user. It is not a multi-user web service and has no remote authentication model. Its mandatory boundary is therefore loopback:
+The backend is a local privileged component: folder browsing, scanning, video streaming, and export intentionally operate on paths selected by the local user. It is not a multi-user web service and has no remote authentication model. Loopback/browser guards do not authenticate an OS user or local process: a native local client can omit browser metadata. Trusted local clients and a trusted host are explicit assumptions, not isolation guarantees against other local accounts/apps. Its mandatory network boundary is loopback:
 
 - the listener refuses non-loopback bind addresses;
 - request `Host`, `Origin`, and Fetch Metadata are checked;
@@ -31,6 +31,8 @@ The backend is a local privileged component: folder browsing, scanning, video st
 - internal executable paths and raw filesystem errors are not returned to clients;
 - request bodies, recursive scans, captured child-process output, concurrent exports, and media ranges are bounded;
 - local media and filesystem API responses use `Cache-Control: no-store`; static application assets remain separately cacheable.
+
+All private control routes use `express-rate-limit` with an aggregate 300-request/minute process-local quota; `/video` has a separate 300-request/minute quota for legitimate range bursts. Host/origin rejection precedes accounting, and limiting precedes JSON parsing, filesystem access and tool execution. Fixed loopback keys prevent forwarding-header/IP quota evasion and unbounded client maps. A 429 includes retry guidance and is uncached. This complements, not replaces, the scan/export concurrency and resource bounds.
 
 Filesystem names and API payloads are untrusted. Frontend code must use `textContent`, DOM properties, or the context-safe encoder in `public/security.js`; never interpolate an unencoded path, filename, or error into HTML. Values restored from `localStorage` are convenience state, not trusted authorization state.
 
@@ -53,13 +55,16 @@ The browser keeps two video elements: one active and one preloaded. Separate mon
 `POST /export` accepts an ordered list of existing MP4 files, a `.mp4` output path, optional range boundaries, speed, and a named quality profile. The backend:
 
 1. validates and resolves source files and rejects a mixed A/B camera timeline;
-2. reserves a new output filename with exclusive creation, adding a numeric suffix when needed;
+2. resolves the output directory once and creates mode-0700 private staging with a mode-0600 output file; preflights hard-link support before encoding;
 3. determines per-file overlap with the global range using at most four concurrent metadata probes;
 4. builds FFmpeg filters for trim, speed, audio normalization, and concatenation;
 5. runs one export at a time and keeps only a bounded stderr tail;
 6. strips inherited container metadata and chapters from the output;
 7. terminates complete Unix process groups during cancellation/shutdown using Node's negative-PID signal API (there is no external `kill` subprocess);
-8. removes the reserved partial output on failure before the sidecar exits.
+8. flushes a completed regular file and publishes it using atomic no-clobber `link`, retrying numeric suffixes on collisions;
+9. removes only known private staging entries on failure or success. A completed public output is never deleted for a late client disconnect.
+
+Publication is the commit point. There is no public placeholder for FFmpeg to reopen, and cleanup never targets the public result name. Filesystems without hard links (including exFAT/FAT) fail closed with local-disk guidance before encoding; overwrite-capable rename or non-atomic copy is not an equivalent fallback. Selected symlink aliases cannot redirect a prepared job, but canonical parent directories must remain trusted and stable. Staging identity checks refuse uncertain cleanup; they are not an atomic compare-and-delete guarantee against hostile concurrent parent replacement. Abrupt power loss/SIGKILL can leave a hidden staging folder; inspect it before manually removing it and keep the original recordings.
 
 Input files are never modified. Output is encoded as H.264/yuv420p with optional AAC audio and a newly generated `faststart` container; input comments, device tags, GPS/location metadata, and chapters are not copied.
 
@@ -74,6 +79,8 @@ Visual z-index and Chromium DOM assertions alone are insufficient: native testin
 The Tauri host accepts only a credential-free `http://127.0.0.1:<port>/` (or localhost) ready URL emitted by its owned sidecar. No generic sidecar-provided navigation is allowed. The webview CSP is non-null, and no application capability grants frontend IPC commands. Development starts from `frontendDist`, not an unstarted fixed-port dev server. Event supervision continues after `ready`; unexpected termination clears the child handle and displays recovery guidance, while intentional Quit suppresses that error. The child mutex is released before waiting for shutdown.
 
 `check:ffmpeg` follows runtime candidates: explicit operator paths, validated bundled resources, then system tools. The source-build cache is not a runtime candidate and is validated separately by build/copy gates. An empty development `resources/bin` is absent; an incomplete nonempty bundle fails closed. Resource generation includes exact project license and third-party notice bytes. These notices and metadata checks alone do not establish distribution-license compliance.
+
+Cached manifest regeneration reads one regular no-follow descriptor, validates its pins/hashes, writes a private exclusive sibling and atomically replaces only the manifest name. Existing or swapped destination symlinks cannot redirect truncating writes. Build parents are trusted operator-owned directories; simultaneous builds or hostile parent replacement are unsupported.
 
 JavaScript dependencies and tool versions are exact in `package-lock.json`; npm lifecycle scripts are disabled by repository configuration. macOS release media tools are built from checksum-pinned FFmpeg and x264 source archives with a macOS 11.0 deployment target. Reuse requires an exact build manifest verifying source-pin and binary-hash consistency, arm64 architecture, deployment target, and redistributable license output (local manifests establish pin and hash consistency, not cryptographic signed provenance); explicit operator binaries receive an accurate disclaimer instead of the source-built manifest. The desktop installer stages a complete bundle beside the destination before its atomic rename. GitHub Actions are pinned to immutable commit SHAs and receive job-scoped minimum permissions. Dependabot tracks npm, Cargo, and Actions drift, and GitHub default CodeQL setup analyzes Actions and JavaScript with extended queries; Rust remains covered by formatting, Clippy, tests, and RustSec because GitHub's default-setup API does not currently accept Rust as a configured language.
 

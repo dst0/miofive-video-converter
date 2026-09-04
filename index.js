@@ -1,12 +1,14 @@
 // server
 const express = require('express');
 const helmet = require('helmet');
+const {rateLimit} = require('express-rate-limit');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const os = require('os');
 const path = require('path');
 const {spawn} = require('child_process');
 const {pipeline} = require('stream/promises');
+const {prepareExportOutput, publishExportOutput, cleanupExportOutput} = require('./export-output');
 
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
@@ -209,27 +211,18 @@ function guessMountPoint(partitions, volumes) {
     }
     return null;
 }
-const rateLimitMap = new Map();
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const MAX_REQUESTS = 300; // Browser playback can legitimately issue many range requests.
-
-function checkRateLimit(clientId) {
-    const now = Date.now();
-    for (const [key, value] of rateLimitMap) {
-        if (now > value.resetTime) rateLimitMap.delete(key);
-    }
-
-    const clientData = rateLimitMap.get(clientId) || { count: 0, resetTime: now + RATE_LIMIT_WINDOW };
-    
-    if (now > clientData.resetTime) {
-        clientData.count = 0;
-        clientData.resetTime = now + RATE_LIMIT_WINDOW;
-    }
-    
-    clientData.count++;
-    rateLimitMap.set(clientId, clientData);
-    
-    return clientData.count <= MAX_REQUESTS;
+function createLocalRateLimiter({windowMs = 60000, limit = 300} = {}) {
+    return rateLimit({
+        windowMs,
+        limit,
+        // This is one local-user process, not a multi-tenant proxy. A fixed key
+        // bounds memory and prevents spoofed forwarding headers/IPs adding quota.
+        keyGenerator: () => 'loopback',
+        standardHeaders: 'draft-8',
+        legacyHeaders: false,
+        handler: (_req, res) => res.status(429).set('Cache-Control', 'no-store')
+            .json({error: 'Too many requests. Please try again later.'}),
+    });
 }
 
 function killChildProcessTree(child) {
@@ -544,9 +537,15 @@ app.use(helmet({
     crossOriginEmbedderPolicy: false,
 }));
 app.use(requestBoundaryGuard);
+// Reject hostile browser origins before consuming quota. Keep media's legitimate
+// range-request bursts separate from controls, and limit before parsing bodies
+// or doing filesystem/process work. Express mounts also cover case/trailing slash.
+app.use(['/api', '/check-ffmpeg', '/demo-mode', '/export', '/list-directories', '/scan'], createLocalRateLimiter());
+app.use('/video', createLocalRateLimiter());
 app.use(express.json({limit: '64kb', strict: true}));
 app.use((req, res, next) => {
-    if (PRIVATE_ENDPOINTS.has(req.path) || req.path.startsWith('/api/')) {
+    const normalizedRoute = req.path.toLowerCase().replace(/\/+$/, '');
+    if (PRIVATE_ENDPOINTS.has(normalizedRoute) || normalizedRoute.startsWith('/api/')) {
         res.set('Cache-Control', 'no-store');
     }
 
@@ -967,45 +966,6 @@ async function validateInputFiles(files) {
     return normalizedFiles;
 }
 
-async function getAvailableOutputPath(outputPath) {
-    if (typeof outputPath !== 'string' || !outputPath.trim()) {
-        throw new Error('Output path is required');
-    }
-    const normalizedOutputPath = path.resolve(outputPath);
-    const parsedPath = path.parse(normalizedOutputPath);
-
-    if (!parsedPath.dir) {
-        throw new Error('Output folder is required');
-    }
-    if (parsedPath.ext.toLowerCase() !== '.mp4') {
-        throw new Error('Output filename must use the .mp4 extension');
-    }
-
-    await fs.access(parsedPath.dir);
-    const outputDirStat = await fs.stat(parsedPath.dir);
-    if (!outputDirStat.isDirectory()) {
-        throw new Error('Output folder is not a directory');
-    }
-
-    let finalOutputPath = normalizedOutputPath;
-    let counter = 1;
-    const MAX_COUNTER = 9999;
-
-    while (counter <= MAX_COUNTER) {
-        try {
-            const handle = await fs.open(finalOutputPath, 'wx', 0o600);
-            await handle.close();
-            return finalOutputPath;
-        } catch (error) {
-            if (error.code !== 'EEXIST') throw error;
-            finalOutputPath = path.join(parsedPath.dir, `${parsedPath.name}_${counter}${parsedPath.ext}`);
-            counter++;
-        }
-    }
-
-    throw new Error('Too many files with the same name. Please choose a different filename.');
-}
-
 function validateOutputFilename(filename) {
     if (typeof filename !== 'string' || !filename || filename !== filename.trim()) {
         throw new Error('Output filename is required');
@@ -1320,12 +1280,6 @@ app.get('/demo-mode', async (req, res) => {
 
 // List directories endpoint
 app.post('/list-directories', async (req, res) => {
-    // Rate limiting check
-    const clientId = req.ip || req.connection.remoteAddress;
-    if (!checkRateLimit(clientId)) {
-        return res.status(429).json({error: 'Too many requests. Please try again later.'});
-    }
-    
     // In demo mode, only allow access to test-data directory
     if (DEMO_MODE) {
         const {path: dirPath} = req.body;
@@ -1481,7 +1435,7 @@ app.post('/list-directories', async (req, res) => {
             }
         }
         
-        // Normalize and resolve the path to prevent directory traversal attacks
+        // Normalize the selected local path; only demo mode imposes a fixed root.
         const normalizedPath = path.resolve(dirPath);
         
         // Verify the path exists and is accessible
@@ -1612,8 +1566,15 @@ async function handleExportRequest(req, res) {
 
     const abortController = requestLifetime(res);
 
-    let finalOutputPath;
-    let finalOutputPathClaimed = false;
+    let stagedOutput;
+    const cleanup = async () => {
+        try { await cleanupExportOutput(stagedOutput); } catch {
+            // Preserve uncertain/unexpected entries. Never broaden cleanup to the
+            // user's destination or turn a committed export into a failed one.
+            console.warn('Unable to remove private export staging folder; manual inspection may be needed.');
+        }
+        stagedOutput = undefined;
+    };
     exportInProgress = true;
     try {
         if (abortController.signal.aborted) {
@@ -1636,14 +1597,13 @@ async function handleExportRequest(req, res) {
         if (cameraChannels.size > 1) {
             throw new Error('Mixed camera channels cannot be exported as one exact timeline');
         }
-        finalOutputPath = await getAvailableOutputPath(requestedOutputPath);
-        finalOutputPathClaimed = true;
+        stagedOutput = await prepareExportOutput(requestedOutputPath);
         if (abortController.signal.aborted) {
             throw abortController.signal.reason || new Error('Client disconnected');
         }
         const details = await exportVideoRange({
             files: normalizedFiles,
-            finalOutputPath,
+            finalOutputPath: stagedOutput.stagingPath,
             rangeStart,
             rangeEnd,
             speed,
@@ -1655,6 +1615,9 @@ async function handleExportRequest(req, res) {
             throw abortController.signal.reason || new Error('Client disconnected');
         }
 
+        const finalOutputPath = await publishExportOutput(stagedOutput, abortController.signal);
+        await cleanup();
+        if (res.destroyed || res.writableEnded) return;
         res.json({
             success: true,
             message: 'Video exported successfully',
@@ -1662,9 +1625,7 @@ async function handleExportRequest(req, res) {
             details,
         });
     } catch (err) {
-        if (finalOutputPathClaimed && finalOutputPath) {
-            await fs.rm(finalOutputPath, {force: true}).catch(() => {});
-        }
+        await cleanup();
         if (!res.writableEnded && !res.destroyed) {
             const clientError = isClientInputError(err);
             res.status(clientError ? 400 : 500).json({
@@ -1704,12 +1665,6 @@ function parseByteRange(rangeHeader, fileSize) {
 }
 
 app.get('/video', async (req, res) => {
-    // Rate limiting check
-    const clientId = req.ip || req.connection.remoteAddress;
-    if (!checkRateLimit(clientId)) {
-        return res.status(429).json({error: 'Too many requests. Please try again later.'});
-    }
-    
     const videoPath = req.query.path;
     
     if (typeof videoPath !== 'string' || !videoPath.trim()) {
@@ -1717,7 +1672,7 @@ app.get('/video', async (req, res) => {
     }
     
     try {
-        // Normalize and resolve the path to prevent directory traversal attacks
+        // Normalize the selected local path; only demo mode imposes a fixed root.
         const normalizedPath = path.resolve(videoPath);
         
         // Normal mode intentionally serves an explicit local MP4 path so recordings may
@@ -1846,6 +1801,7 @@ module.exports = {
     app,
     startServer,
     checkFFmpeg,
+    createLocalRateLimiter,
     buildExportSegments,
     getVideoDuration,
     getVideoDurationFast,
@@ -1856,6 +1812,7 @@ module.exports = {
     parseDiskutilList,
     parseFilename,
     realPathInside,
+    requestBoundaryGuard,
     resolveExecutable,
     resolveRequestedOutputPath,
     runCapture,

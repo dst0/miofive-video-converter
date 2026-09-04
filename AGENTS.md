@@ -11,6 +11,7 @@
 - If lean-ctx reports its 120-second capture limit, do not count pass-looking text as a successful gate. Use its streaming track mode (`lean-ctx -t 'npm run prepush'`) and require the real zero exit status; do not shorten or skip tests to fit the capture window.
 - Run the release build and timing-sensitive process/browser gates sequentially on a shared workstation. If fixture startup or cleanup times out under build contention, preserve the failure and rerun the unchanged containing gate after the build; do not increase lifecycle deadlines just to make a loaded run green.
 - Inspect `git diff --cached --summary` as well as the text diff before committing: preserve executable bits on existing shebang entry points unless their removal is intentional and verified.
+- Mutex-release tests must send requests that pass all pre-mutex validation; an earlier validation error cannot prove admission or release. Cleanup may remove a temporary name only after exclusive creation actually established ownership.
 
 ## Durable Learning Capture
 

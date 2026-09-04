@@ -9,11 +9,12 @@ This app is intended to use open-source dependencies only. This file summarizes 
 ## JavaScript Runtime and Build Dependencies
 
 - `express`: MIT.
+- `express-rate-limit`: MIT.
 - `helmet`: MIT.
 - `@playwright/test`: Apache-2.0.
 - `@tauri-apps/cli`: Apache-2.0 OR MIT.
 - `@yao-pkg/pkg` and `@yao-pkg/pkg-fetch`: MIT.
-The transitive npm dependency licenses in the current lockfile (298 total packages) are open-source licenses such as MIT, ISC, Apache-2.0, BSD, and BlueOak. The app does not depend on npm FFmpeg/FFprobe binary installer packages.
+The transitive npm dependency licenses in the lockfile are open-source licenses such as MIT, ISC, Apache-2.0, BSD, and BlueOak. Run `npm run check:licenses` for the exact resolved package count. The app does not depend on npm FFmpeg/FFprobe binary installer packages.
 
 ## FFmpeg and FFprobe Binaries
 

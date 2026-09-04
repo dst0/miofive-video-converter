@@ -588,6 +588,9 @@ test('client HTTP disconnect during export terminates transcode process, removes
         }
         assert.ok(ffmpegPid, 'mock FFmpeg did not start in time');
         assert.doesNotThrow(() => process.kill(ffmpegPid, 0), 'mock FFmpeg should be running');
+        await assert.rejects(fs.access(outputFile), {code: 'ENOENT'}, 'no public placeholder while encoding');
+        assert.ok((await fs.readdir(directory)).some((name) => name.startsWith('.miofive-export-')));
+        await fs.writeFile(outputFile, 'unrelated file created while export runs');
 
         // Client disconnects while transcode is active
         clientRequest.destroy();
@@ -616,19 +619,26 @@ test('client HTTP disconnect during export terminates transcode process, removes
         }
         assert.ok(processTerminated, `mock FFmpeg PID ${ffmpegPid} was not killed on disconnect`);
 
-        // Assert partial output file was removed
-        await assert.rejects(() => fs.access(outputFile), {code: 'ENOENT'});
+        // Cleanup may outlive child termination, but must remove only staging.
+        for (let attempt = 0; attempt < 100; attempt++) {
+            if (!(await fs.readdir(directory)).some((name) => name.startsWith('.miofive-export-'))) break;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+        }
+        assert.equal((await fs.readdir(directory)).some((name) => name.startsWith('.miofive-export-')), false);
+        assert.equal(await fs.readFile(outputFile, 'utf8'), 'unrelated file created while export runs');
 
-        // Assert exportInProgress mutex is released: next export attempt does not return 409
+        // Cross the actual mutex before failing tool preflight. An empty files
+        // list returns before admission and cannot prove the mutex was released.
+        process.env.MIOFIVE_FFMPEG_PATH = path.join(directory, 'absent-tool');
         const probeResponse = await request({
             port,
             requestPath: '/export',
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({files: []}), // Invalid files returns 400, proving mutex is not 409
+            body: JSON.stringify({files: [sampleVideo], outputPath: outputFile}),
         });
         assert.equal(probeResponse.status, 400);
-        assert.match(JSON.parse(probeResponse.body).error, /No files to export/);
+        assert.match(JSON.parse(probeResponse.body).error, /FFmpeg is not available/);
     } finally {
         if (previousFfmpegPath !== undefined) process.env.MIOFIVE_FFMPEG_PATH = previousFfmpegPath;
         else delete process.env.MIOFIVE_FFMPEG_PATH;
@@ -796,15 +806,16 @@ test('client HTTP disconnect during duration probe terminates ffprobe process gr
         await assert.rejects(() => fs.access(ffmpegInvocationsFile), {code: 'ENOENT'});
         await assert.rejects(() => fs.access(outputFile), {code: 'ENOENT'});
 
+        process.env.MIOFIVE_FFMPEG_PATH = path.join(directory, 'absent-tool');
         const probeResponse = await request({
             port,
             requestPath: '/export',
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({files: []}),
+            body: JSON.stringify({files: dummyVideos, outputPath: outputFile}),
         });
         assert.equal(probeResponse.status, 400);
-        assert.match(JSON.parse(probeResponse.body).error, /No files to export/);
+        assert.match(JSON.parse(probeResponse.body).error, /FFmpeg is not available/);
     } finally {
         if (prevFfprobePath !== undefined) process.env.MIOFIVE_FFPROBE_PATH = prevFfprobePath;
         else delete process.env.MIOFIVE_FFPROBE_PATH;
@@ -994,15 +1005,16 @@ test('client HTTP disconnect during audio probe terminates ffprobe process group
         await assert.rejects(() => fs.access(ffmpegInvocationsFile), {code: 'ENOENT'});
         await assert.rejects(() => fs.access(outputFile), {code: 'ENOENT'});
 
+        process.env.MIOFIVE_FFMPEG_PATH = path.join(directory, 'absent-tool');
         const probeResponse = await request({
             port,
             requestPath: '/export',
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({files: []}),
+            body: JSON.stringify({files: dummyVideos, outputPath: outputFile}),
         });
         assert.equal(probeResponse.status, 400);
-        assert.match(JSON.parse(probeResponse.body).error, /No files to export/);
+        assert.match(JSON.parse(probeResponse.body).error, /FFmpeg is not available/);
     } finally {
         if (prevFfprobePath !== undefined) process.env.MIOFIVE_FFPROBE_PATH = prevFfprobePath;
         else delete process.env.MIOFIVE_FFPROBE_PATH;
@@ -1097,7 +1109,7 @@ test('positive real HTTP export request succeeds and normal JSON request does no
         assert.equal(response.status, 200, `export failed: ${response.body.toString()}`);
         const parsed = JSON.parse(response.body);
         assert.equal(parsed.success, true);
-        assert.equal(parsed.output, outputFile);
+        assert.equal(parsed.output, await fs.realpath(outputFile));
 
         const stat = await fs.stat(outputFile);
         assert.ok(stat.size > 0, 'output file should exist and have content');

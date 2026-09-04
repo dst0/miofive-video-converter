@@ -24,6 +24,9 @@ The previous report described useful completed work but mixed interim gates with
 | P2: desktop monitoring ended at `ready` | Continue reading sidecar events, clear an unexpectedly terminated child, display recovery guidance, and suppress errors on intentional Quit | Independent adversarial code review plus native lifecycle verification |
 | P2: media availability check selected artifacts runtime did not use | Share runtime resolver; validate actual bundled bytes before execution; support system tools and an intentionally empty development bundle | Hermetic PATH/override/incomplete-bundle tests |
 | P2: project and third-party notices were absent from packaged resources | Generate exact copies alongside the FFmpeg notice | Resource-copy byte comparison and native bundle inspection |
+| P1: exclusive output reservation did not survive later pathname replacement | Encode in canonical private staging; publish using no-clobber hard links; late disconnect retains complete output | Seven publication tests plus strengthened real HTTP-cancellation tests |
+| P2: most expensive private routes lacked a rate limit | Maintained middleware, separate control/media budgets, limits before JSON/filesystem/process work | Real route exhaustion, reset, spoofed-header and origin-budget tests |
+| P2: cached manifest validation preceded a truncating pathname write | No-follow descriptor validation and private atomic sibling publication | Existing/swapped symlinks, interrupted write and temporary-name collision tests |
 
 ## Decisions and tradeoffs
 
@@ -35,6 +38,8 @@ The previous report described useful completed work but mixed interim gates with
 - Modal ownership: z-index/ARIA retirement, two native dialogs, and a frame-delayed close/open all failed the native AX reproduction. A single native shell switching retained panels succeeded without timing workarounds or losing form state. Chromium structural checks now assert that contract, not arbitrary z-index values or forced DOM visibility.
 
 ## Verification record
+
+### Published checkpoint `5bab61c` (before the CodeQL follow-up)
 
 All results below are observed on 2026-09-05 (Brisbane), not inferred from a prior agent's summary.
 
@@ -48,6 +53,18 @@ All results below are observed on 2026-09-05 (Brisbane), not inferred from a pri
 - Native packaging: final `npm run pack:mac` **passed**, exit 0 in 182.842 seconds. Generated public assets, tools, manifest, sidecar and notices matched their source bytes. The complete bundle file/mode manifest digest was `9362464c576d1582df1ac717ada660eb8db59cbb3a5ae1b93dcab6972094e70f`, unchanged after the GUI run. The bundle has only a linker ad-hoc executable signature; `codesign --verify --deep --strict` **failed** resource-seal verification. This is a local source-build/run result, not signed/notarized distribution approval; no binary is published.
 - Two independent read-only adversarial reviewers inspected runtime and delivery changes. Follow-up review found late-metadata, running-export focus and fallback dialog-role cases; the corresponding corrections are included. The final single-shell lifecycle design was independently re-reviewed without a native lifecycle blocker in that bounded scope.
 - Remote CI is a separate exact-PR-head gate and is not claimed by local results. Current `main` protection has empty required-check contexts and does not enforce admins, so this PR must remain open for owner review instead of self-merge. Published check results belong to the PR, not a mutable local report.
+
+### CodeQL follow-up
+
+The first published head passed clean-checkout JavaScript and Rust CI but failed CodeQL with 26 alerts. Root and both independent reviewers traced the exact SARIF and distinguished intentional local-operator paths from real rate-limiting, manifest-write, temporary-fixture and output-ownership defects. [Per-alert evidence](codeql-triage.md) preserves the scope; no broad query exclusions or severity reductions were added.
+
+The follow-up adds private/no-clobber export publication, capability preflight, quotas before expensive work, no-follow/atomic manifest replacement and `mkdtemp` fixtures. It also corrects the proof of mutex release: a retry must pass pre-mutex input validation. Four manifest tests include a temporary-name collision to prove failed exclusive creation cannot authorize cleanup.
+
+Minimum Node 22.13.0 passed all **55 unit tests**, zero skips, after these corrections. Final `npm run prepush` then passed, exit 0 in **254.378 seconds**: 55 unit tests, **164 Playwright tests**, lint, declared-license metadata (300 npm/458 Cargo entries), Rust fmt/Clippy and one Rust test. `npm audit --audit-level=high` reports zero vulnerabilities after the reviewed exact dependency addition. Closed logs are Brotli Q6. The earlier 42-test/artifact checkpoint above must not be presented as this follow-up's final build.
+
+Rebuilt `npm run pack:mac` passed, exit 0 in **214.619 seconds**. Source/generated/bundled assets, notices, tools and sidecar matched. The final 21-file/mode manifest SHA-256 is `6d54d6dbdd24781df45f21ff37ab7297a335f1c8df5ef22410b79101fb369457`; it remained identical after native GUI testing. The final app scanned 10 synthetic clips, exercised player controls and retained Export/Folder panels with keyboard focus, then exported 0.5–3.5 seconds to an already occupied name. The existing sentinel hash stayed unchanged, success reported the `_1.mp4` suffix, and verified H.264/AAC 160×120 duration was **3.000000 seconds**. Ordinary Quit removed both identified processes and port 52138. Full resource-seal signature verification still fails; this is not a signed/notarized release.
+
+The independent follow-up found no remaining data-loss blocker under the documented trusted-parent assumption; its mutex-proof and route-case cache findings were corrected and included in the final gate. Exact committed-head scanners and hosted checks are read back before/after push and recorded in PR #45. In particular, passing local checks is not substituted for a failed hosted CodeQL result.
 
 ## Boundaries retained
 
