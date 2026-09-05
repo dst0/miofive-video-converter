@@ -29,6 +29,21 @@ These are conclusions about exact dataflows, not statements that arbitrary local
 
 ## Limits and publication status
 
+### Exact-head refresh at `c0696cc`
+
+JavaScript SARIF analysis `1727829984` for `c0696cc08d34439a276f3a9c812aedd2f6cc50e5` reports 20 alerts. Both clean-checkout JavaScript and Rust CI passed ([run 33930516024](https://github.com/dst0/miofive-video-converter/actions/runs/33930516024)); the aggregate CodeQL result still failed. The missing-rate-limit, manifest-write and predictable-temporary-directory findings are no longer present. No alerts were dismissed.
+
+- New #54 (`export-output.js:31`): explicitly selected output directory reaches `realpath`. This is the intended local destination interface; demo export is disabled.
+- New #55 (`export-output.js:73`): the same selected output reaches only the **destination** of `fs.link`, not the private staging source. Publication never overwrites an existing name and retries a suffix on `EEXIST`; cancellation never unlinks public names. This is intentional destination selection, not the previous reopen/cleanup race.
+- The previous narrowly classified operator/runtime flows #33–39, #41–44, #46, #48–50 and #52 remain. Root and an independent read-only reviewer refreshed the runtime source/sink paths against the exact SARIF; the delivery reviewer separately inspected the tooling contract. Those classifications retain the trusted-local-client and stable-parent limitations below.
+- New fixture findings #56/#57 (`tests/unit/index.test.js:593,628` at this head): the test intentionally checked public-path absence before creating and later reopening a competing sentinel by pathname. The follow-up uses an exclusive `wx+` descriptor throughout, checks that the public path still names that same regular inode and size, then reads the retained descriptor at explicit offset zero. It also cancels the request and cleans up the owned process group when an early assertion fails. This strengthens the test instead of excluding test code from analysis.
+
+The strengthened regression was run against an isolated snapshot of `5bab61c`: it failed specifically because the old exporter exposed a public placeholder during encoding, then exited normally without a test timeout. It passes against the corrected implementation. A retained descriptor alone would be insufficient evidence of public-file preservation, because an unlinked inode can remain readable; the public-path identity assertion is required too.
+
+This refresh records 18 narrowly reviewed intentional production/tooling flows and two corrected fixture flows, **not** a passing CodeQL result on an unpublished follow-up. Updated-head analysis and any alert disposition must still be verified separately.
+
+### Trust and disposition boundary
+
 Browser metadata and loopback do **not** authenticate an OS user/process: native local clients may omit those headers. This utility is not safe as a remote or multi-user service. Canonical parent directories must remain trusted/stable; inode-before-unlink is not atomic compare-and-delete. Hard-link publication requires filesystem support; exFAT/FAT fails before encoding with guidance to use a supported local disk. A silent rename/copy fallback was rejected because it would weaken the no-overwrite/complete-file guarantee.
 
 This document records the initial failed revision and the code response. Exact updated-head checks and any per-alert disposition must be read back from GitHub and recorded in the PR; this file alone is not evidence that CodeQL passed or alerts were dismissed.

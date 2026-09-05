@@ -66,6 +66,16 @@ Rebuilt `npm run pack:mac` passed, exit 0 in **214.619 seconds**. Source/generat
 
 The independent follow-up found no remaining data-loss blocker under the documented trusted-parent assumption; its mutex-proof and route-case cache findings were corrected and included in the final gate. Exact committed-head scanners and hosted checks are read back before/after push and recorded in PR #45. In particular, passing local checks is not substituted for a failed hosted CodeQL result.
 
+### Fixture proof follow-up
+
+Exact head `c0696cc08d34439a276f3a9c812aedd2f6cc50e5` passed both clean-checkout JavaScript and Rust CI ([run 33930516024](https://github.com/dst0/miofive-video-converter/actions/runs/33930516024)). Its CodeQL result still failed with 20 alerts: 18 narrowly reviewed intentional local-path/operator flows and two competing-file fixture findings. No alerts were dismissed or queries excluded. The [dated triage refresh](codeql-triage.md) records the new IDs and exact dataflow assumptions.
+
+The fixture now retains an exclusively created descriptor, checks the public path still names that same regular inode and size, reads contents at explicit offset zero and releases owned requests/process groups even if an early assertion fails. Copied into a disposable `5bab61c` snapshot, that same strengthened test failed specifically at `no public placeholder while encoding`, then terminated normally without a test timeout. It passes with the corrected backend. All **55 unit tests** passed again on actual **Node 22.13.0**, zero skips, in **16.248 seconds**.
+
+Only tests, instructions and documentation change after the `c0696cc` native proof: application, dependency, build and packaged-resource inputs remain identical. A fresh source/resource comparison and complete bundle manifest check still produced `6d54d6dbdd24781df45f21ff37ab7297a335f1c8df5ef22410b79101fb369457`. This is verification of the same already GUI-tested bytes, not a claimed new build or signed release. Updated-head hosted checks and alert disposition remain separate gates, recorded in the PR after push.
+
+The final containing `npm run prepush` passed with exit 0 in **267.586 seconds**: **55 unit tests**, **164 Playwright tests** (one worker, zero retries), lint, declared-license metadata checks, Rust fmt/Clippy and **one Rust test**. The completed output is retained as Brotli Q6. An independent read-only review found no actionable blocker in the strengthened identity/content assertions or early-failure cleanup.
+
 ## Boundaries retained
 
 - The product is single-user and loopback-only. No remote deployment, authentication service, telemetry or upload feature is introduced.

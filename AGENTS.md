@@ -12,6 +12,7 @@
 - Run the release build and timing-sensitive process/browser gates sequentially on a shared workstation. If fixture startup or cleanup times out under build contention, preserve the failure and rerun the unchanged containing gate after the build; do not increase lifecycle deadlines just to make a loaded run green.
 - Inspect `git diff --cached --summary` as well as the text diff before committing: preserve executable bits on existing shebang entry points unless their removal is intentional and verified.
 - Mutex-release tests must send requests that pass all pre-mutex validation; an earlier validation error cannot prove admission or release. Cleanup may remove a temporary name only after exclusive creation actually established ownership.
+- Race fixtures must retain exclusively created file descriptors, verify both public-path identity and descriptor contents, and clean up owned requests/process groups even when the first regression assertion fails. Prove the test fails against the old implementation.
 
 ## Durable Learning Capture
 

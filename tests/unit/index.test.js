@@ -560,9 +560,13 @@ test('client HTTP disconnect during export terminates transcode process, removes
     process.env.MOCK_PID_FILE = pidFile;
 
     const {server, port} = await startServer({port: 0, host: '127.0.0.1', silent: true});
+    let clientRequest;
+    let competingHandle;
+    let ffmpegPid = null;
+    let processTerminated = false;
 
     try {
-        const clientRequest = http.request({
+        clientRequest = http.request({
             hostname: '127.0.0.1',
             port,
             path: '/export',
@@ -577,7 +581,6 @@ test('client HTTP disconnect during export terminates transcode process, removes
         clientRequest.end();
 
         // Wait for mock FFmpeg process to start and record its PID
-        let ffmpegPid = null;
         for (let attempt = 0; attempt < 100; attempt++) {
             try {
                 ffmpegPid = Number(await fs.readFile(pidFile, 'utf8'));
@@ -590,13 +593,15 @@ test('client HTTP disconnect during export terminates transcode process, removes
         assert.doesNotThrow(() => process.kill(ffmpegPid, 0), 'mock FFmpeg should be running');
         await assert.rejects(fs.access(outputFile), {code: 'ENOENT'}, 'no public placeholder while encoding');
         assert.ok((await fs.readdir(directory)).some((name) => name.startsWith('.miofive-export-')));
-        await fs.writeFile(outputFile, 'unrelated file created while export runs');
+        const sentinel = Buffer.from('unrelated file created while export runs');
+        competingHandle = await fs.open(outputFile, 'wx+', 0o600);
+        await competingHandle.writeFile(sentinel);
+        const competingIdentity = await competingHandle.stat();
 
         // Client disconnects while transcode is active
         clientRequest.destroy();
 
         // Wait for process termination and cleanup
-        let processTerminated = false;
         for (let attempt = 0; attempt < 40; attempt++) {
             try {
                 process.kill(ffmpegPid, 0);
@@ -625,7 +630,14 @@ test('client HTTP disconnect during export terminates transcode process, removes
             await new Promise((resolve) => setTimeout(resolve, 25));
         }
         assert.equal((await fs.readdir(directory)).some((name) => name.startsWith('.miofive-export-')), false);
-        assert.equal(await fs.readFile(outputFile, 'utf8'), 'unrelated file created while export runs');
+        const publicIdentity = await fs.lstat(outputFile);
+        assert.ok(publicIdentity.isFile());
+        assert.deepEqual([publicIdentity.dev, publicIdentity.ino, publicIdentity.size],
+            [competingIdentity.dev, competingIdentity.ino, sentinel.length]);
+        const contents = Buffer.alloc(sentinel.length);
+        const {bytesRead} = await competingHandle.read(contents, 0, contents.length, 0);
+        assert.equal(bytesRead, sentinel.length);
+        assert.deepEqual(contents, sentinel);
 
         // Cross the actual mutex before failing tool preflight. An empty files
         // list returns before admission and cannot prove the mutex was released.
@@ -640,6 +652,12 @@ test('client HTTP disconnect during export terminates transcode process, removes
         assert.equal(probeResponse.status, 400);
         assert.match(JSON.parse(probeResponse.body).error, /FFmpeg is not available/);
     } finally {
+        clientRequest?.destroy();
+        if (ffmpegPid && !processTerminated) {
+            try { process.kill(-ffmpegPid, 'SIGKILL'); } catch { /* Already reaped. */ }
+        }
+        server.closeAllConnections();
+        await competingHandle?.close();
         if (previousFfmpegPath !== undefined) process.env.MIOFIVE_FFMPEG_PATH = previousFfmpegPath;
         else delete process.env.MIOFIVE_FFMPEG_PATH;
         if (previousPidFile !== undefined) process.env.MOCK_PID_FILE = previousPidFile;

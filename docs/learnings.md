@@ -686,3 +686,23 @@ Sanitize all evidence and never include credentials, tokens, private keys, custo
 - **Prevention/follow-up:** Test state transitions using a stimulus that can actually reach the claimed transition, and assert a response unique to the post-transition path.
 - **Reusable learning:** Negative input validation is not evidence that a protected operation can be admitted again.
 - **References:** `tests/unit/index.test.js`, `index.js`, `AGENTS.md`
+
+### 2026-09-05 — A race regression must protect its own competing-file fixture
+
+- **Status:** Resolved
+- **Task/context:** Exact-head CodeQL refresh of the real HTTP-disconnect export regression.
+- **Unexpected observation or failure:** The regression checked that a public filename was absent, then created and read a competing sentinel through separate pathname operations. CodeQL correctly identified that fixture's check/reopen pattern; its original failure cleanup also depended on reaching the normal cancellation assertion.
+- **Evidence:** SARIF `1727829984` at `c0696cc` reported fixture alerts #56/#57. With the strengthened test copied into an isolated `5bab61c` snapshot, the old implementation failed specifically with `no public placeholder while encoding` and the test process exited without a timeout. The corrected implementation passes the focused test.
+- **Approaches tried:**
+  - **Attempt:** Keep reading the competing file by pathname or exclude intentional race fixtures from security analysis.
+    - **Outcome:** Did not work
+    - **Why:** Reopening repeats the unsafe pattern, and excluding tests would hide unrelated future defects.
+  - **Attempt:** Retain an exclusive read/write descriptor, assert the public path still names its inode and size, and verify contents at explicit offset zero.
+    - **Outcome:** Worked
+    - **Why:** The fixture owns exactly the object it wrote, while the separate public-path assertion prevents a deleted-but-still-open file from falsely proving preservation.
+- **Root cause:** A test of pathname ownership relied on pathname reopening for its own evidence; cleanup was written for the passing path rather than the deliberately failing baseline.
+- **Resolution:** Use `wx+` and retained descriptor identity/content checks. Destroy the owned HTTP request, terminate its owned process group on failure and close active server connections in `finally` before fixture removal.
+- **Verification:** Focused green regression passed; the same test failed on the old backend at the intended assertion, with normal test-runner termination. The containing gate is recorded in `docs/product-review.md`; the red log is retained privately as Brotli Q6.
+- **Prevention/follow-up:** Keep both public-path and descriptor assertions, exercise the red baseline, and never weaken a regression to appease static analysis. No application or packaged-resource inputs changed in this fixture-only follow-up.
+- **Reusable learning:** A regression's evidence must remain valid under the same failure it is designed to detect, and its failing path must release owned resources.
+- **References:** `tests/unit/index.test.js`, `docs/codeql-triage.md`, `AGENTS.md`
