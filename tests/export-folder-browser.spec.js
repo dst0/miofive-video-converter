@@ -1,7 +1,7 @@
 /**
  * Tests for Export Folder Browser Functionality
  * 
- * Regression tests for the z-index conflict between export modal and folder browser modal
+ * Regression tests for competing export/folder modal boundaries
  * and end-to-end flow tests for the export browse button.
  */
 const { test, expect } = require('@playwright/test');
@@ -60,8 +60,9 @@ test.describe('Export Modal - Folder Browser Integration', () => {
         // Folder browser modal should now be visible (regression: z-index was wrong before)
         await page.waitForSelector('#folderBrowserModal', { state: 'visible', timeout: 5000 });
 
-        // Export modal should still be in the DOM (folder browser renders on top)
-        await expect(page.locator('#exportModal')).toBeVisible();
+        // Retain the form without exposing a second active modal panel.
+        await expect(page.locator('#exportModal')).toBeAttached();
+        await expect(page.locator('#exportModal')).toBeHidden();
     });
 
     test('should allow navigating up from a folder with no subdirectories', async ({ page }) => {
@@ -79,24 +80,16 @@ test.describe('Export Modal - Folder Browser Integration', () => {
         await expect(page.locator('#folderTree .folder-item').filter({ hasText: path.basename(TEST_DATA_PATH) })).toBeVisible();
     });
 
-    test('folder browser modal should render above export modal (z-index regression)', async ({ page }) => {
+    test('folder browser owns the shared modal while the export panel is inactive', async ({ page }) => {
         await openExportModal(page);
         await page.click('#exportBrowseFolderBtn');
         await page.waitForSelector('#folderBrowserModal', { state: 'visible', timeout: 5000 });
 
-        // Verify folder browser modal has higher z-index via CSS
-        const zindex = await page.evaluate(() => {
-            const modal = document.getElementById('folderBrowserModal');
-            return getComputedStyle(modal).zIndex;
-        });
-        expect(zindex).toBe('2000');
-
-        // Export modal should have lower z-index
-        const exportZindex = await page.evaluate(() => {
-            const modal = document.getElementById('exportModal');
-            return getComputedStyle(modal).zIndex;
-        });
-        expect(exportZindex).toBe('1000');
+        await expect(page.getByRole('dialog', { name: 'Select Folder' })).toBeVisible();
+        await expect(page.locator('dialog:modal')).toHaveCount(1);
+        await expect(page.locator('#exportModal')).toBeHidden();
+        await expect(page.locator('#exportModal')).toHaveJSProperty('inert', true);
+        await expect(page.locator('#closeBrowserBtn')).toBeFocused();
     });
 
     test('should populate export output folder after selecting a folder in browser', async ({ page }) => {
@@ -138,39 +131,30 @@ test.describe('Export Modal - Folder Browser Integration', () => {
         }
     });
 
-    test('should set window.browsingForExport flag when clicking export browse button', async ({ page }) => {
+    test('export browse should start from the export output folder', async ({ page }) => {
         await openExportModal(page);
-
-        // Verify flag is not set initially
-        const initialFlag = await page.evaluate(() => window.browsingForExport);
-        expect(initialFlag).toBeFalsy();
-
-        // Click browse button
+        await page.evaluate((dir) => {
+            document.getElementById('exportOutputFolder').value = dir;
+        }, TEST_OUTPUT_DIR);
         await page.click('#exportBrowseFolderBtn');
         await page.waitForSelector('#folderBrowserModal', { state: 'visible' });
-
-        // Flag should be set
-        const flagAfterClick = await page.evaluate(() => window.browsingForExport);
-        expect(flagAfterClick).toBe(true);
+        await expect(page.locator('#currentPathDisplay')).toHaveText(TEST_OUTPUT_DIR);
     });
 
-    test('should clear browsingForExport flag after selecting folder', async ({ page }) => {
+    test('cancelling export browse resets the next browser to scan purpose', async ({ page }) => {
         await openExportModal(page);
+        await page.evaluate((dir) => {
+            document.getElementById('exportOutputFolder').value = dir;
+        }, TEST_OUTPUT_DIR);
         await page.click('#exportBrowseFolderBtn');
         await page.waitForSelector('#folderBrowserModal', { state: 'visible' });
-
-        // Wait for folder tree to populate
-        await expect(page.locator('#folderTree').locator('.folder-item').first()).toBeVisible({ timeout: 10000 });
-
-        // Select a folder
-        const folders = page.locator('#folderTree').locator('.folder-item');
-        await folders.first().click();
-        await page.click('#selectFolderBtn');
+        await page.click('#cancelBrowserBtn');
         await page.waitForSelector('#folderBrowserModal', { state: 'hidden' });
-
-        // Flag should be cleared
-        const flagAfterSelect = await page.evaluate(() => window.browsingForExport);
-        expect(flagAfterSelect).toBeFalsy();
+        await page.click('#exportCancelBtn');
+        await page.click('#backBtn');
+        await page.fill('#folderPath', TEST_DATA_PATH);
+        await page.click('#browseFolderBtn');
+        await expect(page.locator('#currentPathDisplay')).toHaveText(TEST_DATA_PATH);
     });
 
     test('should close export modal with Escape without opening folder browser', async ({ page }) => {

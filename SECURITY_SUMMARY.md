@@ -1,5 +1,8 @@
 # Security Summary
 
+> [!WARNING]
+> **Historical Scan Summary (Non-Current):** This document records a point-in-time CodeQL scan from 2025-01-31 on branch `copilot/add-dual-player-architecture`. References to `player.html` reflect earlier file organization. For current security analysis, threat models, and verified boundaries, see [`security_best_practices_report.md`](security_best_practices_report.md) and [`SECURITY.md`](SECURITY.md).
+
 ## CodeQL Security Scan Results
 
 **Status**: ✅ **PASSED** - No vulnerabilities detected

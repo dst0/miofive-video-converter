@@ -6,30 +6,40 @@ BUILD_ROOT="${ROOT_DIR}/vendor/ffmpeg/build"
 SOURCE_ROOT="${ROOT_DIR}/vendor/ffmpeg/src"
 INSTALL_ROOT="${ROOT_DIR}/vendor/ffmpeg/macos-arm64"
 DOWNLOAD_ROOT="${ROOT_DIR}/vendor/ffmpeg/downloads"
+CONFIG_READER="${ROOT_DIR}/scripts/read-ffmpeg-build-config.js"
 
-FFMPEG_VERSION="8.1.1"
-FFMPEG_ARCHIVE="ffmpeg-${FFMPEG_VERSION}.tar.xz"
-FFMPEG_URL="https://ffmpeg.org/releases/${FFMPEG_ARCHIVE}"
-FFMPEG_SHA256="b6863adde98898f42602017462871b5f6333e65aec803fdd7a6308639c52edf3"
+read_config() {
+  node "${CONFIG_READER}" "$1"
+}
 
-X264_COMMIT="0480cb05fa188d37ae87e8f4fd8f1aea3711f7ee"
-X264_ARCHIVE="x264-${X264_COMMIT}.tar.gz"
-X264_URL="https://code.videolan.org/videolan/x264/-/archive/${X264_COMMIT}/${X264_ARCHIVE}"
-X264_SHA256="d0967a1348c85dfde363bb52610403be898171493100561efa0dd05d5fd1ae50"
+FFMPEG_VERSION="$(read_config ffmpeg.version)"
+FFMPEG_ARCHIVE="$(read_config ffmpeg.archive)"
+FFMPEG_URL="$(read_config ffmpeg.url)"
+FFMPEG_SHA256="$(read_config ffmpeg.sha256)"
+
+X264_COMMIT="$(read_config x264.commit)"
+X264_ARCHIVE="$(read_config x264.archive)"
+X264_URL="$(read_config x264.url)"
+X264_SHA256="$(read_config x264.sha256)"
+MINIMUM_MACOS_VERSION="$(read_config minimumMacosVersion)"
+export MACOSX_DEPLOYMENT_TARGET="${MINIMUM_MACOS_VERSION}"
+BUILD_JOBS="$(read_config buildJobs)"
 
 if [[ "$(uname -s)" != "Darwin" || "$(uname -m)" != "arm64" ]]; then
   echo "This source build script currently supports Apple Silicon macOS only." >&2
   exit 1
 fi
 
-for tool in curl make clang tar shasum; do
+for tool in curl make clang node tar shasum; do
   if ! command -v "${tool}" >/dev/null 2>&1; then
     echo "Missing required build tool: ${tool}" >&2
     exit 1
   fi
 done
 
-jobs="$(sysctl -n hw.ncpu 2>/dev/null || echo 4)"
+jobs="${BUILD_JOBS}"
+echo "Build parallelism: ${jobs} workers"
+
 mkdir -p "${BUILD_ROOT}" "${SOURCE_ROOT}" "${INSTALL_ROOT}" "${DOWNLOAD_ROOT}"
 
 download() {
@@ -135,7 +145,9 @@ echo "Building x264 ${X264_COMMIT}"
     --enable-static \
     --disable-opencl \
     --disable-cli \
-    --disable-asm
+    --disable-asm \
+    --extra-cflags="-mmacosx-version-min=${MINIMUM_MACOS_VERSION}" \
+    --extra-ldflags="-mmacosx-version-min=${MINIMUM_MACOS_VERSION}"
   make -j "${jobs}"
   make install
 )
@@ -148,8 +160,8 @@ echo "Building FFmpeg ${FFMPEG_VERSION}"
   ./configure \
     --prefix="${INSTALL_ROOT}" \
     --pkg-config="${pkg_config_shim}" \
-    --extra-cflags="-I${INSTALL_ROOT}/include" \
-    --extra-ldflags="-L${INSTALL_ROOT}/lib" \
+    --extra-cflags="-I${INSTALL_ROOT}/include -mmacosx-version-min=${MINIMUM_MACOS_VERSION}" \
+    --extra-ldflags="-L${INSTALL_ROOT}/lib -mmacosx-version-min=${MINIMUM_MACOS_VERSION}" \
     --extra-libs="-lpthread -lm" \
     --disable-autodetect \
     --disable-debug \
@@ -164,30 +176,12 @@ echo "Building FFmpeg ${FFMPEG_VERSION}"
   make install
 )
 
+echo "Recording canonical build manifest and validating artifacts..."
+node "${ROOT_DIR}/scripts/copy-ffmpeg-binaries.js" --record-manifest
+node "${ROOT_DIR}/scripts/copy-ffmpeg-binaries.js" --validate-manifest
+
 assert_redistributable "${INSTALL_ROOT}/bin/ffmpeg" "ffmpeg"
 assert_redistributable "${INSTALL_ROOT}/bin/ffprobe" "ffprobe"
-
-cat > "${INSTALL_ROOT}/BUILD-MANIFEST.txt" <<EOF
-Miofive Video Converter bundled FFmpeg build
-
-FFmpeg:
-  version: ${FFMPEG_VERSION}
-  source: ${FFMPEG_URL}
-  sha256: ${FFMPEG_SHA256}
-
-x264:
-  commit: ${X264_COMMIT}
-  source: ${X264_URL}
-  sha256: ${X264_SHA256}
-
-Build:
-  host: $(uname -s) $(uname -m)
-  compiler: $(clang --version | head -1)
-  configure: --disable-autodetect --disable-debug --disable-doc --disable-ffplay --disable-network --enable-gpl --enable-version3 --enable-libx264 --disable-nonfree
-
-Validation:
-  ffmpeg -L and ffprobe -L were checked and did not report nonfree components.
-EOF
 
 echo "Built source FFmpeg bundle:"
 echo "  ${INSTALL_ROOT}/bin/ffmpeg"

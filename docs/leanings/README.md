@@ -1,5 +1,9 @@
 # Learning records
 
+> [!NOTE]
+> **Compatibility Notice:** In accordance with explicit user instructions, the canonical, active append-only learning journal is maintained at [`docs/learnings.md`](../learnings.md).
+> This directory and its per-file policy specification (`docs/leanings/`) are preserved intact for historical compatibility pending formal user clarification regarding directory naming and structure. Do not delete or rename this directory; record all active engineering learnings in [`docs/learnings.md`](../learnings.md).
+
 This directory is the repository-wide, append-only collection of durable engineering learnings. Each learning lives in its own Markdown file so changes remain focused, searchable, and easy to review.
 
 ## When to add a learning

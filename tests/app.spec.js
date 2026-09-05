@@ -30,7 +30,7 @@ test.describe('Application Basic Tests', () => {
     await expect(page.locator('#channelA')).toBeVisible();
     await expect(page.locator('#channelB')).toBeVisible();
     await expect(page.locator('#channelA')).toBeChecked();
-    await expect(page.locator('#channelB')).toBeChecked();
+    await expect(page.locator('#channelB')).not.toBeChecked();
     await expect(page.locator('#folderPath')).toBeVisible();
     await expect(page.locator('#browseFolderBtn')).toBeVisible();
     await expect(page.locator('#scanBtn')).toBeVisible();
@@ -61,16 +61,18 @@ test.describe('Application Basic Tests', () => {
     // Set a folder path first (to test channel validation, not folder validation)
     await page.locator('#folderPath').fill(path.join(os.tmpdir(), 'test'));
     
-    // Uncheck both channels
-    await page.locator('#channelA').uncheck();
-    await page.locator('#channelB').uncheck();
+    // Clear the selected radio programmatically to exercise the validation path.
+    await page.evaluate(() => {
+      document.getElementById('channelA').checked = false;
+      document.getElementById('channelB').checked = false;
+    });
     
     // Click scan button
     await page.locator('#scanBtn').click();
     
     // Wait for error message
     await expect(page.locator('#results .error')).toBeVisible();
-    await expect(page.locator('#results .error')).toContainText('Select at least one channel');
+    await expect(page.locator('#results .error')).toContainText('Select exactly one camera channel');
   });
 });
 

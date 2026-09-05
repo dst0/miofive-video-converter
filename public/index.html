@@ -4,6 +4,10 @@
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <meta name="theme-color" content="#2563eb" />
+        <meta
+            http-equiv="Content-Security-Policy"
+            content="default-src 'self'; base-uri 'none'; connect-src 'self'; font-src 'self'; form-action 'self'; img-src 'self' data:; media-src 'self' blob:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; worker-src 'self'"
+        />
         <title>Miofive Video Converter</title>
         <link rel="icon" href="app-icon.svg" type="image/svg+xml" />
         <link rel="manifest" href="manifest.webmanifest" />
@@ -25,19 +29,19 @@
                 <div class="section-title">1. Scan Folder</div>
 
                 <div class="input-group">
-                    <label>Channels:</label>
+                    <label>Camera channel:</label>
                     <label
-                        ><input type="checkbox" id="channelA" checked />
+                        ><input type="radio" name="cameraChannel" id="channelA" checked />
                         A</label
                     >
                     <label
-                        ><input type="checkbox" id="channelB" checked />
+                        ><input type="radio" name="cameraChannel" id="channelB" />
                         B</label
                     >
                 </div>
 
                 <div class="input-group folder-browser-group">
-                    <label>Folder:</label>
+                    <label for="folderPath">Folder:</label>
                     <div class="folder-browser-container">
                         <input
                             type="text"
@@ -61,8 +65,7 @@
                             Enable Pre-Scan Date Range Filters
                         </label>
                         <span class="filter-help"
-                            >💡 Filter files by date before scanning to improve
-                            performance</span
+                            >💡 Filters use this computer's local time and match clip start times. Use the timeline after scanning to include overlapping clips.</span
                         >
                     </div>
                     <div
@@ -145,6 +148,7 @@
 
                 <div class="input-group">
                     <button id="scanBtn">Scan</button>
+                    <button id="cancelScanBtn" type="button" hidden>Cancel scan</button>
                 </div>
             </div>
 
@@ -182,7 +186,6 @@
                     <video
                         id="videoPlayer1"
                         class="video-player active-player"
-                        autoplay
                         playsinline
                         aria-label="Current video"
                         aria-hidden="false"
@@ -515,13 +518,14 @@
                 </div>
             </div>
 
-            <!-- Export Videos Modal -->
+        </div>
+
+        <!-- A single native boundary hosts both retained dialog panels. -->
+        <dialog id="productDialog" class="modal" style="display: none" aria-hidden="true">
+            <!-- Export Videos Panel -->
             <div
                 id="exportModal"
-                class="modal"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="exportModalTitle"
+                class="modal-panel"
                 aria-hidden="true"
                 style="display: none"
             >
@@ -635,7 +639,6 @@
                                     type="text"
                                     id="exportOutputFolder"
                                     placeholder="No folder selected"
-                                    readonly
                                 />
                                 <button
                                     type="button"
@@ -676,17 +679,17 @@
                     </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Folder Browser Modal -->
-        <div id="folderBrowserModal" class="modal" style="display: none">
+        <!-- Folder Browser Panel -->
+        <div id="folderBrowserModal" class="modal-panel" style="display: none" aria-hidden="true">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3>Select Folder</h3>
+                    <h3 id="folderBrowserTitle">Select Folder</h3>
                     <button
                         type="button"
                         class="close-btn"
                         id="closeBrowserBtn"
+                        aria-label="Close folder browser"
                     >
                         &times;
                     </button>
@@ -715,6 +718,7 @@
                 </div>
             </div>
         </div>
+        </dialog>
 
         <!-- Snackbar container for notifications -->
         <div
@@ -726,14 +730,5 @@
         ></div>
 
         <script type="module" src="app.js?v=export-range-1"></script>
-        <script>
-            if ('serviceWorker' in navigator && !['localhost', '127.0.0.1'].includes(window.location.hostname)) {
-                window.addEventListener('load', () => {
-                    navigator.serviceWorker
-                        .register('/service-worker.js')
-                        .catch(() => {});
-                });
-            }
-        </script>
     </body>
 </html>

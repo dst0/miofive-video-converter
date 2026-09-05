@@ -1,49 +1,63 @@
-# This workflow will do a clean installation of node dependencies, cache/restore them, build the source code and run tests across different versions of node
-# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-nodejs
-
-name: Node.js CI
+name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
-
+  javascript:
+    name: JavaScript / test
     runs-on: ubuntu-latest
-    
-    container:
-      image: mcr.microsoft.com/playwright:v1.56.1-noble
-      options: --user root
-
-    strategy:
-      matrix:
-        node-version: [22.x]
-        # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
-
+    timeout-minutes: 25
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Install FFmpeg
-      run: |
-        apt-get update && apt-get install -y ffmpeg && apt-get clean && rm -rf /var/lib/apt/lists/*
-    
-    - name: Verify installations
-      run: |
-        node --version
-        npm --version
-        ffmpeg -version
-    
-    - name: Cache npm dependencies
-      uses: actions/cache@v4
-      with:
-        path: ~/.npm
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        restore-keys: |
-          ${{ runner.os }}-node-
-    
-    - run: npm ci
-    - run: npm run build --if-present
-    - run: npm test --if-present
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies without lifecycle scripts
+        run: npm ci --ignore-scripts
+      - name: Install Chromium and runtime dependencies
+        run: npx playwright install --with-deps chromium
+      - name: Install FFmpeg
+        run: sudo apt-get update && sudo apt-get install --yes --no-install-recommends ffmpeg
+      - name: Validate JavaScript and licenses
+        run: npm run lint && npm run test:unit && npm run check:licenses
+      - name: Test browser and API behavior
+        run: npm run test:e2e
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=moderate
+      - name: Audit all npm dependencies
+        run: npm audit --audit-level=high
+
+  rust:
+    name: Rust / check
+    runs-on: macos-15
+    timeout-minutes: 35
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Show runner toolchain
+        run: rustc --version && cargo --version
+      - name: Format, lint, and test
+        run: npm run check:rust
+      - name: Install pinned RustSec scanner
+        run: cargo install cargo-audit --locked --version 0.22.1
+      - name: Audit Rust dependencies
+        run: cargo audit --file src-tauri/Cargo.lock

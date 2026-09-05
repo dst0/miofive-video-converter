@@ -6,15 +6,16 @@ const { defineConfig, devices } = require('@playwright/test');
  */
 module.exports = defineConfig({
   testDir: './tests',
-  fullyParallel: true,
+  testIgnore: ['unit/**'],
+  fullyParallel: false,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 2 : undefined,
-  reporter: process.env.CI ? [['list'], ['html']] : 'html',
+  retries: 0,
+  workers: 1,
+  reporter: [['list'], ['html', { open: 'never' }]],
   timeout: 30000, // 30 seconds per test (default is 30s, making it explicit)
   use: {
-    baseURL: 'http://localhost:3000',
-    trace: 'on-first-retry',
+    baseURL: 'http://127.0.0.1:3000',
+    trace: 'retain-on-failure',
     actionTimeout: 10000, // 10 seconds for actions like click, fill
     serviceWorkers: 'block',
   },
@@ -28,8 +29,8 @@ module.exports = defineConfig({
 
   webServer: {
     command: 'npm start',
-    url: 'http://localhost:3000',
-    reuseExistingServer: !process.env.CI,
+    url: 'http://127.0.0.1:3000',
+    reuseExistingServer: false,
     timeout: 120 * 1000,
   },
 });

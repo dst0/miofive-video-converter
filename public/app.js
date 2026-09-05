@@ -1,6 +1,7 @@
 import { initializeFolderBrowser } from './folder-browser.js';
-import { initPlayer, showPlayerScreen, hidePlayerScreen, showExportFlow } from './player.js?v=export-range-1';
+import { initPlayer, showPlayerScreen, showExportFlow } from './player.js?v=export-range-1';
 import { setupDemoMode, isGitHubPages } from './demo-api-mock.js';
+import {escapeHtml, safeClassToken, safeStorage as localStorage} from './security.js';
 
 let scannedFiles = [];
 let ffmpegAvailable = true;
@@ -8,14 +9,24 @@ let timelineData = null;
 let demoMode = false;
 let demoPath = null;
 let removableDevices = [];
+const MAX_CALENDAR_MARKER_DAYS = 64;
+let timelineInteractionController = null;
+let timelineInitializationTimer = null;
+let scanRequestController = null;
+let scanRequestGeneration = 0;
 
-document.addEventListener('DOMContentLoaded', () => {
+let isAppInitialized = false;
+
+function initApp() {
+    if (isAppInitialized) return;
+    isAppInitialized = true;
+
     // Setup demo mode for GitHub Pages
     setupDemoMode();
     
     // Check demo mode first (also returns removable devices)
     fetch('/demo-mode')
-        .then(r => r.json())
+        .then(r => (r.ok ? r.json() : { enabled: false }))
         .then(async data => {
             demoMode = data.enabled;
             demoPath = data.demoPath;
@@ -58,20 +69,25 @@ document.addEventListener('DOMContentLoaded', () => {
             await loadSavedPaths();
         })
         .catch(err => {
-            console.error('Failed to check demo mode:', err);
+            console.warn('Failed to check demo mode:', err);
             // Load saved paths even if demo check fails
             loadSavedPaths();
         });
     
-    // Load saved values (only if not in demo mode)
-    loadSavedPaths();
     initializePreScanFilters();
     initializeFolderBrowser(); // Initialize folder browser from folder-browser.js
     initPlayer(); // Initialize the player module
 
+    if ('serviceWorker' in navigator && !['localhost', '127.0.0.1', '[::1]'].includes(window.location.hostname)) {
+        window.addEventListener('load', () => {
+            const serviceWorkerUrl = new URL('service-worker.js', document.baseURI);
+            navigator.serviceWorker.register(serviceWorkerUrl, {scope: './'}).catch(() => {});
+        });
+    }
+
     // FFmpeg check
     fetch('/check-ffmpeg')
-        .then((r) => r.json())
+        .then((r) => (r.ok ? r.json() : { available: false }))
         .then((data) => {
             ffmpegAvailable = data.available;
             if (!ffmpegAvailable) {
@@ -81,11 +97,25 @@ document.addEventListener('DOMContentLoaded', () => {
             Export needs FFmpeg and FFprobe from a bundled redistributable build, MIOFIVE_FFMPEG_PATH/MIOFIVE_FFPROBE_PATH, Homebrew paths, or PATH.
           </div>`;
             }
+        })
+        .catch(() => {
+            ffmpegAvailable = false;
         });
 
     document.getElementById('scanBtn').addEventListener('click', scanFolder);
+    document.getElementById('cancelScanBtn').addEventListener('click', cancelActiveScan);
     document.getElementById('folderPath').addEventListener('input', savePaths);
-});
+    ['folderPath', 'channelA', 'channelB', 'preScanStartTime', 'preScanEndTime'].forEach((id) => {
+        const eventName = id === 'folderPath' ? 'input' : 'change';
+        document.getElementById(id).addEventListener(eventName, cancelActiveScan);
+    });
+}
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initApp);
+} else {
+    initApp();
+}
 
 // Validate a path exists on the server
 async function validatePath(targetPath) {
@@ -138,28 +168,17 @@ async function loadSavedPaths() {
     // If scan path is invalid, try to auto-set from removable device
     if (!scanPathValid) {
         const device = getBestRemovableDevice();
-        if (device) {
+        if (device && (!folderPathInput.value || folderPathInput.value.trim() === '')) {
             folderPathInput.value = device.mountPoint;
             localStorage.setItem('mp4-combiner-folder-path', device.mountPoint);
-            console.log(`[auto-path] Scan folder → ${device.deviceName}: ${device.mountPoint}`);
         }
-    } else {
+    } else if (!folderPathInput.value || folderPathInput.value.trim() === '') {
         folderPathInput.value = savedFolderPath;
     }
     
-    // If export path is invalid, try to auto-set from removable device
-    if (!exportPathValid) {
-        const device = getBestRemovableDevice();
-        if (device) {
-            const preferredExportPath = await validatePath(device.documentsVideoPath)
-                ? device.documentsVideoPath
-                : device.mountPoint;
-            localStorage.setItem('mp4-combiner-output-folder', preferredExportPath);
-            console.log(`[auto-path] Export folder → ${device.deviceName}: ${preferredExportPath}`);
-        } else if (savedExportPath) {
-            localStorage.removeItem('mp4-combiner-output-folder');
-        }
-    }
+    // A newly discovered recording card is not consent to use it as an output
+    // destination. Reuse only a valid folder the user previously chose.
+    if (!exportPathValid && savedExportPath) localStorage.removeItem('mp4-combiner-output-folder');
 }
 
 // Function to save path values to localStorage
@@ -202,6 +221,7 @@ function initializePreScanFilters() {
 
     // Toggle filter controls visibility
     enableFiltersCheckbox.addEventListener('change', () => {
+        cancelActiveScan();
         const enabled = enableFiltersCheckbox.checked;
         filterControls.style.display = enabled ? 'block' : 'none';
         localStorage.setItem('pre-scan-filters-enabled', enabled);
@@ -218,11 +238,13 @@ function initializePreScanFilters() {
 
     // Clear buttons
     document.getElementById('clearStartTime').addEventListener('click', () => {
+        cancelActiveScan();
         startTimeInput.value = '';
         localStorage.removeItem('pre-scan-start-time');
     });
 
     document.getElementById('clearEndTime').addEventListener('click', () => {
+        cancelActiveScan();
         endTimeInput.value = '';
         localStorage.removeItem('pre-scan-end-time');
     });
@@ -230,6 +252,7 @@ function initializePreScanFilters() {
     // Preset buttons
     document.querySelectorAll('.preset-btn').forEach((btn) => {
         btn.addEventListener('click', () => {
+            cancelActiveScan();
             const preset = btn.dataset.preset;
             applyDatePreset(preset);
         });
@@ -274,7 +297,7 @@ function applyDatePreset(preset) {
             );
             break;
 
-        case 'yesterday':
+        case 'yesterday': {
             const yesterday = new Date(now);
             yesterday.setDate(yesterday.getDate() - 1);
             startDate = new Date(
@@ -294,6 +317,7 @@ function applyDatePreset(preset) {
                 59
             );
             break;
+        }
 
         case 'last7days':
             endDate = new Date(now);
@@ -301,15 +325,16 @@ function applyDatePreset(preset) {
             startDate.setDate(startDate.getDate() - 7);
             break;
 
-        case 'thisweek':
+        case 'thisweek': {
             const startOfWeek = new Date(now);
             startOfWeek.setDate(now.getDate() - now.getDay()); // Sunday
             startOfWeek.setHours(0, 0, 0, 0);
             startDate = startOfWeek;
             endDate = new Date(now);
             break;
+        }
 
-        case 'lastweek':
+        case 'lastweek': {
             const startOfLastWeek = new Date(now);
             startOfLastWeek.setDate(now.getDate() - now.getDay() - 7); // Last Sunday
             startOfLastWeek.setHours(0, 0, 0, 0);
@@ -319,6 +344,7 @@ function applyDatePreset(preset) {
             startDate = startOfLastWeek;
             endDate = endOfLastWeek;
             break;
+        }
     }
 
     if (startDate && endDate) {
@@ -404,21 +430,13 @@ function getExportRangeFromTimelineSelection(selectedFiles) {
 
         const fileStart = new Date(file.utcTime).getTime();
         const fileEnd = fileStart + duration * 1000;
-        const startsInSelectedRange =
-            fileStart >= selectedRange.startTime &&
-            fileStart <= selectedRange.endTime;
+        const overlapsSelectedRange =
+            fileEnd > selectedRange.startTime &&
+            fileStart < selectedRange.endTime;
 
-        if (startsInSelectedRange) {
-            const overlapStart =
-                selectedRange.startTime > fileStart &&
-                selectedRange.startTime < fileEnd
-                    ? selectedRange.startTime
-                    : fileStart;
-            const overlapEnd =
-                selectedRange.endTime > fileStart &&
-                selectedRange.endTime < fileEnd
-                    ? selectedRange.endTime
-                    : fileEnd;
+        if (overlapsSelectedRange) {
+            const overlapStart = Math.max(selectedRange.startTime, fileStart);
+            const overlapEnd = Math.min(selectedRange.endTime, fileEnd);
             const startInFile = (overlapStart - fileStart) / 1000;
             const endInFile = (overlapEnd - fileStart) / 1000;
 
@@ -477,10 +495,16 @@ function updateSelectAllState() {
 }
 
 function generateTimeMarkers(minTime, maxTime) {
+    if (!Number.isFinite(minTime) || !Number.isFinite(maxTime) || maxTime <= minTime) {
+        return '';
+    }
     const markers = [];
     const halfDayZones = [];
     const startDate = new Date(minTime);
     const endDate = new Date(maxTime);
+    const daySpan = Math.max(1, Math.ceil((maxTime - minTime) / 86400000));
+    const markerStepDays = Math.max(1, Math.ceil(daySpan / MAX_CALENDAR_MARKER_DAYS));
+    let generatedDays = 0;
 
     // Start from the first day
     const currentDate = new Date(
@@ -489,7 +513,8 @@ function generateTimeMarkers(minTime, maxTime) {
         startDate.getDate()
     );
 
-    while (currentDate <= endDate) {
+    while (currentDate <= endDate && generatedDays < MAX_CALENDAR_MARKER_DAYS) {
+        generatedDays++;
         const dayStart = new Date(currentDate);
         dayStart.setHours(0, 0, 0, 0);
         const dayEnd = new Date(currentDate);
@@ -581,7 +606,7 @@ function generateTimeMarkers(minTime, maxTime) {
         }
 
         // Move to next day
-        currentDate.setDate(currentDate.getDate() + 1);
+        currentDate.setDate(currentDate.getDate() + markerStepDays);
     }
 
     return halfDayZones.join('') + markers.join('');
@@ -590,15 +615,19 @@ function generateTimeMarkers(minTime, maxTime) {
 function createTimeline(files) {
     if (files.length === 0) return '';
 
-    const times = files.map((f) => new Date(f.utcTime).getTime());
-    const minTime = Math.min(...times);
-    const maxTime = Math.max(...times);
+    const startTimes = files.map((f) => new Date(f.utcTime).getTime());
+    const minTime = Math.min(...startTimes);
+    const endTimes = files.map((f) => {
+        const start = new Date(f.utcTime).getTime();
+        const duration = Number(f.duration);
+        return start + (Number.isFinite(duration) && duration > 0 ? duration * 1000 : 0);
+    });
+    const maxTime = Math.max(...endTimes);
     const timeRange = maxTime - minTime;
 
-    // If all files have the same timestamp, create a minimal range
-    const actualRange = timeRange === 0 ? 3600000 : timeRange; // 1 hour minimum
-    const actualMin = timeRange === 0 ? minTime - 1800000 : minTime; // 30 min before if same time
-    const actualMax = timeRange === 0 ? maxTime + 1800000 : maxTime; // 30 min after if same time
+    // If all files have the same timestamp and no duration, create a minimal range
+    const actualMin = timeRange <= 0 ? minTime - 1800000 : minTime; // 30 min before if same time
+    const actualMax = timeRange <= 0 ? maxTime + 1800000 : maxTime; // 30 min after if same time
 
     timelineData = {
         minTime: actualMin,
@@ -609,14 +638,16 @@ function createTimeline(files) {
 
     const fileMarkers = files
         .map((file, index) => {
-            const position =
+            const rawPosition =
                 ((new Date(file.utcTime).getTime() - actualMin) /
                     (actualMax - actualMin)) *
                 100;
+            const position = Math.max(0, Math.min(100, Number(rawPosition) || 0));
             const fileType = file.fileType || 'Other';
-            return `<div class="file-marker file-marker-${fileType.toLowerCase()}" data-index="${index}" data-directory="${fileType}" style="left: ${position}%" title="${
+            const safeFileType = escapeHtml(fileType);
+            return `<div class="file-marker file-marker-${safeClassToken(fileType)}" data-index="${index}" data-directory="${safeFileType}" style="left: ${position}%" title="${escapeHtml(
                 file.filename
-            } (${fileType})&#10;Click to select ±3 minute range"></div>`;
+            )} (${safeFileType})&#10;Click to select ±3 minute range"></div>`;
         })
         .join('');
 
@@ -683,34 +714,10 @@ function createTimeline(files) {
         </div>`;
 }
 
-// Optional function to switch between different icon styles
-function setTimelineIconStyle(style = 'default') {
-    const rangeHandles = document.querySelectorAll('.range-handle');
-
-    // Remove existing style classes
-    rangeHandles.forEach((handle) => {
-        handle.classList.remove(
-            'arrow-style',
-            'double-arrow-style',
-            'geometric-style',
-            'bracket-style'
-        );
-    });
-
-    // Apply new style
-    if (style !== 'default') {
-        rangeHandles.forEach((handle) => {
-            handle.classList.add(`${style}-style`);
-        });
-    }
-}
-
-// You can call this function to switch styles:
-// setTimelineIconStyle('arrow-style');      // ◀ ▶
-// setTimelineIconStyle('double-arrow-style'); // ⇤ ⇥
-// setTimelineIconStyle('geometric-style');   // ⮜ ⮞
-// setTimelineIconStyle('bracket-style');     // ⟨ ⟩
 function initializeTimeline() {
+    timelineInteractionController?.abort();
+    timelineInteractionController = new AbortController();
+    const {signal} = timelineInteractionController;
     const rangeStart = document.querySelector('.range-start');
     const rangeEnd = document.querySelector('.range-end');
     const rangeSelection = document.querySelector('.range-selection');
@@ -767,7 +774,8 @@ function initializeTimeline() {
     manualEndInput.value = formatDateTimeLocal(new Date(endTime));
 
     // Update snap points after timeline is rendered
-    setTimeout(updateSnapPoints, 100);
+    const snapPointTimer = setTimeout(updateSnapPoints, 100);
+    signal.addEventListener('abort', () => clearTimeout(snapPointTimer), {once: true});
 
     function formatDateTimeLocal(date) {
         const year = date.getFullYear();
@@ -915,16 +923,16 @@ function initializeTimeline() {
 
     // Event listeners for handles
     rangeStart.addEventListener('mousedown', (e) =>
-        handleMouseDown(e, rangeStart)
+        handleMouseDown(e, rangeStart), {signal}
     );
-    rangeEnd.addEventListener('mousedown', (e) => handleMouseDown(e, rangeEnd));
+    rangeEnd.addEventListener('mousedown', (e) => handleMouseDown(e, rangeEnd), {signal});
 
-    document.addEventListener('mousemove', handleMouseMove);
-    document.addEventListener('mouseup', handleMouseUp);
+    document.addEventListener('mousemove', handleMouseMove, {signal});
+    document.addEventListener('mouseup', handleMouseUp, {signal});
 
     // Event listeners for manual inputs
-    manualStartInput.addEventListener('change', updateFromManualInput);
-    manualEndInput.addEventListener('change', updateFromManualInput);
+    manualStartInput.addEventListener('change', updateFromManualInput, {signal});
+    manualEndInput.addEventListener('change', updateFromManualInput, {signal});
 
     // Time marker click handlers
     document.addEventListener('click', (e) => {
@@ -973,7 +981,7 @@ function initializeTimeline() {
 
             setRangeFromTimes(startTime, endTime);
         }
-    });
+    }, {signal});
 
     // Reset button
     document.getElementById('resetRange').addEventListener('click', () => {
@@ -982,7 +990,7 @@ function initializeTimeline() {
         rangeStart.style.left = '0%';
         rangeEnd.style.left = '100%';
         updateRangeDisplay();
-    });
+    }, {signal});
 
     // Initial update
     updateRangeDisplay();
@@ -995,7 +1003,12 @@ function filterFilesByTimeRange(startTime, endTime) {
     fileCheckboxes.forEach((checkbox, index) => {
         const file = scannedFiles[index];
         const fileTime = new Date(file.utcTime).getTime();
-        const inRange = fileTime >= startTime && fileTime <= endTime;
+        const duration = Number(file.duration);
+        const hasDuration = Number.isFinite(duration) && duration > 0;
+        const fileEnd = hasDuration ? fileTime + duration * 1000 : fileTime;
+        const inRange = hasDuration
+            ? fileEnd > startTime && fileTime < endTime
+            : fileTime >= startTime && fileTime <= endTime;
 
         const fileItem = checkbox.closest('.file-item');
         if (inRange) {
@@ -1014,7 +1027,12 @@ function filterFilesByTimeRange(startTime, endTime) {
     fileMarkers.forEach((marker, index) => {
         const file = scannedFiles[index];
         const fileTime = new Date(file.utcTime).getTime();
-        const inRange = fileTime >= startTime && fileTime <= endTime;
+        const duration = Number(file.duration);
+        const hasDuration = Number.isFinite(duration) && duration > 0;
+        const fileEnd = hasDuration ? fileTime + duration * 1000 : fileTime;
+        const inRange = hasDuration
+            ? fileEnd > startTime && fileTime < endTime
+            : fileTime >= startTime && fileTime <= endTime;
         marker.style.opacity = inRange ? '1' : '0.3';
     });
 
@@ -1032,6 +1050,30 @@ function updateTimelineSelection() {
     // This function can be used to sync timeline with checkbox selections if needed
 }
 
+function disposeTimelineInteractions() {
+    timelineInteractionController?.abort();
+    timelineInteractionController = null;
+    clearTimeout(timelineInitializationTimer);
+    timelineInitializationTimer = null;
+}
+
+function cancelActiveScan() {
+    if (!scanRequestController) return;
+    scanRequestController.abort();
+    scanRequestController = null;
+    scanRequestGeneration++;
+    document.getElementById('cancelScanBtn').hidden = true;
+    const scanButton = document.getElementById('scanBtn');
+    if (scanButton) {
+        scanButton.disabled = false;
+        scanButton.textContent = 'Scan';
+    }
+    const resultsDiv = document.getElementById('results');
+    if (resultsDiv && resultsDiv.querySelector('.loading')) {
+        resultsDiv.innerHTML = '';
+    }
+}
+
 async function scanFolder() {
     const folderPath = document.getElementById('folderPath').value.trim();
     const includeChannels = selectedChannels();
@@ -1043,15 +1085,25 @@ async function scanFolder() {
         return;
     }
 
-    if (includeChannels.length === 0) {
+    if (includeChannels.length !== 1) {
         resultsDiv.innerHTML =
-            '<div class="error">Select at least one channel (A/B)</div>';
+            '<div class="error">Select exactly one camera channel (A or B)</div>';
         return;
     }
 
     // Get pre-scan filter dates
     const filterDates = getPreScanFilterDates();
     if (filterDates === null) return; // Validation failed
+
+    scanRequestController?.abort();
+    const requestController = new AbortController();
+    scanRequestController = requestController;
+    const requestGeneration = ++scanRequestGeneration;
+    const scanButton = document.getElementById('scanBtn');
+    scanButton.disabled = true;
+    scanButton.textContent = 'Scanning…';
+    document.getElementById('cancelScanBtn').hidden = false;
+    disposeTimelineInteractions();
 
     resultsDiv.innerHTML =
         '<div class="loading"><div class="spinner"></div>Scanning...</div>';
@@ -1060,6 +1112,7 @@ async function scanFolder() {
         const response = await fetch('/scan', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            signal: requestController.signal,
             body: JSON.stringify({
                 folderPath,
                 startTime: filterDates.startTime,
@@ -1069,10 +1122,11 @@ async function scanFolder() {
         });
 
         const data = await response.json();
+        if (requestGeneration !== scanRequestGeneration) return;
         if (!response.ok) {
             let result = '';
-            result += `<div class="error">${data.error}</div>`;
-            result += `<div class="error2">${data.message}</div>`;
+            result += `<div class="error">${escapeHtml(data.error || 'Scan failed')}</div>`;
+            if (data.message) result += `<div class="error2">${escapeHtml(data.message)}</div>`;
             resultsDiv.innerHTML = result;
             return;
         }
@@ -1083,7 +1137,7 @@ async function scanFolder() {
             if (filterDates.startTime || filterDates.endTime) {
                 message += ' within the specified date range';
             }
-            resultsDiv.innerHTML = `<div class="count">${message}</div>`;
+            resultsDiv.innerHTML = `<div class="count">${escapeHtml(message)}</div>`;
             return;
         }
 
@@ -1094,8 +1148,8 @@ async function scanFolder() {
         <label class="file-checkbox-label">
           <input type="checkbox" class="file-checkbox" data-index="${index}" checked />
           <div class="file-info">
-            <div class="file-path">${f.filename}</div>
-            <div class="file-time">UTC: ${new Date(
+            <div class="file-path">${escapeHtml(f.filename)}</div>
+            <div class="file-time">Local display time: ${new Date(
                 f.utcTime
             ).toLocaleString()}</div>
           </div>
@@ -1136,8 +1190,8 @@ async function scanFolder() {
       </div>`;
 
         // Initialize timeline after DOM is ready
-        setTimeout(() => {
-            initializeTimeline();
+        timelineInitializationTimer = setTimeout(() => {
+            if (requestGeneration === scanRequestGeneration) initializeTimeline();
         }, 100);
 
         // Add event listeners for checkboxes
@@ -1157,8 +1211,16 @@ async function scanFolder() {
             .getElementById('playVideosBtn')
             .addEventListener('click', playVideos);
     } catch (err) {
+        if (err.name === 'AbortError' || requestGeneration !== scanRequestGeneration) return;
         resultsDiv.innerHTML =
             '<div class="error">Failed to scan folder.</div>';
+    } finally {
+        if (requestGeneration === scanRequestGeneration) {
+            scanRequestController = null;
+            scanButton.disabled = false;
+            scanButton.textContent = 'Scan';
+            document.getElementById('cancelScanBtn').hidden = true;
+        }
     }
 }
 
