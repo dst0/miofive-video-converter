@@ -706,3 +706,105 @@ Sanitize all evidence and never include credentials, tokens, private keys, custo
 - **Prevention/follow-up:** Keep both public-path and descriptor assertions, exercise the red baseline, and never weaken a regression to appease static analysis. No application or packaged-resource inputs changed in this fixture-only follow-up.
 - **Reusable learning:** A regression's evidence must remain valid under the same failure it is designed to detect, and its failing path must release owned resources.
 - **References:** `tests/unit/index.test.js`, `docs/codeql-triage.md`, `AGENTS.md`
+
+### 2026-09-06 — Pilot an agent CLI transport before parallel delegation
+
+- **Status:** Resolved
+- **Task/context:** Restarting four bounded read-only reviews through the user-requested AGY CLI model while root retained architecture and acceptance.
+- **Unexpected observation or failure:** All four CLI processes exited zero and left their assigned worktrees clean, but the coordinator did not retain their reports or conversation IDs. They were not accepted as completed reviews.
+- **Evidence:** The collector expected a `type` field. A no-tool live probe instead returned `event: init`, `event: step_update`, and `event: result`, with an uppercase `SUCCESS` status. The corrected pilot retained the exact requested model, canonical cwd, matching conversation ID and expected literal final response. The reported permission mode differed from the requested plan/sandbox flags.
+- **Approaches tried:**
+  - **Attempt:** Reuse a familiar NDJSON envelope and infer success from a zero CLI exit.
+    - **Outcome:** Did not work
+    - **Why:** The provider protocol differed, so filtering silently discarded the evidence; process success was not review acceptance.
+  - **Attempt:** Probe with a no-tool request, validate the live envelope and identity fields, and retain only scoped final responses and safe metadata in closed Brotli Q6 chunks.
+    - **Outcome:** Worked
+    - **Why:** It proved receipt and task identity without retaining intermediate reasoning, tool payloads, environment details or raw account banners.
+- **Root cause:** Root assumed transport compatibility before validating the actual CLI output contract.
+- **Resolution:** Corrected the collector and scheduled fresh bounded reviews; do not guess the lost conversations with an unscoped continuation command. No product changes were produced or accepted by the discarded runs.
+- **Verification:** The no-tool pilot returned the expected literal response with the requested model and cwd and matching init/result conversation IDs; all four original worktrees remained clean at the pinned baseline.
+- **Prevention/follow-up:** Pilot before fan-out, retain exact conversation IDs, independently check worktree scope, and never describe a requested permission flag as an enforced sandbox without evidence. `AGENTS.md` now records this rule.
+- **Reusable learning:** Verify transport and scope before multiplying work; an agent's exit status is neither evidence retention nor independent acceptance.
+- **References:** `AGENTS.md`; private sanitized coordinator transport records for 2026-09-06 (not release evidence)
+
+### 2026-09-06 — Agent isolation must preserve verifiable Git context
+
+- **Status:** Resolved
+- **Task/context:** Delegating source review and old-PR reconciliation in isolated working directories.
+- **Unexpected observation or failure:** Root's Git preflight succeeded, but AGY's sandbox could not read the linked worktrees' common Git directory outside their workspace. One report nevertheless asserted complete coverage of old PRs using incorrect PR-purpose mappings.
+- **Evidence:** In-agent Git commands returned exit 128 while canonical `pwd` matched. Root's authenticated PR metadata showed #35 concerned playback promises, #37 demo durations, #38 conditional pause, and #42–44 dependency updates; the unsupported reconciliation was rejected. No refs or PRs were removed.
+- **Approaches tried:**
+  - **Attempt:** Rely on a coordinator-only Git preflight for linked worktrees.
+    - **Outcome:** Partial
+    - **Why:** It verified root's source identity but not the worker's ability to inspect the same Git metadata under its filesystem boundary.
+  - **Attempt:** Use independent local clones with internal Git metadata and pilot the five identity/status commands inside AGY; fetch exact public PR refs for the reconciliation task.
+    - **Outcome:** Worked
+    - **Why:** The worker could verify its own root, branch, full HEAD and clean state without a sandbox bypass. Local fetched refs permit actual diffs instead of inferred PR intent.
+- **Root cause:** The coordinator and worker had different filesystem access. The rejected report compounded that setup limitation by treating unavailable historical evidence as confirmed coverage.
+- **Resolution:** Use the proven isolated-clone route for subsequent tasks and reject any claim unsupported by successful source/provider reads. Source observations from the earlier run remain partial evidence, not Git-history proof.
+- **Verification:** The live in-agent pilot returned all five expected values and zero Git failures; root independently verified the six fetched PR heads against current GitHub metadata. Cleanup remains withheld pending accepted replacement.
+- **Prevention/follow-up:** `AGENTS.md` now requires an in-agent Git pilot and prohibits coverage claims following failed metadata reads. Distinguish Git ancestry, semantic replacement and byte equality.
+- **Reusable learning:** Test the worker's actual environment, and turn missing evidence into an explicit unknown, never a confident history summary.
+- **References:** `AGENTS.md`; GitHub PRs #35, #37, #38, #42, #43 and #44
+
+### 2026-09-06 — Media failures need source-owned recovery after readiness
+
+- **Status:** Resolved
+- **Task/context:** Practical reliability follow-up for local playback and removable media.
+- **Unexpected observation or failure:** A failed cross-clip request stopped the native video while the UI still showed Pause. Errors after initial readiness had no persistent recovery handler.
+- **Evidence:** In a real browser using ten synthetic clips, aborting clip 10 and seeking to 18.5 seconds left `paused=true`, video index 9 and a Pause button on the old source. A separate new regression failed against `8c698e5` at the expected Play-versus-Pause assertion.
+- **Approaches tried:**
+  - **Attempt:** Rely on transient video-element readiness/error listeners.
+    - **Outcome:** Did not work
+    - **Why:** Readiness removes them, child source failures may not populate `video.error`, and the cross-clip seek wait lacked a failure callback.
+  - **Attempt:** Extend the existing source-generation lifecycle with persistent source/video listeners and bounded seek failure handling.
+    - **Outcome:** Worked
+    - **Why:** Only current active failures cancel pending work and pause; stale or inactive sources do not interrupt a newer selection.
+- **Root cause:** Initial readiness and subsequent media failure were treated as one lifecycle, while the seek path omitted its failure transition.
+- **Resolution:** Pause on current media failure, clear pending seeks and display reconnect/rescan-or-select guidance. Do not clear errors on queued `timeupdate` events caused by pausing. Preserve manual navigation's paused intent.
+- **Verification:** The nine focused browser regressions passed; the old-code state regression failed as intended. A headed browser reproduced the failed request on the new source and showed the recovery message and paused controls. Full containing-gate results are recorded in `docs/product-review.md`.
+- **Prevention/follow-up:** Retain timeout, source-element, post-readiness, navigation and latest-seek coverage. Import the existing module in tests instead of adding production test globals.
+- **Review limit:** A reviewer additionally asserted an unconditional WebKit exception for setting `currentTime` before metadata and an unhandled play rejection, without a reproduction. The existing request wrapper catches rejections, and the [HTML setter contract](https://html.spec.whatwg.org/multipage/media.html#dom-media-currenttime) assigns a default playback start position in `HAVE_NOTHING`. Root did not accept that browser-specific claim as confirmed or add speculative code for it.
+- **Acceptance follow-up:** Independent review found that paused selections bypassed readiness timeouts; root then found that buffered readiness could coexist with a current network error. All selections now retain bounded recovery without forcing autoplay, and ready fast paths reject an existing error. Twelve focused tests passed. The buffered-error regression was run before its two-condition fix and failed because recovery guidance stayed hidden; it passed after the fix. The final headed-browser check also verified the failed clip's overlay says Video 10 of 10 rather than retaining Video 1.
+- **Reusable learning:** Successful initial loading does not end media ownership; failure feedback must follow the current source until it is retired.
+- **References:** `public/player.js`, `tests/player-media-errors.spec.js`, `docs/architecture.md`
+
+### 2026-09-06 — Installation must validate its staged copy and own its cleanup
+
+- **Status:** Resolved
+- **Task/context:** Preserve a working local macOS installation when a replacement build or copy is incomplete.
+- **Unexpected observation or failure:** The installer accepted any source directory, including one without the host executable. A staging-name collision entered cleanup even though the installer had not created that directory.
+- **Evidence:** The missing-host regression failed against `8c698e5` because installation unexpectedly succeeded. Source inspection showed unconditional removal in the copy-failure catch. The refined fixture checks the foreign sentinel, old app and absence of an install backup.
+- **Approaches tried:**
+  - **Attempt:** Generic plist/HTML parsing and a guessed executable display name.
+    - **Outcome:** Did not work
+    - **Why:** The candidate missed imported modules, admitted the wrong resource layout and confused Tauri's product label with the Cargo executable. Root rejected it using the actual Cargo/configuration contract.
+  - **Attempt:** Validate the known bundle contents before and after copying, reusing the existing media manifest validator, and create staging exclusively before owning its cleanup.
+    - **Outcome:** Worked
+    - **Why:** It catches missing/corrupt essential files without creating a new signing or package-format framework. Explicit operator-supplied tools retain their supported local path.
+- **Root cause:** Directory existence was mistaken for bundle completeness, and an attempted copy was mistaken for staging ownership.
+- **Resolution:** Validate host/sidecar/tools/assets/notices and applicable media hashes; preserve the destination until staged validation succeeds. Retain backup/rollback and surface actionable CLI errors.
+- **Verification:** Root independently ran all 23 initial installer regressions and 20 existing tooling tests successfully. The subsequent acceptance and containing-gate results are recorded in `docs/product-review.md`; synthetic fixtures are not executable-app proof.
+- **Prevention/follow-up:** Keep fixtures aligned with `miofive-video-converter` and nested Tauri resources. Check foreign content, not only exception codes. Preserve caught errors as causes; lint caught a new rollback wrapper that discarded its cause before publication.
+- **Reusable learning:** Validate the copy that will be promoted, and delete only staging that this operation actually created.
+- **References:** `scripts/install-mac-app.js`, `tests/unit/installer.test.js`, `tests/unit/tooling.test.js`, `README.md`
+
+### 2026-09-06 — Local diagnostics are not excluded from lint by Git ignore
+
+- **Status:** Resolved
+- **Task/context:** Root's headed-browser acceptance script and installer error-chain integration.
+- **Unexpected observation or failure:** The first containing pre-commit run stopped on the temporary browser script and the nested rollback wrapper.
+- **Evidence:** ESLint reported undefined browser globals in ignored `output/playwright/verify-media-recovery.js`, and `preserve-caught-error` rejected an outer installation error as the cause inside a rollback catch.
+- **Approaches tried:**
+  - **Attempt:** Assume a Git-ignored diagnostic is outside `eslint .`, and attach the original operation error directly in a nested catch.
+    - **Outcome:** Did not work
+    - **Why:** ESLint has its own file inventory; the nearest caught rollback failure must remain the direct cause.
+  - **Attempt:** Move the closed diagnostic outside the source tree and preserve both failures in `AggregateError.errors` with the rollback error as its direct cause.
+    - **Outcome:** Worked
+    - **Why:** No lint exclusions or suppression comments were added, and neither failure's identity was lost.
+- **Root cause:** Root's integration assumptions about lint scope and nested error causality were incorrect; the worker's successful unit report did not cover the containing lint gate.
+- **Resolution:** Keep ad hoc browser drivers in the private coordinator directory and retain both failure objects in the installer regression.
+- **Verification:** Repository lint and all 24 installer regressions passed after correction. The strengthened collision test failed against the old installer at the missing foreign-sentinel read, not at an API-specific error-code mismatch.
+- **Prevention/follow-up:** Run containing gates after delegated unit checks, preserve nearest caught causes and use explicit object-identity assertions for combined failures.
+- **Reusable learning:** Ignored by Git is not ignored by tooling; a passing focused test is not a passing delivery gate.
+- **References:** `scripts/install-mac-app.js`, `tests/unit/installer.test.js`, `eslint.config.js`

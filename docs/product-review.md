@@ -76,11 +76,26 @@ Only tests, instructions and documentation change after the `c0696cc` native pro
 
 The final containing `npm run prepush` passed with exit 0 in **267.586 seconds**: **55 unit tests**, **164 Playwright tests** (one worker, zero retries), lint, declared-license metadata checks, Rust fmt/Clippy and **one Rust test**. The completed output is retained as Brotli Q6. An independent read-only review found no actionable blocker in the strengthened identity/content assertions or early-failure cleanup.
 
-## Boundaries retained
+## 2026-09-06 practical reliability follow-up
+
+The follow-up stays within the local open-source utility: media recovery, preserving a working installation, regression evidence and accurate setup instructions. No signing/notarization, SBOM/provenance, authentication service or enterprise-security framework is added. Root owns architecture and acceptance; bounded implementation and independent reviews used AGY CLI with `gemini-3.8-flash-high` and high effort in exact isolated clones.
+
+- Playback failures now have source-owned recovery beyond initial readiness, including child-source errors and failed cross-clip seeks. Current failures pause and show reconnect/rescan-or-select guidance; old/inactive sources cannot interrupt a new selection. Manual navigation keeps paused intent.
+- The local installer validates the source and staged bundle before replacing a working app. Exclusive staging protects unrelated colliding content, and copy/promotion/rollback failures retain the available old installation with actionable diagnostics. Existing explicit media-tool overrides remain supported.
+- [Six old PRs were reconciled against exact heads](git-reconciliation.md). Their useful intent is represented, but semantic replacement is not a merge or proof of lossless historical recovery. No PR/ref/worktree deletion occurred.
+- Alternatives rejected: a new playback state framework, generic plist/HTML package parsing with guessed executable names, and a new release-security pipeline. Existing generation guards and the actual Tauri layout provide a smaller fix.
+
+Focused verification before the containing gate: twelve browser tests passed after the independent review's paused-navigation timeout fix and root's buffered-error guard. The latter test first failed on the intermediate candidate because recovery guidance stayed hidden. Baseline `8c698e5` failed the active-error UI-state regression. Missing-host and staging-collision tests also failed on that baseline, the latter specifically because foreign content was deleted. All 24 installer tests and repository lint passed after acceptance corrections. A headed browser showed recovery guidance, paused controls and the correct Video 10 of 10 overlay for the same failed clip-10 request. A real local `.app` installed into an owned temporary destination with all 21 file contents/modes matching, the old sentinel retained in backup and source unchanged; no user app was replaced.
+
+Final literal `npm run prepush` **passed**, exit 0 in **257.219 seconds** on Node 26.5.0: **79 unit tests**, **176 Playwright tests** (one worker, zero retries), lint, 300 npm/458 Cargo license metadata entries, Rust fmt/Clippy and **one Rust test**. Completed gate logs are retained as Brotli Q6. `npm audit --audit-level=high` returned zero vulnerabilities; both lockfile hashes remained unchanged throughout this follow-up. Earlier dated build digests and native GUI results above are historical, not evidence for changed frontend bytes.
+
+Final `npm run pack:mac` **passed**, exit 0 in **333.678 seconds**. Generated/bundled UI files, media tools, notices and sidecar matched their source bytes. The 21-file/mode bundle manifest digest is `67292f4970a1c6514896efab54ce05ea45030f7b34af7e6a12576bbb182f0fc3`. Installation of that exact bundle into an owned temporary destination preserved its previous sentinel in backup, matched every installed file/mode and left the source unchanged. The temporary copy was removed after verification; the user's Applications directory was not touched. Current changed-UI evidence is the headed browser and automated suite, not a claimed rerun of the earlier native GUI export. Full resource-seal signature verification still fails for this local build; no signed/notarized binary is published.
+
+## Current boundaries
 
 - The product is single-user and loopback-only. No remote deployment, authentication service, telemetry or upload feature is introduced.
 - Source recordings are never edited. Exact exports concatenate selected clips; clock gaps are not synthesized. Users must still verify output before deleting originals.
 - Only synthetic repository media is used for tests. Diagnostic captures must be tied to the owned app window/browser tab; unrelated desktop content is forbidden.
 - Source-build manifests prove source-pin and artifact-hash consistency, not signed provenance. Package-license metadata and copied notices are not a comprehensive distribution-license determination.
-- Public macOS binary distribution still requires Developer ID signing, notarization, full redistribution notices/source compliance, SBOM/provenance and exact-byte promotion/rollback. This PR publishes source, not a signed installer or deployed runtime.
+- This PR publishes tested source, not a signed/notarized installer or deployed runtime. Public binary-release verification remains separate; no new signing, SBOM/provenance or enterprise-security framework is introduced in this source follow-up.
 - Existing primary-worktree user files are preserved. Missing historical temporary worktrees remain an uncertain historical event; verified backups protect current work, but do not establish lossless historical recovery.

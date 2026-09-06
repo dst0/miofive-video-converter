@@ -13,6 +13,8 @@
 - Inspect `git diff --cached --summary` as well as the text diff before committing: preserve executable bits on existing shebang entry points unless their removal is intentional and verified.
 - Mutex-release tests must send requests that pass all pre-mutex validation; an earlier validation error cannot prove admission or release. Cleanup may remove a temporary name only after exclusive creation actually established ownership.
 - Race fixtures must retain exclusively created file descriptors, verify both public-path identity and descriptor contents, and clean up owned requests/process groups even when the first regression assertion fails. Prove the test fails against the old implementation.
+- Before parallel CLI-agent dispatch, pilot the live output protocol with a no-tool request; verify model, canonical cwd, conversation ID and final result, then retain safe closed evidence. A zero CLI exit or requested permission flag alone does not prove accepted work or an enforced sandbox.
+- Pilot Git preflight inside the agent sandbox too. If linked-worktree metadata is outside its allowed workspace, use an isolated clone with internal Git metadata, not a sandbox bypass; failed Git/provider reads cannot support branch identity or PR-coverage claims.
 
 ## Durable Learning Capture
 

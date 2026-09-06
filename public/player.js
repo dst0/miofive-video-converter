@@ -24,6 +24,24 @@ let exportRequestGeneration = 0;
 let playbackRequestTokens = [0, 0];
 let playerSourceTokens = [0, 0];
 let playerReadyWaitCleanups = [null, null];
+let playerSourceErrorCleanups = [null, null];
+
+const PLAYBACK_RECOVERY_GUIDANCE =
+    'Playback unavailable for this video. If the storage device was removed, reconnect it and rescan, or select another video.';
+
+function clearPlayerError() {
+    const errorEl = document.getElementById('playerErrorMessage');
+    if (!errorEl) return;
+    errorEl.textContent = '';
+    errorEl.style.display = 'none';
+}
+
+function showPlayerError(message) {
+    const errorEl = document.getElementById('playerErrorMessage');
+    if (!errorEl) return;
+    errorEl.textContent = message;
+    errorEl.style.display = 'block';
+}
 
 function cancelPlayerReadyWait(playerIndex) {
     const cleanup = playerReadyWaitCleanups[playerIndex];
@@ -31,8 +49,15 @@ function cancelPlayerReadyWait(playerIndex) {
     if (cleanup) cleanup();
 }
 
+function cancelPlayerSourceErrorListener(playerIndex) {
+    const cleanup = playerSourceErrorCleanups[playerIndex];
+    playerSourceErrorCleanups[playerIndex] = null;
+    if (cleanup) cleanup();
+}
+
 function invalidatePlayerSource(playerIndex) {
     cancelPlayerReadyWait(playerIndex);
+    cancelPlayerSourceErrorListener(playerIndex);
     playerSourceTokens[playerIndex]++;
     return playerSourceTokens[playerIndex];
 }
@@ -46,6 +71,21 @@ function isCurrentPlayerSource(playerIndex, sourceToken, videoIndex) {
     );
 }
 
+function handleActiveSourceError(playerIndex, sourceToken, videoIndex) {
+    if (playerIndex !== activePlayerIndex) return;
+    if (!isCurrentPlayerSource(playerIndex, sourceToken, videoIndex)) return;
+    const playerScreen = document.getElementById('playerScreen');
+    if (!playerScreen || playerScreen.style.display === 'none') return;
+
+    playbackRequestTokens[playerIndex]++;
+    cancelPlayerReadyWait(playerIndex);
+    pendingSeekByPlayer[playerIndex] = null;
+    pausePlayer(playerIndex);
+    setGlobalPlayerState('paused');
+    updateVideoInfo();
+    showPlayerError(PLAYBACK_RECOVERY_GUIDANCE);
+}
+
 function waitForPlayerSource({
     playerIndex,
     sourceToken,
@@ -56,6 +96,7 @@ function waitForPlayerSource({
 }) {
     cancelPlayerReadyWait(playerIndex);
     const player = videoPlayers[playerIndex];
+    const source = videoSources[playerIndex];
     if (!player) return;
 
     let finished = false;
@@ -63,6 +104,7 @@ function waitForPlayerSource({
     const cleanup = () => {
         player.removeEventListener('loadeddata', handleReady);
         player.removeEventListener('error', handleFailure);
+        source?.removeEventListener('error', handleFailure);
         clearTimeout(timeoutId);
         if (playerReadyWaitCleanups[playerIndex] === cleanup) {
             playerReadyWaitCleanups[playerIndex] = null;
@@ -75,11 +117,24 @@ function waitForPlayerSource({
         if (!isCurrentPlayerSource(playerIndex, sourceToken, videoIndex)) return;
         callback?.(player);
     };
-    const handleReady = () => finish(onReady);
+    const handleReady = () => {
+        finish((readyPlayer) => {
+            if (playerIndex === activePlayerIndex) {
+                clearPlayerError();
+            }
+            onReady?.(readyPlayer);
+        });
+    };
     const handleFailure = () => finish(onFailure);
+
+    if (player.error) {
+        finish(onFailure);
+        return;
+    }
 
     player.addEventListener('loadeddata', handleReady);
     player.addEventListener('error', handleFailure);
+    source?.addEventListener('error', handleFailure);
     timeoutId = setTimeout(() => {
         if (isCurrentPlayerSource(playerIndex, sourceToken, videoIndex)) {
             console.error(timeoutMessage);
@@ -288,6 +343,7 @@ function handlePlayPromiseError(err, message = 'Error playing video:') {
 
     console.error(message, err);
     setGlobalPlayerState('paused');
+    showPlayerError(PLAYBACK_RECOVERY_GUIDANCE);
 }
 
 function pausePlayer(playerIndex) {
@@ -539,6 +595,7 @@ export function initPlayer() {
             if (document.getElementById('playerScreen').style.display === 'none') return;
             if (index === activePlayerIndex) {
                 console.log('play event triggered at player index', index);
+                clearPlayerError();
                 setGlobalPlayerState('playing');
             }
         });
@@ -686,6 +743,7 @@ export function showExportFlow(files, options = {}) {
 
 // Hide player screen and return to main
 export function hidePlayerScreen() {
+    clearPlayerError();
     // Pause playback
     videoPlayers.forEach((player, index) => {
         pausePlayer(index);
@@ -783,6 +841,20 @@ function loadVideoIntoPlayer(videoIndex, playerIndex) {
     player.dataset.videoIndex = videoIndex;
     player.load();
     player.playbackRate = getNearestSupportedSpeed(getSelectedPlaybackSpeed());
+
+    const onSourceError = () => {
+        if (playerIndex !== activePlayerIndex) return;
+        if (!isCurrentPlayerSource(playerIndex, sourceToken, videoIndex)) return;
+        handleActiveSourceError(playerIndex, sourceToken, videoIndex);
+    };
+    player.addEventListener('error', onSourceError);
+    source?.addEventListener('error', onSourceError);
+
+    playerSourceErrorCleanups[playerIndex] = () => {
+        player.removeEventListener('error', onSourceError);
+        source?.removeEventListener('error', onSourceError);
+    };
+
     return sourceToken;
 }
 
@@ -797,6 +869,7 @@ function preloadNextVideo() {
 
 // Switch to the next video (seamless transition using dual players)
 function switchToNextVideo(isUserAction = false) {
+    clearPlayerError();
     const nextVideoIndex = currentVideoIndex + 1;
     if (nextVideoIndex >= videoFiles.length) {
         setGlobalPlayerState('ended');
@@ -831,35 +904,39 @@ function switchToNextVideo(isUserAction = false) {
     // Update video info
     const videoFile = videoFiles[currentVideoIndex];
     document.getElementById('currentVideoName').textContent = videoFile.filename;
+    updateVideoInfo();
 
     updateNavigationButtonStates();
     updateActivePlayerAccessibility();
 
     // Start playback on new active player if we were playing before
     const newActivePlayer = videoPlayers[activePlayerIndex];
-    if (wasPlaying) {
-        if (
-            isCurrentPlayerSource(activePlayerIndex, nextSourceToken, nextVideoIndex) &&
-            newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
-        ) {
+    if (
+        isCurrentPlayerSource(activePlayerIndex, nextSourceToken, nextVideoIndex) &&
+        !newActivePlayer.error &&
+        newActivePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA
+    ) {
+        if (wasPlaying && globalPlayerState === 'playing') {
             newActivePlayer.currentTime = 0;
             void requestPlay(activePlayerIndex);
-        } else {
-            const targetPlayerIndex = activePlayerIndex;
-            waitForPlayerSource({
-                playerIndex: targetPlayerIndex,
-                sourceToken: nextSourceToken,
-                videoIndex: nextVideoIndex,
-                onReady: (player) => {
-                    if (targetPlayerIndex !== activePlayerIndex || globalPlayerState !== 'playing') return;
+        }
+    } else {
+        const targetPlayerIndex = activePlayerIndex;
+        waitForPlayerSource({
+            playerIndex: targetPlayerIndex,
+            sourceToken: nextSourceToken,
+            videoIndex: nextVideoIndex,
+            onReady: (player) => {
+                if (targetPlayerIndex !== activePlayerIndex) return;
+                if (wasPlaying && globalPlayerState === 'playing') {
                     player.currentTime = 0;
                     void requestPlay(targetPlayerIndex);
-                },
-                onFailure: () => {
-                    if (targetPlayerIndex === activePlayerIndex) setGlobalPlayerState('paused');
-                },
-            });
-        }
+                }
+            },
+            onFailure: () => {
+                handleActiveSourceError(targetPlayerIndex, nextSourceToken, nextVideoIndex);
+            },
+        });
     }
 
     // Preload the next video into the now-inactive player
@@ -873,6 +950,7 @@ function loadVideo(index, shouldPause = true) {
     if (index < 0 || index >= videoFiles.length) {
         return;
     }
+    clearPlayerError();
 
     // Pause when seeking/jumping (but not on initial load)
     if (shouldPause) {
@@ -895,6 +973,7 @@ function loadVideo(index, shouldPause = true) {
     // Update video info - textContent is safe from XSS (unlike innerHTML)
     // It treats the value as plain text, not HTML
     document.getElementById('currentVideoName').textContent = videoFile.filename;
+    updateVideoInfo();
 
     updateNavigationButtonStates();
     updateActivePlayerAccessibility();
@@ -911,28 +990,31 @@ function loadVideo(index, shouldPause = true) {
         loadVideoIntoPlayer(index + 1, nextPlayerIndex);
     }
     
-    // If not pausing (initial load), ensure playback starts
+    const activePlayer = videoPlayers[activePlayerIndex];
     if (!shouldPause) {
         setGlobalPlayerState('playing');
-        const activePlayer = videoPlayers[activePlayerIndex];
-        // Wait for video to be ready before playing
-        if (activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+    }
+
+    if (!activePlayer.error && activePlayer.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
+        if (!shouldPause && globalPlayerState === 'playing') {
             void requestPlay(activePlayerIndex, 'Error playing video on initial load:');
-        } else {
-            const targetPlayerIndex = activePlayerIndex;
-            waitForPlayerSource({
-                playerIndex: targetPlayerIndex,
-                sourceToken: activeSourceToken,
-                videoIndex: index,
-                onReady: () => {
-                    if (targetPlayerIndex !== activePlayerIndex || globalPlayerState !== 'playing') return;
-                    void requestPlay(targetPlayerIndex, 'Error playing video on initial load:');
-                },
-                onFailure: () => {
-                    if (targetPlayerIndex === activePlayerIndex) setGlobalPlayerState('paused');
-                },
-            });
         }
+    } else {
+        const targetPlayerIndex = activePlayerIndex;
+        waitForPlayerSource({
+            playerIndex: targetPlayerIndex,
+            sourceToken: activeSourceToken,
+            videoIndex: index,
+            onReady: () => {
+                if (targetPlayerIndex !== activePlayerIndex) return;
+                if (!shouldPause && globalPlayerState === 'playing') {
+                    void requestPlay(targetPlayerIndex, 'Error playing video on initial load:');
+                }
+            },
+            onFailure: () => {
+                handleActiveSourceError(targetPlayerIndex, activeSourceToken, index);
+            },
+        });
     }
 
     return activeSourceToken;
@@ -1716,6 +1798,9 @@ export function seekToGlobalTime(targetTime) {
                 sourceToken,
                 videoIndex: targetVideoIndex,
                 onReady: applySeek,
+                onFailure: () => {
+                    handleActiveSourceError(targetPlayerIndex, sourceToken, targetVideoIndex);
+                },
                 timeoutMessage: 'Timeout waiting to seek in video',
             });
         }

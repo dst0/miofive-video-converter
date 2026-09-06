@@ -90,10 +90,14 @@ npm run install:mac
 open "$HOME/Applications/Miofive Video Converter.app"
 ```
 
-If an app already exists, the installer first copies into a sibling staging path, then atomically installs it while preserving the previous bundle as a timestamped backup. A packaged app includes the Node sidecar, FFmpeg/FFprobe and project/third-party notices; end users do not need the development toolchain. If the backend stops unexpectedly, the app displays a recovery message instead of leaving an apparently working player. Quit and reopen it, and check the output destination before retrying an interrupted export.
+The installer checks the source and its staged copy for the host executable, Node sidecar, media tools, required UI files and notices before replacing an existing app. Source-built media tools must match their build manifest; explicitly supplied local tools keep their documented override path. An incomplete development bundle without FFmpeg/FFprobe is not installable by this command. Use the development workflow instead.
+
+If an app already exists, installation preserves it as a timestamped backup beside the new bundle. Copy/validation failures leave it in place; a failed final rename attempts to restore it. The CLI reports the failing step, including a restoration failure if one occurs. Installation assumes a trusted, user-owned destination and one installer at a time.
+
+If playback becomes unavailable, the player pauses and shows recovery guidance: reconnect the storage device and rescan, or select another video. If the backend stops unexpectedly, quit and reopen the app. Check the output destination before retrying an interrupted export, and verify exports before deleting original recordings.
 
 > [!WARNING]
-> **Distribution & Release Integrity Boundary:** The repository builds local macOS desktop binaries, but automated cryptographic code signing, Apple notarization, SLSA provenance/SBOM generation, and exact-byte rollback target verification are currently NOT implemented. Distribution must fail closed until these signing and release pipeline requirements are fulfilled.
+> These commands build and install a local source-built app, not a signed/notarized installer for public distribution. Binary-release verification is a separate task; it does not block publishing tested open-source changes.
 
 Advanced build options:
 

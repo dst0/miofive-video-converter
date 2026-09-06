@@ -161,17 +161,74 @@ test('ESLint ignores generated desktop resources and vendored source trees', () 
     }
 });
 
+async function createValidInstallerBundle(bundlePath) {
+    await fsPromises.mkdir(path.join(bundlePath, 'Contents', 'MacOS'), {recursive: true});
+    const infoPlist = [
+        '<?xml version="1.0" encoding="UTF-8"?>',
+        '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">',
+        '<plist version="1.0">',
+        '<dict>',
+        '    <key>CFBundleExecutable</key>',
+        '    <string>miofive-video-converter</string>',
+        '</dict>',
+        '</plist>',
+    ].join('\n');
+    await fsPromises.writeFile(path.join(bundlePath, 'Contents', 'Info.plist'), infoPlist);
+
+    await fsPromises.writeFile(path.join(bundlePath, 'Contents', 'MacOS', 'miofive-video-converter'), '#!/bin/sh\nexit 0\n', {mode: 0o755});
+    await fsPromises.writeFile(path.join(bundlePath, 'Contents', 'MacOS', 'miofive-server'), '#!/bin/sh\nexit 0\n', {mode: 0o755});
+
+    const resources = path.join(bundlePath, 'Contents', 'Resources', 'resources');
+    const binDir = path.join(resources, 'bin');
+    const licensesDir = path.join(resources, 'licenses');
+    const publicDir = path.join(resources, 'public');
+    await fsPromises.mkdir(binDir, {recursive: true});
+    await fsPromises.mkdir(licensesDir, {recursive: true});
+    await fsPromises.mkdir(publicDir, {recursive: true});
+
+    const ffmpegPath = path.join(binDir, 'ffmpeg');
+    const ffprobePath = path.join(binDir, 'ffprobe');
+    await fsPromises.writeFile(ffmpegPath, 'synthetic ffmpeg', {mode: 0o755});
+    await fsPromises.writeFile(ffprobePath, 'synthetic ffprobe', {mode: 0o755});
+
+    await fsPromises.writeFile(path.join(licensesDir, 'PROJECT-LICENSE.txt'), 'MIT License\n');
+    await fsPromises.writeFile(path.join(licensesDir, 'THIRD_PARTY_NOTICES.md'), 'Third Party Notices\n');
+    await fsPromises.writeFile(
+        path.join(licensesDir, 'FFMPEG-GPL-NOTICE.txt'),
+        'Bundled FFmpeg and FFprobe\n\nSource type: source-built\n'
+    );
+
+    const ffmpegSha256 = computeSha256(ffmpegPath);
+    const ffprobeSha256 = computeSha256(ffprobePath);
+    const manifestText = generateBuildManifestText({ffmpegSha256, ffprobeSha256});
+    await fsPromises.writeFile(path.join(resources, 'BUILD-MANIFEST.txt'), manifestText);
+
+    const requiredPublicAssets = [
+        ['index.html', '<!doctype html><html><body>Miofive</body></html>'],
+        ['app.js', 'console.log("app");'],
+        ['player.js', 'console.log("player");'],
+        ['folder-browser.js', 'console.log("folder-browser");'],
+        ['security.js', 'console.log("security");'],
+        ['demo-api-mock.js', 'console.log("demo-api-mock");'],
+        ['dialog.js', 'console.log("dialog");'],
+        ['styles.css', 'body { margin: 0; }'],
+        ['player-styles.css', '.player { display: block; }'],
+    ];
+    for (const [name, content] of requiredPublicAssets) {
+        await fsPromises.writeFile(path.join(publicDir, name), content);
+    }
+}
+
 test('macOS installation leaves the current application intact when staging copy fails', async () => {
     const directory = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'miofive-installer-'));
     const sourcePath = path.join(directory, 'source.app');
     const destinationPath = path.join(directory, 'Applications', 'Miofive.app');
-    await fsPromises.mkdir(sourcePath);
+    await createValidInstallerBundle(sourcePath);
     await fsPromises.mkdir(destinationPath, {recursive: true});
     await fsPromises.writeFile(path.join(destinationPath, 'current.txt'), 'working');
 
     const failingFileSystem = Object.create(fsPromises);
     failingFileSystem.cp = async (_source, staging) => {
-        await fsPromises.mkdir(staging);
         await fsPromises.writeFile(path.join(staging, 'partial.txt'), 'partial');
         throw new Error('simulated copy failure');
     };
@@ -203,8 +260,7 @@ test('macOS installation restores existing application from backup when final re
     const directory = await fsPromises.mkdtemp(path.join(os.tmpdir(), 'miofive-installer-rollback-'));
     const sourcePath = path.join(directory, 'source.app');
     const destinationPath = path.join(directory, 'Applications', 'Miofive.app');
-    await fsPromises.mkdir(sourcePath);
-    await fsPromises.writeFile(path.join(sourcePath, 'new.txt'), 'new-version');
+    await createValidInstallerBundle(sourcePath);
     await fsPromises.mkdir(destinationPath, {recursive: true});
     await fsPromises.writeFile(path.join(destinationPath, 'current.txt'), 'working');
 
