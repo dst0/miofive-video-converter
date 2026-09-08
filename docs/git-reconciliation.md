@@ -49,8 +49,8 @@ This is a bounded six-PR comparison, not certification that every historical or 
   - [#42](https://github.com/dst0/miofive-video-converter/pull/42) (`dependabot/npm_and_yarn/body-parser-1.20.6`) — CLOSED
   - [#43](https://github.com/dst0/miofive-video-converter/pull/43) (`dependabot/npm_and_yarn/multi-fe93483a4d`) — CLOSED
   - [#44](https://github.com/dst0/miofive-video-converter/pull/44) (`dependabot/npm_and_yarn/tar-7.5.22`) — CLOSED
-- **Remote branches deleted:** The remote branches corresponding to those six closed PRs along with all orphan remote tracking branches were deleted from `origin`.
-- **Current remote state:** Remote `origin` now retains only `origin/main` and the five active post-merge Dependabot branches:
+- **Remote branches deleted:** The remote branches corresponding to those six closed PRs along with the verified orphan remote branch `fix/export-folder-selection` were deleted from `origin`.
+- **Remote state snapshot:** At the snapshot after stale cleanup and before publishing the consolidated branch (`codex/dependency-review-20260908`), remote `origin` retained only `origin/main` and the five active post-merge Dependabot branches:
   - `dependabot/cargo/src-tauri/libc-0.2.189` (PR #46)
   - `dependabot/cargo/src-tauri/tauri-plugin-shell-2.3.6` (PR #47)
   - `dependabot/cargo/src-tauri/tauri-build-2.6.3` (PR #48)

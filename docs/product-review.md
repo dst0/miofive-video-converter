@@ -105,7 +105,7 @@ Final literal `npm run prepush` **passed**, exit 0 in **229.47 seconds**: lint, 
 
 ## 2026-09-08 consolidated dependency follow-up
 
-Following the merge of PR #45 at commit `7670dfd8be6dccb73d62d811fb0f25d5b508c563`, five post-merge Dependabot dependency updates were consolidated into a single reviewed follow-up branch (`codex/dependency-review-20260908`). Rather than running local package update commands that risk resolver drift, the exact patch union of the five approved Dependabot commits was applied via `git cherry-pick --no-commit`.
+Following the merge of PR #45 at commit `7670dfd8be6dccb73d62d811fb0f25d5b508c563`, five post-merge Dependabot dependency updates were consolidated into a single reviewed follow-up branch (`codex/dependency-review-20260908`). Rather than running `cargo update` which risks Cargo resolver drift, the exact patch union of the five approved Dependabot commits was applied via `git cherry-pick --no-commit`.
 
 ### Exact dependency versions
 
