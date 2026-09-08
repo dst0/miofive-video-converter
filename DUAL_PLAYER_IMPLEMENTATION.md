@@ -1,5 +1,8 @@
 # Dual-Player Architecture Implementation
 
+> [!WARNING]
+> **Historical Design Note (Non-Current):** This document describes the initial dual-player design (PR #14). Historical references to `player.html` reflect early drafts; the active application UI is consolidated in [`public/index.html`](public/index.html). For canonical runtime contracts, see [`docs/architecture.md`](docs/architecture.md).
+
 ## Overview
 
 This document describes the implementation of the dual-player architecture with custom playback controls for the Miofive Video Converter application.

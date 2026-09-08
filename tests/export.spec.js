@@ -4,26 +4,26 @@
 const { test, expect } = require('@playwright/test');
 const path = require('path');
 const fs = require('fs').promises;
+const os = require('os');
 
 const TEST_DATA_PATH = path.join(__dirname, '..', 'test-data', 'Normal');
-const TEST_OUTPUT_DIR = path.join(__dirname, '..', 'test-output');
 
 test.describe('Video Player Export Functionality', () => {
     let baseURL;
-
-    test.beforeAll(async () => {
-        // Ensure test output directory exists
-        try {
-            await fs.mkdir(TEST_OUTPUT_DIR, { recursive: true });
-        } catch (err) {
-            // Directory already exists
-        }
-    });
+    let testOutputDir;
 
     test.beforeEach(async ({ page, baseURL: url }) => {
+        testOutputDir = await fs.mkdtemp(path.join(os.tmpdir(), 'miofive-ui-export-'));
         baseURL = url || 'http://localhost:3000';
         await page.goto(baseURL);
         await page.waitForLoadState('networkidle');
+    });
+
+    test.afterEach(async () => {
+        if (testOutputDir) {
+            await fs.rm(testOutputDir, { recursive: true, force: true });
+            testOutputDir = undefined;
+        }
     });
 
     test('should show export button in player screen', async ({ page }) => {
@@ -181,7 +181,7 @@ test.describe('Video Player Export Functionality', () => {
 
         await page.evaluate((outputDir) => {
             document.getElementById('exportOutputFolder').value = outputDir;
-        }, TEST_OUTPUT_DIR);
+        }, testOutputDir);
         await page.fill('#exportOutputFilename', 'millisecond_range.mp4');
         await page.fill('#exportRangeStart', '00:00.500');
         await page.fill('#exportRangeEnd', '00:02.250');
@@ -192,7 +192,7 @@ test.describe('Video Player Export Functionality', () => {
                 contentType: 'application/json',
                 body: JSON.stringify({
                     success: true,
-                    output: path.join(TEST_OUTPUT_DIR, 'millisecond_range.mp4'),
+                    output: path.join(testOutputDir, 'millisecond_range.mp4'),
                     details: {
                         rangeStart: 0.5,
                         rangeEnd: 2.25,
@@ -214,6 +214,9 @@ test.describe('Video Player Export Functionality', () => {
         expect(body.rangeEnd).toBe(2.25);
         expect(body.speed).toBe(1);
         expect(body.quality).toBe('max');
+        expect(body.outputFolder).toBe(testOutputDir);
+        expect(body.outputFilename).toBe('millisecond_range.mp4');
+        expect(body.outputPath).toBeUndefined();
     });
 
     test('should have output folder and filename inputs', async ({ page }) => {
@@ -352,7 +355,7 @@ test.describe('Video Player Export Functionality', () => {
         // Set output folder
         await page.evaluate((outputDir) => {
             document.getElementById('exportOutputFolder').value = outputDir;
-        }, TEST_OUTPUT_DIR);
+        }, testOutputDir);
 
         // Clear filename
         await page.fill('#exportOutputFilename', '');
@@ -364,6 +367,23 @@ test.describe('Video Player Export Functionality', () => {
         await page.waitForSelector('#exportStatus .error');
         const errorText = await page.locator('#exportStatus .error').textContent();
         expect(errorText).toContain('filename');
+    });
+
+    test('should reject folder traversal in the filename field', async ({page}) => {
+        await page.fill('#folderPath', TEST_DATA_PATH);
+        await page.click('#scanBtn');
+        await page.waitForSelector('.file-list', {timeout: 10000});
+        await page.click('#playVideosBtn');
+        await page.waitForSelector('#playerScreen', {state: 'visible', timeout: 5000});
+        await page.click('#exportVideosBtn');
+        await page.evaluate((outputDir) => {
+            document.getElementById('exportOutputFolder').value = outputDir;
+        }, testOutputDir);
+        await page.fill('#exportOutputFilename', '../outside.mp4');
+        await page.click('#exportConfirmBtn');
+
+        await expect(page.locator('#exportStatus .error')).toContainText('plain filename');
+        await expect(page.locator('#exportConfirmBtn')).toBeEnabled();
     });
 
     test('should validate export range before sending request', async ({ page }) => {
@@ -382,7 +402,7 @@ test.describe('Video Player Export Functionality', () => {
 
         await page.evaluate((outputDir) => {
             document.getElementById('exportOutputFolder').value = outputDir;
-        }, TEST_OUTPUT_DIR);
+        }, testOutputDir);
         await page.fill('#exportOutputFilename', 'invalid_range.mp4');
         await page.fill('#exportRangeStart', '00:10');
         await page.fill('#exportRangeEnd', '00:05');
@@ -410,7 +430,7 @@ test.describe('Video Player Export Functionality', () => {
         // Set output folder
         await page.evaluate((outputDir) => {
             document.getElementById('exportOutputFolder').value = outputDir;
-        }, TEST_OUTPUT_DIR);
+        }, testOutputDir);
 
         // Set filename
         const testFilename = 'test_export.mp4';
@@ -420,13 +440,13 @@ test.describe('Video Player Export Functionality', () => {
         await page.click('#exportConfirmBtn');
 
         // Wait for modal to close and snackbar to appear
-        await page.waitForSelector('#exportModal', { state: 'hidden', timeout: 5000 });
+        await page.waitForSelector('#exportModal', { state: 'hidden', timeout: 30000 });
         await page.waitForSelector('#snackbar.show.success', { timeout: 30000 });
         const snackbarText = await page.locator('#snackbar').textContent();
         expect(snackbarText).toContain('Export successful');
 
         // Verify file was created
-        const outputPath = path.join(TEST_OUTPUT_DIR, testFilename);
+        const outputPath = path.join(testOutputDir, testFilename);
         const fileExists = await fs.access(outputPath).then(() => true).catch(() => false);
         expect(fileExists).toBeTruthy();
 
@@ -453,7 +473,7 @@ test.describe('Video Player Export Functionality', () => {
         // Set output folder
         await page.evaluate((outputDir) => {
             document.getElementById('exportOutputFolder').value = outputDir;
-        }, TEST_OUTPUT_DIR);
+        }, testOutputDir);
 
         // Set filename
         await page.fill('#exportOutputFilename', 'test_export_localStorage.mp4');
@@ -462,17 +482,17 @@ test.describe('Video Player Export Functionality', () => {
         await page.click('#exportConfirmBtn');
 
         // Wait for modal to close and snackbar to appear
-        await page.waitForSelector('#exportModal', { state: 'hidden', timeout: 5000 });
+        await page.waitForSelector('#exportModal', { state: 'hidden', timeout: 30000 });
         await page.waitForSelector('#snackbar.show.success', { timeout: 30000 });
 
         // Verify localStorage was updated
         const savedFolder = await page.evaluate(() => {
             return localStorage.getItem('mp4-combiner-output-folder');
         });
-        expect(savedFolder).toBe(TEST_OUTPUT_DIR);
+        expect(savedFolder).toBe(testOutputDir);
 
         // Clean up
-        const outputPath = path.join(TEST_OUTPUT_DIR, 'test_export_localStorage.mp4');
+        const outputPath = path.join(testOutputDir, 'test_export_localStorage.mp4');
         await fs.unlink(outputPath).catch(() => {});
     });
 });

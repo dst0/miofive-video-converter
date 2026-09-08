@@ -1,0 +1,5 @@
+[build]
+jobs = 2
+
+[env]
+MACOSX_DEPLOYMENT_TARGET = "11.0"

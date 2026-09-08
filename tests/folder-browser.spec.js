@@ -1,7 +1,6 @@
 // @ts-check
 const { test, expect } = require('@playwright/test');
-const os = require('os');
-const path = require('path');
+
 
 test.describe('Folder Browser Tests', () => {
   test.beforeEach(async ({ page }) => {
@@ -17,22 +16,8 @@ test.describe('Folder Browser Tests', () => {
 
   async function openFolderBrowser(page) {
     await page.locator('#browseFolderBtn').click();
-    try {
-      await page.waitForFunction(() => (
-        getComputedStyle(document.getElementById('folderBrowserModal')).display !== 'none'
-      ), null, { timeout: 1000 });
-    } catch {
-      await page.evaluate(async () => {
-        const module = await import('/folder-browser.js');
-        await module.openFolderBrowser();
-      });
-    }
-    await page.locator('#folderBrowserModal').evaluate((modal) => {
-      modal.style.display = 'flex';
-    });
-    await page.waitForFunction(() => (
-      getComputedStyle(document.getElementById('folderBrowserModal')).display !== 'none'
-    ), null, { timeout: 5000 });
+    await expect(page.getByRole('dialog', { name: 'Select Folder' })).toBeVisible();
+    await expect(page.locator('#folderBrowserModal')).toBeVisible();
   }
 
   async function expectFolderBrowserOpen(page) {

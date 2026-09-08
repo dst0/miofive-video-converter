@@ -62,9 +62,7 @@ test.describe('Scan Functionality Tests', () => {
 
   test('should filter by channel A only', async ({ page }) => {
     
-    // Uncheck channel B
-    await page.locator('#channelB').uncheck();
-    
+
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);
     
@@ -81,8 +79,7 @@ test.describe('Scan Functionality Tests', () => {
 
   test('should filter by channel B only', async ({ page }) => {
     
-    // Uncheck channel A
-    await page.locator('#channelA').uncheck();
+    await page.locator('#channelB').check();
     
     // Set the test folder path
     await page.locator('#folderPath').fill(testDir);

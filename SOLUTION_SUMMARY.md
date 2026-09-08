@@ -1,5 +1,8 @@
 # Playback Position Rendering Fix - Summary
 
+> [!WARNING]
+> **Historical Summary (Non-Current):** This document reflects early playback and duration extraction work. References to reading only the first 1MB describe earlier prototype code; see [`docs/architecture.md:43-44`](docs/architecture.md) for the active random-access atom traversal contract with `ffprobe` fallback.
+
 ## Problem Statement
 There was an issue with playback position rendering due to not knowing in advance the total duration of video.
 

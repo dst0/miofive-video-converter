@@ -21,70 +21,80 @@ const MOCK_VIDEO_FILES = [
         path: `${DEMO_NORMAL_PATH}/010125_100000_010125_050000_000001A.MP4`,
         utcTime: '2025-01-01T10:00:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100100_010125_050100_000002A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100100_010125_050100_000002A.MP4`,
         utcTime: '2025-01-01T10:01:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100200_010125_050200_000003A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100200_010125_050200_000003A.MP4`,
         utcTime: '2025-01-01T10:02:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100300_010125_050300_000004A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100300_010125_050300_000004A.MP4`,
         utcTime: '2025-01-01T10:03:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100400_010125_050400_000005A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100400_010125_050400_000005A.MP4`,
         utcTime: '2025-01-01T10:04:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100500_010125_050500_000006A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100500_010125_050500_000006A.MP4`,
         utcTime: '2025-01-01T10:05:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100600_010125_050600_000007A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100600_010125_050600_000007A.MP4`,
         utcTime: '2025-01-01T10:06:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100700_010125_050700_000008A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100700_010125_050700_000008A.MP4`,
         utcTime: '2025-01-01T10:07:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100800_010125_050800_000009A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100800_010125_050800_000009A.MP4`,
         utcTime: '2025-01-01T10:08:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     },
     {
         filename: '010125_100900_010125_050900_000010A.MP4',
         path: `${DEMO_NORMAL_PATH}/010125_100900_010125_050900_000010A.MP4`,
         utcTime: '2025-01-01T10:09:00.000Z',
         fileType: 'Normal',
-        channel: 'A'
+        channel: 'A',
+        duration: 2
     }
 ].map(file => ({
     ...file,
@@ -118,7 +128,7 @@ export class DemoAPI {
      * Mock /list-directories endpoint
      */
     static async listDirectories(data) {
-        const { currentPath = '' } = data;
+        const currentPath = data.path ?? data.currentPath ?? '';
 
         // Root level - show test-data
         if (!currentPath || currentPath === '') {
@@ -171,7 +181,10 @@ export class DemoAPI {
      * Mock /scan endpoint
      */
     static async scan(data) {
-        const { channels = ['A', 'B'], startTime, endTime } = data;
+        const { channels = ['A'], startTime, endTime } = data;
+        if (!Array.isArray(channels) || channels.length !== 1 || !['A', 'B'].includes(channels[0])) {
+            throw new Error('Select exactly one camera channel (A or B)');
+        }
 
         // Filter files by channel
         let files = MOCK_VIDEO_FILES.filter(file => {
@@ -198,7 +211,7 @@ export class DemoAPI {
     /**
      * Mock /export endpoint - always fails in demo mode
      */
-    static async export(data) {
+    static async export(_data) {
         throw new Error('Video export is disabled in demo mode. Download the full application to use this feature.');
     }
 

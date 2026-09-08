@@ -3,18 +3,6 @@
 const fs = require('fs');
 const path = require('path');
 
-const rootDir = path.join(__dirname, '..');
-const resourceDir = path.join(rootDir, 'src-tauri', 'resources');
-const includeDemoVideos = process.argv.includes('--include-demo-videos');
-
-const copies = [
-    ['public', 'public'],
-];
-
-if (includeDemoVideos) {
-    copies.push(['test-data', 'test-data']);
-}
-
 function copyDirectory(sourceDir, targetDir) {
     if (!fs.existsSync(sourceDir)) {
         throw new Error(`Missing resource source: ${sourceDir}`);
@@ -25,13 +13,25 @@ function copyDirectory(sourceDir, targetDir) {
     fs.cpSync(sourceDir, targetDir, { recursive: true });
 }
 
-for (const [source, target] of copies) {
-    const sourceDir = path.join(rootDir, source);
-    const targetDir = path.join(resourceDir, target);
-    copyDirectory(sourceDir, targetDir);
-    console.log(`Copied ${source} -> ${path.relative(rootDir, targetDir)}`);
+function copyResources({rootDir = path.join(__dirname, '..'), includeDemoVideos = false} = {}) {
+    const resourceDir = path.join(rootDir, 'src-tauri', 'resources');
+    const copies = [
+        ['public', 'public'],
+        ['LICENSE', 'licenses/PROJECT-LICENSE.txt'],
+        ['THIRD_PARTY_NOTICES.md', 'licenses/THIRD_PARTY_NOTICES.md'],
+    ];
+    if (includeDemoVideos) copies.push(['test-data', 'test-data']);
+    for (const [source, target] of copies) {
+        copyDirectory(path.join(rootDir, source), path.join(resourceDir, target));
+        console.log(`Copied ${source} -> ${target}`);
+    }
+    if (!includeDemoVideos) {
+        fs.rmSync(path.join(resourceDir, 'test-data'), { recursive: true, force: true });
+    }
 }
 
-if (!includeDemoVideos) {
-    fs.rmSync(path.join(resourceDir, 'test-data'), { recursive: true, force: true });
+if (require.main === module) {
+    copyResources({includeDemoVideos: process.argv.includes('--include-demo-videos')});
 }
+
+module.exports = {copyResources};

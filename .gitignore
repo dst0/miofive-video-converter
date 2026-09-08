@@ -18,3 +18,5 @@ src-tauri/binaries/miofive-server-*
 src-tauri/gen/
 src-tauri/resources/
 vendor/ffmpeg/
+output/playwright/
+user_updates.md

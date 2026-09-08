@@ -1,5 +1,8 @@
 # Implementation Summary: Dual-Player Architecture
 
+> [!WARNING]
+> **Historical Summary (Non-Current):** This point-in-time summary reflects PR #14. References to `player.html` describe earlier prototype filenames; UI logic resides in [`public/index.html`](public/index.html). For canonical specifications, see [`docs/architecture.md`](docs/architecture.md) and [`README.md`](README.md).
+
 ## ✅ All Requirements Met
 
 ### 1. Dual-Player Architecture

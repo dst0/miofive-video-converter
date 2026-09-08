@@ -50,8 +50,15 @@ test.describe('Video Player - Screenshot Feature', () => {
     // Wait for player to be ready
     await expect(page.locator('#playerScreen')).toBeVisible();
     
-    // Wait a bit but don't wait for video to load (it might not load in test environment)
-    await page.waitForTimeout(500);
+    // Force a deterministic HAVE_NOTHING state instead of racing the media decoder.
+    await page.evaluate(() => {
+      for (const video of document.querySelectorAll('video')) {
+        video.pause();
+        video.querySelector('source')?.removeAttribute('src');
+        video.removeAttribute('src');
+        video.load();
+      }
+    });
     
     // Click screenshot button - should show "Video not ready" message
     await page.locator('#screenshotBtn').click();

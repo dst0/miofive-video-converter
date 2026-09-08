@@ -1,5 +1,8 @@
 # Visual Guide: Dual-Player Architecture
 
+> [!WARNING]
+> **Historical Design Note (Non-Current):** This visual guide illustrates initial UI mockups from PR #14. It is preserved for reference and does NOT represent current production layout or verification evidence. For canonical contracts, see [`docs/architecture.md`](docs/architecture.md).
+
 ## System Architecture
 
 ```

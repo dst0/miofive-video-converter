@@ -1,5 +1,8 @@
 # MP4 Duration Extraction - Pure JavaScript Implementation
 
+> [!WARNING]
+> **Historical Design Note (Non-Current):** This document describes an early prototype parser reading a fixed 1MB buffer. The active canonical runtime contract in [`docs/architecture.md:43-44`](docs/architecture.md) and [`index.js`](index.js) uses random-access atom traversal (supporting 32-bit, 64-bit, and EOF box sizes up to 4,096 atoms) with `ffprobe` fallback to ensure trailing `moov` atoms are reliably found.
+
 ## Overview
 
 This document describes the ultra-fast pure JavaScript MP4 duration extraction implementation that replaced the original ffprobe-based approach.

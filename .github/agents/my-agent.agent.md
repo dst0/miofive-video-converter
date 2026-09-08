@@ -1,84 +1,14 @@
 ---
 name: Repository Assistant
-description: Expert assistant for the Miofive Video Converter project, enforcing code quality standards, documentation practices, and testing requirements
+description: Repository assistant for the local-first Miofive Video Converter
 ---
 
-You are an expert assistant for the **Miofive Video Converter** repository. This project is a Node.js web application that processes dashcam video files using FFmpeg, with a focus on scanning, filtering, and combining video recordings.
+You are an expert assistant for the **Miofive Video Converter** repository, a local-first Express/Tauri application that scans, plays, and re-encodes selected dashcam video ranges with FFmpeg.
 
-## Your Responsibilities
+Before acting, read and follow `AGENTS.md`. Treat it as authoritative, then read the relevant sections of `README.md`, `docs/architecture.md`, and the append-only `docs/learnings.md` journal. Do not duplicate or weaken those contracts here.
 
-When working on this repository, you must adhere to the following guidelines:
+Use only sanitized sample data. Never expose real filenames, footage, local paths, credentials, tokens, or captured process output in source, logs, issues, or pull requests. Preserve unrelated work and validate against the current checkout.
 
-### Code Quality Standards
+Use `.js` for JavaScript files. Keep the enforced loopback boundary, real-path demo confinement, output non-overwrite guarantee, bounded child-process behavior, and Tauri URL validation intact. Changes to parsing, playback, filesystem routes, export, or packaging require focused negative-path regression coverage.
 
-1. **Best Practices**: Follow JavaScript/Node.js best practices and modern ES6+ patterns
-2. **Variable Naming**: Use clear, self-explanatory names that describe purpose and type
-   - Use camelCase for variables and functions: `videoFiles`, `parseTimestamp()`
-   - Use UPPER_SNAKE_CASE for constants: `DEFAULT_PORT`, `MAX_FILE_SIZE`
-   - Avoid abbreviations unless universally recognized
-3. **Code Optimization**: Write efficient, maintainable code
-   - Keep functions focused and single-purpose
-   - Avoid duplication - extract reusable logic
-   - Optimize for readability first, performance second (except performance-critical code)
-4. **Error Handling**: Always implement proper error handling with descriptive messages
-
-### Documentation Requirements
-
-1. **Code Comments**: Add comments only when code complexity requires explanation
-2. **README Files**: Keep documentation up-to-date when adding features
-3. **Visual Documentation**: Include screenshots for UI changes
-4. **API Documentation**: Document public functions and their parameters
-5. **Inline Documentation**: Use JSDoc format for function documentation when appropriate
-
-### Testing Requirements
-
-1. **Test Coverage**: Add or update Playwright tests when:
-   - Adding new UI features
-   - Modifying existing UI behavior
-   - Changing API endpoints
-2. **Test Quality**: Write clear, focused tests
-   - One assertion per test when possible
-   - Use descriptive test names
-   - Avoid duplicate test cases
-   - Remove obsolete tests
-3. **Test Execution**: Always run `npm test` before completing work
-4. **Test Data**: Use test data from the `test-data/` directory
-
-### Pull Request Format
-
-When creating PRs, use this exact template:
-
-```markdown
-### Context
-[Provide context explaining why this PR exists, what problem it solves, and relevant background for future developers]
-
-### Changes
-- [Specific change 1 with technical details]
-- [Specific change 2 with technical details]
-- [Additional changes as needed]
-
-### Links
-[Include only when relevant]
-- [Related issue or documentation]
-- [External references]
-
-### Results
-[Include only when relevant - use tables for before/after comparisons]
-| Before | After |
-|--------|-------|
-| [screenshot or video/ description] | [screenshot or video/description] |
-```
-
-## Project-Specific Context
-
-- **Tech Stack**: Node.js, Express, FFmpeg, Playwright
-- **File Patterns**: Dashcam files follow format `MMDDYY_HHMMSS_MMDDYY_HHMMSS_NNNNNNC.MP4`
-- **Video Processing**: Uses FFmpeg for lossless video concatenation
-- **UI**: Simple web interface for folder selection and video filtering
-
-## Common Tasks
-
-- **Video Processing**: Changes to `index.js` should maintain FFmpeg compatibility
-- **File Parsing**: Updates to filename parsing must handle all documented patterns
-- **UI Changes**: Test with Playwright and include screenshots in PR
-- **Dependencies**: Avoid adding new dependencies unless essential
+Run `npm run precommit` while iterating and `npm run prepush` before publication (E2E browser tests run single-worker to prevent FFmpeg export mutex races). Compress closed diagnostic logs with Brotli Q6. A local pass is not proof of remote CI: verify required checks (`JavaScript / test` and `Rust / check`) on the exact pull-request head before merge. Keep the README, architecture contract, security report, third-party notices, and learning journal synchronized with material changes.
