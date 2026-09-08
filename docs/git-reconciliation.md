@@ -38,3 +38,22 @@ Dependency evidence: [package.json](../package.json), [package-lock.json](../pac
 The useful intent of these six PRs is represented by the reviewed baseline; blind merges would reintroduce older implementations or dependency trees. They are candidates to close as superseded **after replacement acceptance** and a fresh head/state check. This reconciliation performed no PR closure, merge, branch deletion or worktree pruning, and ran no new tests. Validation results belong to [the dated product review](product-review.md) and exact-head CI.
 
 This is a bounded six-PR comparison, not certification that every historical or missing worktree was recovered. Active task checkouts and user-owned primary-worktree files are not cleanup candidates.
+
+## 2026-09-08 reconciliation addendum
+
+- **PR #45 merged:** PR #45 (`Improve local conversion reliability and desktop installation`) merged into `main` at commit `7670dfd8be6dccb73d62d811fb0f25d5b508c563` on 2026-09-08.
+- **Historical PRs closed:** Following replacement acceptance, the six historical PRs superseded by #45 have now been closed on GitHub:
+  - [#35](https://github.com/dst0/miofive-video-converter/pull/35) (`copilot/fix-player-playback-error`) — CLOSED
+  - [#37](https://github.com/dst0/miofive-video-converter/pull/37) (`copilot/add-demo-video-duration`) — CLOSED
+  - [#38](https://github.com/dst0/miofive-video-converter/pull/38) (`copilot/adjust-dual-player-pause-behavior`) — CLOSED
+  - [#42](https://github.com/dst0/miofive-video-converter/pull/42) (`dependabot/npm_and_yarn/body-parser-1.20.6`) — CLOSED
+  - [#43](https://github.com/dst0/miofive-video-converter/pull/43) (`dependabot/npm_and_yarn/multi-fe93483a4d`) — CLOSED
+  - [#44](https://github.com/dst0/miofive-video-converter/pull/44) (`dependabot/npm_and_yarn/tar-7.5.22`) — CLOSED
+- **Remote branches deleted:** The remote branches corresponding to those six closed PRs along with all orphan remote tracking branches were deleted from `origin`.
+- **Current remote state:** Remote `origin` now retains only `origin/main` and the five active post-merge Dependabot branches:
+  - `dependabot/cargo/src-tauri/libc-0.2.189` (PR #46)
+  - `dependabot/cargo/src-tauri/tauri-plugin-shell-2.3.6` (PR #47)
+  - `dependabot/cargo/src-tauri/tauri-build-2.6.3` (PR #48)
+  - `dependabot/cargo/src-tauri/serde_json-1.0.151` (PR #49)
+  - `dependabot/npm_and_yarn/development-dependencies-c2f163ec78` (PR #50)
+- **Consolidation disposition:** Branch `codex/dependency-review-20260908` consolidates approved PRs #46-#50 into a single reviewed dependency update. Active PRs #46-#50 remain open until merge of this consolidated pull request and will be superseded only after merge.

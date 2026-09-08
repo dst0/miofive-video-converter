@@ -103,6 +103,32 @@ The new deferred-route tests failed **3/3** against exact prior head `a8d3420178
 
 Final literal `npm run prepush` **passed**, exit 0 in **229.47 seconds**: lint, **79 unit tests**, license metadata checks, **179 Playwright tests** with one worker and zero retries, Rust formatting/Clippy with warnings denied and **one Rust test**. This is source and browser evidence for the changed frontend bytes. Earlier package/install/native-GUI evidence remains historical and is not re-labelled as proof of a newly built signed application. Exact-head hosted CI, CodeQL annotations and PR merge state are refreshed separately after push.
 
+## 2026-09-08 consolidated dependency follow-up
+
+Following the merge of PR #45 at commit `7670dfd8be6dccb73d62d811fb0f25d5b508c563`, five post-merge Dependabot dependency updates were consolidated into a single reviewed follow-up branch (`codex/dependency-review-20260908`). Rather than running local package update commands that risk resolver drift, the exact patch union of the five approved Dependabot commits was applied via `git cherry-pick --no-commit`.
+
+### Exact dependency versions
+
+- **Rust / Cargo (`src-tauri/Cargo.lock`):**
+  - `libc`: 0.2.186 → 0.2.189 (PR #46, commit `9047e4901b095b9caf43cb62a8ad797cdd9f45da`)
+  - `tauri-plugin-shell`: 2.3.5 → 2.3.6 (PR #47, commit `6524560446312c8d0ac921c1a0e6b6ce4a528090`)
+  - `tauri-build`: 2.6.2 → 2.6.3 and transitive `tauri-utils`: 2.9.2 → 2.9.3 (PR #48, commit `0375376251ed6ff857683b01765c9ec9e9eb854d`)
+  - `serde_json`: 1.0.150 → 1.0.151 (PR #49, commit `0bd962bccc2b87c384508df4021fea5cb117f50d`)
+- **JavaScript / npm (`package.json`, `package-lock.json`):**
+  - `@playwright/test`: 1.62.1 → 1.63.0 (PR #50, commit `a1e5741d4be2bd01d6546975452494f447e7e3a8`)
+  - `eslint`: 10.9.1 → 10.10.0 (PR #50, commit `a1e5741d4be2bd01d6546975452494f447e7e3a8`)
+  - Associated dev-dependency lockfile resolutions updated identically to PR #50 without collateral resolver drift.
+
+### Honest target scope and verification
+
+- **Scope boundaries:** Pure dependency maintenance only. Zero runtime features added; no `.mjs` files introduced; `.github/dependabot.yml` unchanged.
+- **Lockfile stability:** `npm ci --ignore-scripts` executed cleanly without mutating lockfiles; SHA-256 digests of `package.json`, `package-lock.json`, and `src-tauri/Cargo.lock` remained identical before and after installation.
+- **Security audits:**
+  - `npm audit --audit-level=high`: Exited 0 with **0 vulnerabilities**.
+  - `cargo audit --file src-tauri/Cargo.lock`: Exited 0 with **0 vulnerability advisories** and 17 allowed warnings (16 unmaintained, 1 unsoundness). Truthfully recorded the known `glib` advisory (`RUSTSEC-2024-0429`: unsoundness in `VariantStrIter` implementation), which belongs exclusively to the Linux GTK/WebKitGTK target dependency tree and is neither linked nor executed in the macOS desktop application or Node backend. The warning is neither suppressed nor dismissed.
+- **Prepush gate:** Literal `npm run prepush` validation passed with exit 0 in **592.57 seconds** on Node 26.5.0: ESLint passed, **79 unit tests** passed, license metadata checks passed (307 npm / 458 Cargo entries), **179 Playwright tests** passed (single worker, zero retries), Rust formatting and Clippy passed with warnings denied, and **one Rust test** passed.
+- **Git diff cleanliness:** `git diff --check` passed cleanly with 0 errors.
+
 ## Current boundaries
 
 - The product is single-user and loopback-only. No remote deployment, authentication service, telemetry or upload feature is introduced.
