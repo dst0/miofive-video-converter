@@ -128,15 +128,15 @@ test.describe('Demo API Mock Module Tests', () => {
 
     test('DemoAPI.scan() should include duration property for all files', async ({ page }) => {
         await page.goto('/');
-        
+
         const result = await page.evaluate(async () => {
             const module = await import('/demo-api-mock.js');
-            return await module.DemoAPI.scan({ 
+            return await module.DemoAPI.scan({
                 folderPath: 'test-data/Normal',
                 channels: ['A']
             });
         });
-        
+
         expect(result.files).toHaveLength(10);
         // Every file should have a duration property
         expect(result.files.every(f => Object.hasOwn(f, 'duration'))).toBe(true);

@@ -851,4 +851,199 @@ test.describe('Frontend Correctness & Regression Suite', () => {
         // The caller's array must preserve its initial order (000003A first)
         expect(originalFirstFile).toBe('010125_100200_010125_050200_000003A.MP4');
     });
+
+    function createCheckFfmpegGate() {
+        let releaseCheckFfmpeg;
+        const checkFfmpegGate = new Promise((resolve) => {
+            releaseCheckFfmpeg = resolve;
+        });
+        return {
+            promise: checkFfmpegGate,
+            release: () => releaseCheckFfmpeg?.(),
+        };
+    }
+
+    async function setupFfmpegScenario(page, gate, checkFfmpegHandler) {
+        await page.route('**/check-ffmpeg', async (route) => {
+            try {
+                await gate.promise;
+                if (typeof checkFfmpegHandler === 'function') {
+                    await checkFfmpegHandler(route);
+                } else if (checkFfmpegHandler === 'abort') {
+                    await route.abort('failed');
+                } else {
+                    await route.fulfill({
+                        status: 200,
+                        contentType: 'application/json',
+                        body: JSON.stringify(checkFfmpegHandler),
+                    });
+                }
+            } catch {
+                // Route may be closed during test teardown
+            }
+        });
+
+        await page.route('**/scan', async (route) => {
+            await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                    count: 1,
+                    files: [
+                        {
+                            filename: '010125_100000_010125_050000_000001A.MP4',
+                            path: '/mock/000001A.MP4',
+                            utcTime: '2025-01-01T10:00:00.000Z',
+                            duration: 60,
+                            fileType: 'Normal',
+                            channel: 'A',
+                        },
+                    ],
+                }),
+            });
+        });
+
+        await page.goto('/');
+        await page.locator('#folderPath').fill('/mock/videos');
+        await page.locator('#scanBtn').click();
+
+        return {
+            exportSelectedBtn: page.locator('#exportSelectedBtn'),
+            exportVideosBtn: page.locator('#exportVideosBtn'),
+            playVideosBtn: page.locator('#playVideosBtn'),
+        };
+    }
+
+    function parseRgb(rgbStr) {
+        const match = rgbStr.match(/\d+/g);
+        return match ? match.slice(0, 3).map(Number) : [0, 0, 0];
+    }
+
+    function getLuminance(rgb) {
+        const a = rgb.map((v) => {
+            const s = v / 255;
+            return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
+        });
+        return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
+    }
+
+    function getContrastRatio(rgb1, rgb2) {
+        const l1 = getLuminance(rgb1);
+        const l2 = getLuminance(rgb2);
+        return (Math.max(l1, l2) + 0.05) / (Math.min(l1, l2) + 0.05);
+    }
+
+    async function expectDisabledPlayerExportButton(button, expectedExplanation = 'Export requires FFmpeg and FFprobe') {
+        await expect(button).toBeDisabled();
+        expect(await button.getAttribute('title')).toBe(expectedExplanation);
+        const ariaLabel = await button.getAttribute('aria-label');
+        expect(ariaLabel).toContain(expectedExplanation);
+        await button.hover();
+        await expect(button).toHaveCSS('cursor', 'not-allowed');
+        await expect(button).toHaveCSS('background-color', 'rgb(204, 204, 204)');
+        const styles = await button.evaluate((el) => {
+            const computed = window.getComputedStyle(el);
+            return {
+                backgroundColor: computed.backgroundColor,
+                color: computed.color,
+                cursor: computed.cursor,
+            };
+        });
+        expect(styles.cursor).toBe('not-allowed');
+        expect(styles.backgroundColor).not.toBe('rgb(33, 136, 56)');
+        expect(styles.backgroundColor).toBe('rgb(204, 204, 204)');
+        expect(styles.color).toBe('rgb(33, 37, 41)');
+        expect(getContrastRatio(parseRgb(styles.color), parseRgb(styles.backgroundColor))).toBeGreaterThanOrEqual(4.5);
+    }
+
+    async function expectDisabledReviewExportButton(button, expectedExplanation = 'Export requires FFmpeg and FFprobe') {
+        await expect(button).toBeDisabled();
+        expect(await button.getAttribute('title')).toBe(expectedExplanation);
+    }
+
+    test('both export controls are disabled while /check-ffmpeg is pending and enable after available: true', async ({ page }) => {
+        const gate = createCheckFfmpegGate();
+        try {
+            const scenario = await setupFfmpegScenario(page, gate, { available: true });
+
+            await expect(scenario.exportSelectedBtn).toBeVisible();
+            await expectDisabledReviewExportButton(scenario.exportSelectedBtn);
+            await expect(scenario.playVideosBtn).toBeEnabled();
+
+            // Play must remain available while capability check is pending
+            await scenario.playVideosBtn.click();
+            await expect(page.locator('#playerScreen')).toBeVisible();
+            await expect(scenario.exportVideosBtn).toBeVisible();
+            await expectDisabledPlayerExportButton(scenario.exportVideosBtn);
+
+            gate.release();
+
+            // Both export controls enable once available: true resolves
+            await expect(scenario.exportVideosBtn).toBeEnabled();
+            expect(await scenario.exportVideosBtn.getAttribute('title')).toBeNull();
+            expect(await scenario.exportVideosBtn.getAttribute('aria-label')).toBe('Export Videos');
+            await scenario.exportVideosBtn.hover();
+            await expect(scenario.exportVideosBtn).toHaveCSS('background-color', 'rgb(33, 136, 56)');
+            await expect(scenario.exportVideosBtn).toHaveCSS('cursor', 'pointer');
+
+            await page.locator('#backBtn').click();
+            await expect(page.locator('#playerScreen')).toBeHidden();
+            await expect(scenario.exportSelectedBtn).toBeVisible();
+            await expect(scenario.exportSelectedBtn).toBeEnabled();
+            expect(await scenario.exportSelectedBtn.getAttribute('title')).toBeNull();
+            await expect(page.locator('#ffmpegWarning')).toBeEmpty();
+        } finally {
+            gate.release();
+        }
+    });
+
+    test('both export controls remain disabled and warning is displayed when /check-ffmpeg resolves unavailable', async ({ page }) => {
+        const gate = createCheckFfmpegGate();
+        try {
+            const scenario = await setupFfmpegScenario(page, gate, { available: false });
+
+            await expect(scenario.exportSelectedBtn).toBeVisible();
+            await expect(scenario.playVideosBtn).toBeEnabled();
+
+            gate.release();
+
+            await expectDisabledReviewExportButton(scenario.exportSelectedBtn);
+            const warning = page.locator('#ffmpegWarning');
+            await expect(warning).toBeVisible();
+            await expect(warning).toContainText('FFmpeg is not available');
+
+            // Play must remain available even when FFmpeg is unavailable
+            await scenario.playVideosBtn.click();
+            await expect(page.locator('#playerScreen')).toBeVisible();
+            await expect(scenario.exportVideosBtn).toBeVisible();
+            await expectDisabledPlayerExportButton(scenario.exportVideosBtn);
+        } finally {
+            gate.release();
+        }
+    });
+
+    test('both export controls remain disabled and warning is displayed when /check-ffmpeg request fails', async ({ page }) => {
+        const gate = createCheckFfmpegGate();
+        try {
+            const scenario = await setupFfmpegScenario(page, gate, 'abort');
+
+            await expect(scenario.exportSelectedBtn).toBeVisible();
+            await expect(scenario.playVideosBtn).toBeEnabled();
+
+            gate.release();
+
+            await expectDisabledReviewExportButton(scenario.exportSelectedBtn);
+            const warning = page.locator('#ffmpegWarning');
+            await expect(warning).toBeVisible();
+            await expect(warning).toContainText('FFmpeg is not available');
+
+            // Play must remain available even when FFmpeg check fails
+            await scenario.playVideosBtn.click();
+            await expect(page.locator('#playerScreen')).toBeVisible();
+            await expect(scenario.exportVideosBtn).toBeVisible();
+            await expectDisabledPlayerExportButton(scenario.exportVideosBtn);
+        } finally {
+            gate.release();
+        }
+    });
 });

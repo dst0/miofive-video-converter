@@ -56,8 +56,14 @@
     white-space: nowrap;
 }
 
-.export-btn:hover {
+.export-btn:hover:not(:disabled) {
     background: #218838;
+}
+
+.export-btn:disabled {
+    background: #ccc;
+    color: #212529;
+    cursor: not-allowed;
 }
 
 .back-btn {

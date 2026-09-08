@@ -4,7 +4,7 @@ import { setupDemoMode, isGitHubPages } from './demo-api-mock.js';
 import {escapeHtml, safeClassToken, safeStorage as localStorage} from './security.js';
 
 let scannedFiles = [];
-let ffmpegAvailable = true;
+let ffmpegAvailable = false;
 let timelineData = null;
 let demoMode = false;
 let demoPath = null;
@@ -16,6 +16,41 @@ let scanRequestController = null;
 let scanRequestGeneration = 0;
 
 let isAppInitialized = false;
+
+const EXPORT_REQUIREMENT_EXPLANATION = 'Export requires FFmpeg and FFprobe';
+const FFMPEG_UNAVAILABLE_WARNING_HTML = `
+          <div class="warning">
+            <strong>FFmpeg is not available.</strong><br>
+            Export needs FFmpeg and FFprobe from a bundled redistributable build, MIOFIVE_FFMPEG_PATH/MIOFIVE_FFPROBE_PATH, Homebrew paths, or PATH.
+          </div>`;
+
+function updateFfmpegAvailability(available) {
+    ffmpegAvailable = Boolean(available);
+    const exportSelectedBtn = document.getElementById('exportSelectedBtn');
+    if (exportSelectedBtn) {
+        exportSelectedBtn.disabled = !ffmpegAvailable;
+        if (ffmpegAvailable) {
+            exportSelectedBtn.removeAttribute('title');
+        } else {
+            exportSelectedBtn.title = EXPORT_REQUIREMENT_EXPLANATION;
+        }
+    }
+    const exportVideosBtn = document.getElementById('exportVideosBtn');
+    if (exportVideosBtn) {
+        exportVideosBtn.disabled = !ffmpegAvailable;
+        if (ffmpegAvailable) {
+            exportVideosBtn.removeAttribute('title');
+            exportVideosBtn.setAttribute('aria-label', 'Export Videos');
+        } else {
+            exportVideosBtn.title = EXPORT_REQUIREMENT_EXPLANATION;
+            exportVideosBtn.setAttribute('aria-label', `Export Videos (${EXPORT_REQUIREMENT_EXPLANATION})`);
+        }
+    }
+    const warningEl = document.getElementById('ffmpegWarning');
+    if (warningEl) {
+        warningEl.innerHTML = ffmpegAvailable ? '' : FFMPEG_UNAVAILABLE_WARNING_HTML;
+    }
+}
 
 function initApp() {
     if (isAppInitialized) return;
@@ -89,17 +124,10 @@ function initApp() {
     fetch('/check-ffmpeg')
         .then((r) => (r.ok ? r.json() : { available: false }))
         .then((data) => {
-            ffmpegAvailable = data.available;
-            if (!ffmpegAvailable) {
-                document.getElementById('ffmpegWarning').innerHTML = `
-          <div class="warning">
-            <strong>FFmpeg is not available.</strong><br>
-            Export needs FFmpeg and FFprobe from a bundled redistributable build, MIOFIVE_FFMPEG_PATH/MIOFIVE_FFPROBE_PATH, Homebrew paths, or PATH.
-          </div>`;
-            }
+            updateFfmpegAvailability(Boolean(data && data.available));
         })
         .catch(() => {
-            ffmpegAvailable = false;
+            updateFfmpegAvailability(false);
         });
 
     document.getElementById('scanBtn').addEventListener('click', scanFolder);
@@ -1183,7 +1211,7 @@ async function scanFolder() {
           <div class="input-group button-group">
             <button class="play-button" id="playVideosBtn">▶ Play Videos</button>
             <button class="secondary" id="exportSelectedBtn" ${
-                !ffmpegAvailable ? 'disabled' : ''
+                !ffmpegAvailable ? `disabled title="${EXPORT_REQUIREMENT_EXPLANATION}"` : ''
             }>💾 Export Videos</button>
           </div>
         </div>
@@ -1246,6 +1274,7 @@ function playVideos() {
 }
 
 function exportSelectedVideos() {
+    if (!ffmpegAvailable) return;
     const selectedFiles = getSelectedVisibleFiles();
 
     if (selectedFiles.length === 0) {

@@ -160,7 +160,13 @@
             <div class="player-header">
                 <h1 id="playerTitle">Video Player</h1>
                 <div class="player-header-buttons">
-                    <button id="exportVideosBtn" class="export-btn">
+                    <button
+                        id="exportVideosBtn"
+                        class="export-btn"
+                        disabled
+                        title="Export requires FFmpeg and FFprobe"
+                        aria-label="Export Videos (Export requires FFmpeg and FFprobe)"
+                    >
                         💾 Export Videos
                     </button>
                     <button id="backBtn" class="back-btn">

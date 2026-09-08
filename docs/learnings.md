@@ -808,3 +808,48 @@ Sanitize all evidence and never include credentials, tokens, private keys, custo
 - **Prevention/follow-up:** Run containing gates after delegated unit checks, preserve nearest caught causes and use explicit object-identity assertions for combined failures.
 - **Reusable learning:** Ignored by Git is not ignored by tooling; a passing focused test is not a passing delivery gate.
 - **References:** `scripts/install-mac-app.js`, `tests/unit/installer.test.js`, `eslint.config.js`
+
+### 2026-09-08 — Export button availability and usability must synchronize with pending and completed FFmpeg checks across review and player screens
+
+- **Status:** Resolved
+- **Task/context:** Practical reliability hardening in `public/app.js`, `public/index.html`, `public/player-styles.css`, and regression test suite in `tests/frontend-regressions.spec.js` for FFmpeg availability and disabled button usability across dynamic review (`#exportSelectedBtn`) and static player (`#exportVideosBtn`) controls while preserving player functionality.
+- **Unexpected observation or failure:**
+  1. When scanning completes while the asynchronous `/check-ffmpeg` request is still pending, the UI optimistically rendered dynamic `#exportSelectedBtn` enabled, and the static `#exportVideosBtn` on `#playerScreen` was statically enabled in `public/index.html`. If the subsequent `/check-ffmpeg` response resolved to unavailable (`available: false`) or failed with a network/abort error, `#exportVideosBtn` remained permanently enabled, dynamic `#exportSelectedBtn` was not updated on already-scanned results, and fetch failures never displayed actionable FFmpeg warning guidance.
+  2. In an adversarial usability follow-up review, two UX gaps were proven in disabled `#exportVideosBtn`:
+     - In `public/player-styles.css`, `.export-btn:hover` had greater specificity and loaded later than generic `button:disabled`, causing a disabled `#exportVideosBtn` to turn active green (`rgb(33, 136, 56)`) on hover, and its white text on `#ccc` had poor contrast (~1.6:1, well below WCAG AA 4.5:1; `#666` text would also fail at ~3.58:1).
+     - The disabled player export button did not explain export requirements because `#ffmpegWarning` resides on the hidden `mainScreen` during playback.
+- **Evidence:**
+  - Initial red evidence: Playwright regression tests holding `/check-ffmpeg` with a deferred gate failed against uncorrected code: `expect(locator).toBeDisabled()` failed for `locator('#exportVideosBtn')` (received enabled, unexpected value "enabled") across pending, unavailable, and failed network abort scenarios.
+  - Follow-up red evidence on candidate before CSS/markup fixes:
+    - Missing explanation: `expect(await button.getAttribute('title')).toBe('Export requires FFmpeg and FFprobe')` failed (received `null`).
+    - Hover styling regression: hovering disabled `#exportVideosBtn` produced `backgroundColor: "rgb(33, 136, 56)"` (expected `rgb(204, 204, 204)`).
+    - Contrast failure: `styles.color` was `rgb(255, 255, 255)` against `rgb(204, 204, 204)` background, giving contrast ratio 1.6:1 (< 4.5:1).
+- **Approaches tried:**
+  - **Attempt:** Rely on initial optimistic boolean state and trigger synchronization only on subsequent scans.
+    - **Outcome:** Did not work
+    - **Why:** Already-rendered export controls in the DOM remained stale and clickable if the scan resolved before the backend check, error handlers did not populate the warning banner, and static player export buttons remained active.
+  - **Attempt:** Initialize FFmpeg availability as unavailable/pending (`ffmpegAvailable = false`), set static `#exportVideosBtn` to `disabled` in `public/index.html`, introduce a centralized `updateFfmpegAvailability` helper in `public/app.js` that synchronizes both `#exportSelectedBtn` and `#exportVideosBtn` alongside `#ffmpegWarning`, and retain the defensive `exportSelectedVideos` guard.
+    - **Outcome:** Worked for basic disability state, but left the two usability gaps (hover green bleed-through, low contrast white-on-gray, and missing player explanation).
+    - **Why:** Disabling the button without scoped CSS hover rules and without accessible tooltips/aria-labels left visual feedback misleading and screen reader / player context unexplained.
+  - **Attempt (Reviewer proposal):** Evaluated reviewer proposal to modify `player.js:isExportModalOpen` to check for `hidden` or `inert` when the folder browser is active.
+    - **Outcome:** Determined non-actionable; left `public/player.js` untouched
+    - **Why:** Real UI and keyboard testing demonstrated that `folder-browser.js` already stops immediate propagation for Tab and Escape events when active, `trapExportModalFocus` filters out inactive elements via `offsetParent !== null`, and modal dialog layering is coordinated cleanly through `dialog.js` without any user-visible regression.
+  - **Attempt (Adversarial UX Follow-up):** In `public/player-styles.css`, scope hover to `.export-btn:hover:not(:disabled)` and add explicit `.export-btn:disabled` with `background: #ccc; color: #212529; cursor: not-allowed;` (contrast ratio 9.6:1 >= 4.5:1). In `public/index.html`, add `title="Export requires FFmpeg and FFprobe"` and `aria-label="Export Videos (Export requires FFmpeg and FFprobe)"`. In `public/app.js`, update `updateFfmpegAvailability` and scan template to set and clear `title` and `aria-label` across `#exportVideosBtn` and `#exportSelectedBtn`.
+    - **Outcome:** Worked
+    - **Why:** Hovering over disabled export button retains neutral `#ccc` background, cursor is `not-allowed`, text contrast meets WCAG AA at 9.6:1, both sighted tooltips and assistive labels explain capability requirements across screens, and enabled state cleanly removes disabled title and restores `aria-label="Export Videos"`.
+- **Root cause:** `ffmpegAvailable` was initialized optimistically to `true`, the static `#exportVideosBtn` in `public/index.html` lacked the `disabled` attribute, button rendering lacked a unified synchronization hook to update all DOM export controls when `/check-ffmpeg` settled, `.export-btn:hover` had higher specificity than `button:disabled` without a `:not(:disabled)` guard, and player screen lacked local explanation of disabled export state because the warning banner was isolated in `#mainScreen`.
+- **Resolution:**
+  - Initialized `ffmpegAvailable` to `false` in `public/app.js`.
+  - Added `disabled`, `title="Export requires FFmpeg and FFprobe"`, and `aria-label="Export Videos (Export requires FFmpeg and FFprobe)"` to `#exportVideosBtn` in `public/index.html`.
+  - Scoped `.export-btn:hover:not(:disabled)` and added `.export-btn:disabled` (`background: #ccc; color: #212529; cursor: not-allowed;`) in `public/player-styles.css`.
+  - Extended `updateFfmpegAvailability` in `public/app.js` to synchronize `disabled`, `title`, and `aria-label` on `#exportVideosBtn` (restoring `aria-label="Export Videos"` and clearing `title` when enabled) and `#exportSelectedBtn`, and reflected disabled title in scan results template.
+  - Extended Playwright regression scenarios in `tests/frontend-regressions.spec.js` using `expectDisabledPlayerExportButton` and `expectDisabledReviewExportButton` without duplicated scaffolding, asserting disabled hover, cursor, contrast (>= 4.5:1 and exact reviewed colors), explanation attributes, and enabled restoration while keeping playback available.
+  - Cleaned whitespace in `tests/demo-api-mock.spec.js` and preserved it without functional changes.
+- **Verification:**
+  - Focused Playwright regression tests in `tests/frontend-regressions.spec.js` confirmed red failure against uncorrected code (missing title/aria-label explanation, hover turning green `rgb(33, 136, 56)`, text contrast failure) and green pass (3/3 passed) after fix.
+  - Full Playwright test suites across `frontend-regressions.spec.js` (17/17), `demo-api-mock.spec.js` (17/17), and `player.spec.js` (19/19) all passed (53/53 tests passed).
+  - ESLint passed with 0 errors (`eslint public/app.js tests/frontend-regressions.spec.js`).
+  - `git diff --check` passed cleanly with 0 whitespace or formatting errors.
+- **Prevention/follow-up:** Enforce deferred-gate route tests in `tests/frontend-regressions.spec.js` ensuring pending requests keep dependent actions disabled. Whenever styling buttons with class-based hover styles in modular stylesheets, always guard hover with `:hover:not(:disabled)` and define an explicit `:disabled` rule with verified WCAG AA contrast (>= 4.5:1) and `cursor: not-allowed`. Always provide self-contained explanations via `title` and `aria-label` when a control is disabled due to missing external capabilities.
+- **Reusable learning:** Treat asynchronous capability checks as unready until resolved; never optimistically enable dependent actions before confirmation, initialize static markup in a safe disabled state, ensure resolution handlers update all static and dynamic DOM controls, guard hover pseudo-classes with `:not(:disabled)`, and ensure disabled controls self-describe their state to sighted and assistive users.
+- **References:** `public/app.js`, `public/index.html`, `public/player-styles.css`, `tests/frontend-regressions.spec.js`, `tests/demo-api-mock.spec.js`
