@@ -929,3 +929,26 @@ Sanitize all evidence and never include credentials, tokens, private keys, custo
 - **Prevention/follow-up:** Treat a runner-image upgrade as a normal compatibility change: update the explicit label, run the complete validation matrix, and only then promote it. Revisit Ubuntu 26 in a dedicated PR after it is available and tested.
 - **Reusable learning:** A rolling runner alias is external mutable input; pin the reviewed image for reproducible CI and make upgrades explicit, test-backed source changes.
 - **References:** `.github/workflows/node.js.yml`, `.github/workflows/deploy-demo.yml`, post-merge CI run `35455006333`.
+
+### 2026-09-20 — Personal-repository branch protection must omit organization-only review restrictions
+
+- **Status:** Resolved
+- **Task/context:** Applying reviewed branch protection to `main` after the product-maintenance pull requests.
+- **Unexpected observation or failure:** The first GitHub API update request returned HTTP 422: “Only organization repositories can have users and team restrictions,” even though its dismissal-restrictions object was empty.
+- **Evidence:** The rejected request included `dismissal_restrictions: {}`. A follow-up request that omitted that organization-only field succeeded, and a readback reported strict required checks `JavaScript / test` and `Rust / check`, administrator enforcement, linear history, disabled force-push and deletion, and required conversation resolution.
+- **Approaches tried:**
+  - **Attempt:** Reuse an organization-capable protection payload with an empty `dismissal_restrictions` object.
+    - **Outcome:** Did not work
+    - **Why:** GitHub treats the field itself as an organization-only users-and-teams restriction, even when it is empty.
+  - **Attempt:** Leave `main` without enforced checks because the current maintenance PRs had already passed CI.
+    - **Outcome:** Rejected
+    - **Why:** Historical green CI does not protect future direct or unvalidated changes to the default branch.
+  - **Attempt:** Omit the organization-only field and require the stable JavaScript and Rust CI contexts with strict up-to-date status, while enforcing administrator participation, linear history, conversation resolution, and no force pushes or deletion.
+    - **Outcome:** Worked
+    - **Why:** The configuration is accepted for a personal repository and protects the checked product gates without pretending that non-required informational checks are merge blockers.
+- **Root cause:** GitHub’s branch-protection API shares fields across organization and personal repositories, but an empty organization-only restriction is not a no-op for a personal repository.
+- **Resolution:** Configured `main` with strict required `JavaScript / test` and `Rust / check` statuses, administrator enforcement, linear history, required conversation resolution, and disabled force-push and deletion; intentionally omitted organization-only dismissal restrictions.
+- **Verification:** Read the live protection configuration after the successful update and confirmed the required-check names against the successful maintenance PR checks. The exact PR head is also required to pass the configured CI checks before merge.
+- **Prevention/follow-up:** When applying repository protection, start from a personal-repository-compatible payload and read it back after every write. Add a new required context only after its exact display name and stable behavior are verified.
+- **Reusable learning:** An empty API field can still select an unsupported capability; omit organization-only protection fields for personal repositories and verify the effective policy, not just the write response.
+- **References:** GitHub branch-protection API; PRs #52, #53, and #54; `.github/workflows/node.js.yml`; `src-tauri/Cargo.toml`.
