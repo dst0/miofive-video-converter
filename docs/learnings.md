@@ -906,3 +906,26 @@ Sanitize all evidence and never include credentials, tokens, private keys, custo
 - **Prevention/follow-up:** Put stable behavioral contracts in active instructions and retain tool-specific facts, command names, and historical outcomes in dated learning entries. Future wrapper changes need a new append-only follow-up, not silent historical rewriting.
 - **Reusable learning:** A validation result is the completed command's real exit status, not partial output from any particular wrapper; make that invariant portable while preserving exact evidence of past tools and failures.
 - **References:** `AGENTS.md`, `docs/learnings.md`, preserved local worktrees from 2026-09-04/05.
+
+### 2026-09-20 — CI runner migrations must be explicit and validated
+
+- **Status:** Resolved
+- **Task/context:** Post-merge verification of the product-maintenance pull requests on the `main` branch.
+- **Unexpected observation or failure:** GitHub annotated the successful JavaScript CI job that the rolling `ubuntu-latest` label will migrate to Ubuntu 26 starting 2026-10-19. The same rolling label also ran the Pages deployment, so a host-image migration could alter validation or deployment behavior without a reviewed repository change.
+- **Evidence:** The exact post-merge CI run on `c9cfdd91e4002c3e42d7771f43601b9859b8ae11` emitted the Ubuntu 26 migration annotation for `.github/workflows/node.js.yml`; direct workflow inspection found `ubuntu-latest` in both the JavaScript test and Pages deployment jobs.
+- **Approaches tried:**
+  - **Attempt:** Keep `ubuntu-latest` and rely on the rolling-image migration.
+    - **Outcome:** Rejected
+    - **Why:** The operational change would not be isolated, reviewed, or tested as a deliberate compatibility update.
+  - **Attempt:** Move directly to Ubuntu 26 before the announced migration.
+    - **Outcome:** Rejected
+    - **Why:** The repository has no successful Ubuntu 26 evidence yet, so that would turn a future platform migration into an unreviewed guess.
+  - **Attempt:** Pin both Linux jobs to the currently validated `ubuntu-24.04` image and leave a future Ubuntu 26 migration for an explicit test-backed change.
+    - **Outcome:** Worked
+    - **Why:** The current behavior stays reproducible while the next host upgrade remains visible in version control and CI.
+- **Root cause:** A rolling GitHub-hosted runner label had been used where reproducible validation and deployment behavior are required.
+- **Resolution:** Replaced `ubuntu-latest` with `ubuntu-24.04` in the JavaScript CI and Pages deployment workflows.
+- **Verification:** The pre-change post-merge run passed on `c9cfdd91e4002c3e42d7771f43601b9859b8ae11` and exposed the annotation; workflow syntax, full repository validation, and the new exact-head remote CI are checked before publication.
+- **Prevention/follow-up:** Treat a runner-image upgrade as a normal compatibility change: update the explicit label, run the complete validation matrix, and only then promote it. Revisit Ubuntu 26 in a dedicated PR after it is available and tested.
+- **Reusable learning:** A rolling runner alias is external mutable input; pin the reviewed image for reproducible CI and make upgrades explicit, test-backed source changes.
+- **References:** `.github/workflows/node.js.yml`, `.github/workflows/deploy-demo.yml`, post-merge CI run `35455006333`.
