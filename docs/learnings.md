@@ -883,3 +883,26 @@ Sanitize all evidence and never include credentials, tokens, private keys, custo
 - **Prevention/follow-up:** When consolidating multiple concurrent Dependabot PRs based on the same parent commit, do not run `cargo update` to regenerate the Cargo lockfile. Instead, treat immediate post-merge Dependabot branches as current valid proposals and apply their exact reviewed commit patches via `git cherry-pick --no-commit`. Validate lockfile stability by verifying hashes across clean `npm ci --ignore-scripts`. Always report platform-specific security advisories (such as Linux-only `glib`) transparently rather than adding broad suppressions or mutating `.github/dependabot.yml`.
 - **Reusable learning:** When consolidating verified bot dependency updates, cherry-pick the exact patch union rather than running package-manager update commands that induce resolver drift; verify lockfile hash invariance after clean installation and report platform-scoped scanner warnings honestly without suppression.
 - **References:** Pull Requests #45, #46 (`9047e49`), #47 (`6524560`), #48 (`0375376`), #49 (`0bd962b`), #50 (`a1e5741`); `src-tauri/Cargo.lock`, `package.json`, `package-lock.json`, `docs/git-reconciliation.md`, `docs/product-review.md`.
+
+### 2026-09-20 — Operational instructions should describe validation contracts, not a retired wrapper
+
+- **Status:** Resolved
+- **Task/context:** Reconciling intentionally preserved local `AGENTS.md` and learning-journal changes with the current `main` branch after the full product review.
+- **Unexpected observation or failure:** The active agent instruction made successful long validation contingent on one historical `lean-ctx` command, but that executable is not available in the current environment. A second preserved worktree attempted to fix this by silently rewriting the 2026-09-05 learning entry from its documented `lean-ctx` evidence into generic language. The primary preserved journal was also only a 37-line template and would have discarded the append-only history in `main` if copied over.
+- **Evidence:** `command -v lean-ctx` returned no executable; `AGENTS.md` still named `lean-ctx -t 'npm run prepush'`; the preserved review-worktree diff removed that instruction and rewrote the historical entry; and the primary preserved `docs/learnings.md` contained no recorded entries while the tracked journal contains the dated review evidence.
+- **Approaches tried:**
+  - **Attempt:** Keep the tool-specific instruction unchanged.
+    - **Outcome:** Rejected
+    - **Why:** A missing wrapper must not make the project's validation contract impossible or tempt agents to treat partial captured output as success.
+  - **Attempt:** Copy the preserved journal or rewrite the historical 2026-09-05 entry to generic wording.
+    - **Outcome:** Rejected
+    - **Why:** The former loses durable review evidence, and the latter obscures a still-true record of the historical tool behavior instead of adding a transparent current correction.
+  - **Attempt:** Preserve the historical entry, replace only the active instruction with a tool-neutral direct-or-streaming/real-exit-status contract, and retain the useful detailed learning-capture guidance from the preserved policy.
+    - **Outcome:** Worked
+    - **Why:** The gate remains verifiable with any available execution mechanism while the journal remains append-only and factual.
+- **Root cause:** Operational policy had encoded one transient capture wrapper rather than the invariant it was intended to enforce.
+- **Resolution:** Generalized the active long-validation instruction; expanded the reusable-learning record requirements; added cross-session memory capture when such a tool is available; and preserved the existing journal unchanged except for this append-only entry.
+- **Verification:** Direct inspection confirmed the current environment lacks `lean-ctx`; the retained 2026-09-05 entry still documents its original evidence; the candidate diff is limited to `AGENTS.md` and this appended entry; and `git diff --check` is run before publication.
+- **Prevention/follow-up:** Put stable behavioral contracts in active instructions and retain tool-specific facts, command names, and historical outcomes in dated learning entries. Future wrapper changes need a new append-only follow-up, not silent historical rewriting.
+- **Reusable learning:** A validation result is the completed command's real exit status, not partial output from any particular wrapper; make that invariant portable while preserving exact evidence of past tools and failures.
+- **References:** `AGENTS.md`, `docs/learnings.md`, preserved local worktrees from 2026-09-04/05.
