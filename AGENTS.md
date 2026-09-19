@@ -8,7 +8,7 @@
 
 ## Long validation commands
 
-- If lean-ctx reports its 120-second capture limit, do not count pass-looking text as a successful gate. Use its streaming track mode (`lean-ctx -t 'npm run prepush'`) and require the real zero exit status; do not shorten or skip tests to fit the capture window.
+- Do not count pass-looking output from a bounded capture as a successful gate. Run long validation or build commands through a direct or streaming execution path, require the command's real zero exit status, and never shorten or skip the gate merely to fit a capture limit.
 - Run the release build and timing-sensitive process/browser gates sequentially on a shared workstation. If fixture startup or cleanup times out under build contention, preserve the failure and rerun the unchanged containing gate after the build; do not increase lifecycle deadlines just to make a loaded run green.
 - Inspect `git diff --cached --summary` as well as the text diff before committing: preserve executable bits on existing shebang entry points unless their removal is intentional and verified.
 - Mutex-release tests must send requests that pass all pre-mutex validation; an earlier validation error cannot prove admission or release. Cleanup may remove a temporary name only after exclusive creation actually established ownership.
@@ -20,8 +20,14 @@
 
 - Treat every resolved bug, regression, setup trap, operator mistake, failed experiment, and unexpected behavior as a learning opportunity, not only as a code change.
 - Before or while fixing an issue, preserve the observable symptom and decisive evidence. Once understood, record the root cause rather than only the final patch.
-- Record enough detail to make the learning reusable: what failed and why, attempted approaches and outcomes, unexpected constraints, the verified correction, and the regression prevention.
+- Record enough detail to make the learning reusable:
+  - what went wrong and why;
+  - which approaches were tried, including what worked, what did not work, and why;
+  - any unexpected constraints, side effects, or environmental differences;
+  - the correct path and how it was verified;
+  - the regression test, prevention rule, cleanup, or reset procedure that prevents recurrence.
 - Put durable guidance in the appropriate canonical repository document in the same change: use `AGENTS.md` for agent behavior, `README.md` for user or setup paths, and canonical architecture or product documentation for design and runtime contracts.
+- When a cross-session memory tool is available, save resolved bugs, architectural decisions, durable facts, and learned patterns so future sessions can retrieve them.
 - Do not leave important learnings only in chat, temporary notes, commit history, or a pull-request discussion.
 - If an issue exposes repeated agent friction, add the shortest durable instruction here that would have prevented it.
 - Keep learning records safe: never store credentials, tokens, private keys, customer data, or sensitive payloads; sanitize examples and evidence.
