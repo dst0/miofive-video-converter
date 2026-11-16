@@ -486,18 +486,18 @@ Sanitize all evidence and never include credentials, tokens, private keys, custo
 ### 2026-09-05 — Output capture limits are not validation results
 
 - **Status:** Resolved
-- **Task/context:** Running the literal pre-push gate and native packaging through lean-ctx.
+- **Task/context:** Running the literal pre-push gate and native packaging through bounded CLI capture.
 - **Unexpected observation or failure:** Compressed capture returned status 1 after printing passing suites or a completed bundle, with an explicit 120-second capture-limit marker.
 - **Evidence:** The first integrated run printed 155 passing browser tests and Rust success but ended with `output truncated at 8 MB / 120s limit`. A later 157-test streaming run returned a real status 0. Packaging exhibited the same capture boundary and was rerun in streaming mode.
 - **Approaches tried:**
   - **Attempt:** Use bounded compressed capture for the complete long gate.
     - **Outcome:** Did not work
     - **Why:** Its capture contract cannot represent a successful long-running command without truncation/failure.
-  - **Attempt:** Use lean-ctx streaming track mode and inspect the final exit status.
+  - **Attempt:** Use streaming/direct execution mode and inspect the final exit status.
     - **Outcome:** Worked
     - **Why:** The complete unchanged repository gate can finish without weakening tests or claiming success from partial text.
 - **Root cause:** A tool output limit was conflated with the underlying command's lifecycle.
-- **Resolution:** Use track mode for long validation/build commands, retain the actual exit result, and keep focused compressed commands for short feedback.
+- **Resolution:** Use direct or streaming execution for long validation/build commands, retain the actual exit result, and keep focused compressed commands for short feedback.
 - **Verification:** The literal 157-test pre-push gate completed with status 0 in streaming mode; the final post-review gate is recorded in `docs/product-review.md`.
 - **Prevention/follow-up:** Added the smallest command/exit-status rule to `AGENTS.md`. Active streams remain uncompressed; closed retained evidence uses Brotli Q6 where tooling permits.
 - **Reusable learning:** A wrapper's partial pass-looking output is not a successful gate; verify the command's completed status without changing the gate.
